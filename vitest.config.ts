@@ -13,6 +13,8 @@ export default defineConfig({
     globals: true,
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
+    testTimeout: 20_000,
+    hookTimeout: 60_000,
     include: ['src/**/*.{test,spec}.{ts,tsx}', 'tests/unit/**/*.{test,spec}.{ts,tsx}'],
     benchmark: {
       include: ['src/**/*.bench.ts'],

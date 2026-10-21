@@ -1,3 +1,8 @@
+allowBuilds:
+  # pnpm 12 blocks dependency build scripts by default. esbuild's postinstall
+  # installs its platform binary; everything else in this tree is script-free.
+  esbuild: true
+
 minimumReleaseAgeExclude:
   - immer@11.2.6
   - lucide-react@1.61.0
