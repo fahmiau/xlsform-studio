@@ -20,7 +20,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "=2.12.4", features = [] }
 tauri-plugin-dialog = "=2.6.0"
 # Pinned to the version dialog 2.6 needs. Newer 2.7.x build scripts are blocked
-# by this machine's Smart App Control policy; see docs/adr/0002-tauri-pins.md.
+# by this machine's Smart App Control policy; see docs/adr/0002-tauri-dependency-pins.md.
 tauri-plugin-fs = "=2.4.5"
 tauri-plugin-store = "2"
 tauri-plugin-window-state = "2"
