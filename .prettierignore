@@ -1,0 +1,8 @@
+pnpm-lock.yaml
+src-tauri/target
+src-tauri/gen
+src/ipc/bindings.ts
+coverage
+dist
+tests/fixtures/xlsx
+*.xlsx

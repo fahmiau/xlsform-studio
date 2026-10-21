@@ -1,0 +1,31 @@
+node_modules/
+dist/
+dist-ssr/
+coverage/
+*.local
+.DS_Store
+Thumbs.db
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/schemas/
+
+# Test artifacts
+test-results/
+playwright-report/
+blob-report/
+.vitest-reports/
+
+# Editor
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Generated benchmark fixtures
+tests/fixtures/generated/
+

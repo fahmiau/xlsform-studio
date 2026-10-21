@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "tauri": {
+      "source": "Firzus/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/web/tauri/SKILL.md",
+      "computedHash": "36b8db3ba70a6ed09cf10c0036fd6de6ccfd24cdd27d2ee7919a6f2719b97600"
+    }
+  }
+}

@@ -1,0 +1,58 @@
+[package]
+name = "xlsform-studio"
+version = "0.1.0"
+description = "Offline-first desktop IDE for authoring XLSForm .xlsx files"
+authors = ["xlsform-studio contributors"]
+edition = "2021"
+rust-version = "1.90"
+license = "MIT"
+
+[lib]
+name = "xlsform_studio_lib"
+# Desktop-only v1: the rlib is enough. cdylib/staticlib are only needed for
+# mobile targets and would pick up the test manifest link args.
+crate-type = ["rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "=2.12.4", features = ["unstable"] }
+tauri-plugin-dialog = "=2.6.0"
+# Pinned to the version dialog 2.6 needs. Newer 2.7.x build scripts are blocked
+# by this machine's Smart App Control policy; see docs/adr/0002-tauri-pins.md.
+tauri-plugin-fs = "=2.4.5"
+tauri-plugin-store = "2"
+tauri-plugin-window-state = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+base64 = "0.22"
+rand = "0.9"
+chrono = { version = "0.4", features = ["serde"] }
+tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
+specta = { version = "=2.0.0-rc.25", features = ["derive"] }
+tauri-plugin-agent-kit = { version = "0.1.0-alpha.1", optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+specta-typescript = "0.0.12"
+
+[features]
+# Optional agent-driven native UI inspection (Q5). Debug builds only; the
+# plugin additionally requires TAURI_AGENT_KIT=1 at runtime.
+agent-kit = ["dep:tauri-plugin-agent-kit"]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
+
+# Build scripts are run by the toolchain on every cold build. Small, optimized
+# build scripts are also less likely to trip strict Application Control
+# policies on developer machines.
+[profile.dev.build-override]
+opt-level = 2
+debug = false
