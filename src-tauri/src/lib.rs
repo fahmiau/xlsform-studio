@@ -4,7 +4,7 @@
 mod commands;
 mod error;
 
-use tauri::{Manager, WebviewWindow};
+use tauri::Manager;
 
 pub use error::AppError;
 
@@ -51,12 +51,6 @@ pub fn run() {
         })
         .run(tauri::generate_context!())
         .expect("error while running xlsform-studio");
-}
-
-/// Returns the main window, when it still exists.
-#[allow(dead_code)]
-pub fn main_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Option<WebviewWindow<R>> {
-    app.get_webview_window("main")
 }
 
 #[cfg(test)]

@@ -17,7 +17,7 @@ crate-type = ["rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "=2.12.4", features = ["unstable"] }
+tauri = { version = "=2.12.4", features = [] }
 tauri-plugin-dialog = "=2.6.0"
 # Pinned to the version dialog 2.6 needs. Newer 2.7.x build scripts are blocked
 # by this machine's Smart App Control policy; see docs/adr/0002-tauri-pins.md.
@@ -40,8 +40,9 @@ specta-typescript = "0.0.12"
 
 [features]
 # Optional agent-driven native UI inspection (Q5). Debug builds only; the
-# plugin additionally requires TAURI_AGENT_KIT=1 at runtime.
-agent-kit = ["dep:tauri-plugin-agent-kit"]
+# plugin additionally requires TAURI_AGENT_KIT=1 at runtime. `unstable` is only
+# pulled in by this feature, so default and release builds never enable it.
+agent-kit = ["dep:tauri-plugin-agent-kit", "tauri/unstable"]
 
 [profile.release]
 panic = "abort"

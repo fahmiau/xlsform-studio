@@ -14,6 +14,8 @@ const XLSX_EXTENSION: &str = "xlsx";
 const ERROR_SHARING_VIOLATION: i32 = 32;
 #[cfg(windows)]
 const ERROR_LOCK_VIOLATION: i32 = 33;
+#[cfg(windows)]
+const ERROR_ACCESS_DENIED: i32 = 5;
 
 /// Validate a user-picked workbook path. Only `.xlsx` files are accepted.
 pub(crate) fn validate_workbook_path(path: &Path) -> Result<(), AppError> {
@@ -51,11 +53,19 @@ pub(crate) fn map_io_error(err: &io::Error, path: &Path) -> AppError {
         return AppError::NotFound(path.display().to_string());
     }
     #[cfg(windows)]
-    if matches!(
-        err.raw_os_error(),
-        Some(ERROR_SHARING_VIOLATION | ERROR_LOCK_VIOLATION)
-    ) {
-        return AppError::FileLocked(path.display().to_string());
+    {
+        // 32/33 are the classic sharing/lock violations. Windows also reports
+        // 5 (access denied) when renaming over a workbook another process has
+        // open without delete sharing (Excel does this); only treat it as a
+        // lock when the target exists, so a read-only folder stays an I/O
+        // error.
+        let locked = matches!(
+            err.raw_os_error(),
+            Some(ERROR_SHARING_VIOLATION | ERROR_LOCK_VIOLATION)
+        ) || (err.raw_os_error() == Some(ERROR_ACCESS_DENIED) && path.exists());
+        if locked {
+            return AppError::FileLocked(path.display().to_string());
+        }
     }
     AppError::Io(format!("{}: {err}", path.display()))
 }
@@ -143,7 +153,11 @@ mod tests {
 
     #[test]
     fn rejects_non_xlsx_and_empty_paths() {
-        for path in ["C:/forms/survey.xls", "C:/forms/survey.csv", "C:/forms/survey"] {
+        for path in [
+            "C:/forms/survey.xls",
+            "C:/forms/survey.csv",
+            "C:/forms/survey",
+        ] {
             match validate_workbook_path(Path::new(path)) {
                 Err(AppError::InvalidPath(_)) => {}
                 other => panic!("expected InvalidPath for {path}, got {other:?}"),
@@ -161,7 +175,10 @@ mod tests {
         let temp = temp_path_for(target);
         assert_eq!(temp.parent(), target.parent());
         let name = temp.file_name().unwrap().to_string_lossy();
-        assert!(name.contains("survey.xlsx.tmp-"), "unexpected temp name: {name}");
+        assert!(
+            name.contains("survey.xlsx.tmp-"),
+            "unexpected temp name: {name}"
+        );
         assert_ne!(temp, temp_path_for(target));
     }
 
@@ -225,7 +242,7 @@ mod tests {
 
         let err = atomic_write_with(&target, |file| {
             file.write_all(b"partial")?;
-            Err(io::Error::new(ErrorKind::Other, "injected failure"))
+            Err(io::Error::other("injected failure"))
         })
         .unwrap_err();
         assert_eq!(err.kind(), ErrorKind::Other);
@@ -236,7 +253,48 @@ mod tests {
             .filter_map(|entry| entry.ok())
             .filter(|entry| entry.file_name().to_string_lossy().contains(".tmp-"))
             .collect();
-        assert!(leftovers.is_empty(), "temp file leaked after a failed write");
+        assert!(
+            leftovers.is_empty(),
+            "temp file leaked after a failed write"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn writing_over_a_file_locked_by_another_handle_maps_to_file_locked() {
+        use std::os::windows::fs::OpenOptionsExt;
+
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("form.xlsx");
+        fs::write(&target, b"original").unwrap();
+        // Share mode 0 = the same exclusive lock Excel takes while a workbook
+        // is open; renaming over it fails with ERROR_SHARING_VIOLATION.
+        let lock = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .share_mode(0)
+            .open(&target)
+            .unwrap();
+
+        let err = atomic_write_with(&target, |file| file.write_all(b"new")).unwrap_err();
+        assert!(
+            matches!(map_io_error(&err, &target), AppError::FileLocked(_)),
+            "unexpected error: kind={:?} raw={:?}",
+            err.kind(),
+            err.raw_os_error()
+        );
+        drop(lock);
+        assert_eq!(fs::read(&target).unwrap(), b"original");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn access_denied_for_a_missing_target_is_not_a_lock() {
+        let err = io::Error::from_raw_os_error(ERROR_ACCESS_DENIED);
+        assert!(matches!(
+            map_io_error(&err, Path::new("C:/definitely/missing/form.xlsx")),
+            AppError::Io(_)
+        ));
     }
 
     #[test]
@@ -244,6 +302,9 @@ mod tests {
         let bytes = b"PK\x03\x04 workbook";
         let encoded = base64::engine::general_purpose::STANDARD.encode(bytes);
         assert_eq!(decode_base64(&encoded).unwrap(), bytes);
-        assert!(matches!(decode_base64("not base64!!"), Err(AppError::Io(_))));
+        assert!(matches!(
+            decode_base64("not base64!!"),
+            Err(AppError::Io(_))
+        ));
     }
 }

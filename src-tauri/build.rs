@@ -22,7 +22,8 @@ fn main() {
             Ok("x86") => "x86",
             _ => "amd64",
         };
-        let manifest = std::path::Path::new(&std::env::var("OUT_DIR").unwrap()).join("app-manifest.xml");
+        let manifest =
+            std::path::Path::new(&std::env::var("OUT_DIR").unwrap()).join("app-manifest.xml");
         std::fs::write(
             &manifest,
             format!(
