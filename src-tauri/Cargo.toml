@@ -34,6 +34,13 @@ tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 specta = { version = "=2.0.0-rc.25", features = ["derive"] }
 tauri-plugin-agent-kit = { version = "0.1.0-alpha.1", optional = true }
 
+[target.'cfg(windows)'.dependencies]
+# WebView2 settings are not exposed by Tauri 2.12; the controller is used to
+# turn off browser accelerator keys (Ctrl+R/F5) so they cannot reload the app.
+# Both crates are already in the graph through wry.
+webview2-com = "0.39"
+windows-core = "0.62"
+
 [dev-dependencies]
 tempfile = "3"
 specta-typescript = "0.0.12"

@@ -5206,6 +5206,8 @@ dependencies = [
  "tauri-specta",
  "tempfile",
  "thiserror 2.0.21",
+ "webview2-com",
+ "windows-core",
 ]
 
 [[package]]

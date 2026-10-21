@@ -23,6 +23,29 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
         .error_handling(tauri_specta::ErrorHandlingMode::Throw)
 }
 
+/// WebView2 handles Ctrl+R, F5 and the other browser accelerators itself before
+/// the page sees the keydown, so `preventDefault` in the frontend cannot stop a
+/// reload. Disable them at the WebView2 level (Task 1.10); the app owns those
+/// keys through `src/lib/shortcuts.ts`.
+#[cfg(windows)]
+fn lock_down_browser_accelerators(window: &tauri::WebviewWindow) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings3;
+    use windows_core::Interface;
+
+    let _ = window.with_webview(|webview| {
+        let Ok(core) = (unsafe { webview.controller().CoreWebView2() }) else {
+            return;
+        };
+        let Ok(settings) = (unsafe { core.Settings() }) else {
+            return;
+        };
+        let Ok(settings) = settings.cast::<ICoreWebView2Settings3>() else {
+            return;
+        };
+        let _ = unsafe { settings.SetAreBrowserAcceleratorKeysEnabled(false) };
+    });
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let specta = specta_builder();
@@ -44,9 +67,13 @@ pub fn run() {
         .invoke_handler(specta.invoke_handler())
         .setup(|app| {
             // The main window is declared in tauri.conf.json.
-            if app.get_webview_window("main").is_none() {
+            let Some(window) = app.get_webview_window("main") else {
                 return Err("main window is not configured".into());
-            }
+            };
+            #[cfg(windows)]
+            lock_down_browser_accelerators(&window);
+            #[cfg(not(windows))]
+            let _ = window;
             Ok(())
         })
         .run(tauri::generate_context!())
