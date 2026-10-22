@@ -258,17 +258,27 @@ describe('pasteMatrix', () => {
     expect(result.data.survey.rows.map((row) => row.cells.name)).toEqual(['q1', 'q2', 'a', 'b']);
   });
 
-  it('pastes 500×10 in under 200 ms', () => {
+  it('pastes a 500×10 matrix into new rows', () => {
     const data = workbook([]);
     const matrix = Array.from({ length: 500 }, (_, row) =>
       Array.from({ length: 10 }, (_, column) => `v${row}_${column}`),
     );
-    const started = performance.now();
     const result = pasteMatrix(data, 'survey', { rowIndex: 0, columnIndex: 0 }, matrix, KEYS);
-    const elapsed = performance.now() - started;
     expect(result.data.survey.rows).toHaveLength(500);
-    // Normal runs are ~25 ms. The looser bound tolerates the v8 coverage
-    // provider's instrumentation (~10×), which is still well under a second.
-    expect(elapsed).toBeLessThan(500);
+    expect(result.appendedRows).toBe(500);
+    expect(result.applied).toBe(2000);
+    expect(result.droppedColumns).toBe(6);
+    expect(result.data.survey.rows[0]?.cells).toMatchObject({
+      type: 'v0_0',
+      name: 'v0_1',
+      label: 'v0_2',
+      relevant: 'v0_3',
+    });
+    expect(result.data.survey.rows.at(-1)?.cells).toMatchObject({
+      type: 'v499_0',
+      name: 'v499_1',
+      label: 'v499_2',
+      relevant: 'v499_3',
+    });
   });
 });

@@ -24,7 +24,6 @@ export interface MovePlan {
   sourceStart: number;
   sourceEnd: number;
   targetIndex: number;
-  noop: boolean;
 }
 
 export interface MoveCheck {
@@ -73,8 +72,8 @@ export function planOutlineMove(
     targetIndex = target.startIndex + 1;
   }
 
-  const noop = targetIndex > sourceStart && targetIndex <= sourceEnd + 1;
-  if (noop) return { ok: false, reason: 'The block is already there.' };
+  const isNoop = targetIndex > sourceStart && targetIndex <= sourceEnd + 1;
+  if (isNoop) return { ok: false, reason: 'The block is already there.' };
 
   return {
     ok: true,
@@ -83,7 +82,6 @@ export function planOutlineMove(
       sourceStart,
       sourceEnd,
       targetIndex,
-      noop,
     },
   };
 }

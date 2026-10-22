@@ -133,9 +133,10 @@ export interface PasteMatrixOptions {
 }
 
 /**
- * Paste at a data-column start. Extra rows are appended, columns beyond the
- * available ones are dropped, and read-only cells are skipped. Callers wrap the
- * result in one store `apply` for a single undo step.
+ * Paste at a data-column start. Extra rows are appended after all real sheet
+ * rows (even when folding hides them), columns beyond the available ones are
+ * dropped, and read-only cells are skipped. Callers wrap the result in one
+ * store `apply` for a single undo step.
  */
 export function pasteMatrix(
   data: WorkbookData,

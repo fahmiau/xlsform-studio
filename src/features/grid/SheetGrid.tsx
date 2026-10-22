@@ -25,7 +25,7 @@ import type { ColumnBase } from '@/core/model/columns';
 import { resolveColumn } from '@/core/model/columns';
 import { parseType } from '@/core/model/parseType';
 import type { ColumnKey, ManagedSheetName, RowId } from '@/core/model/types';
-import { applyTypeChange } from '@/core/ops/choices';
+import { applyChoiceEdits, applyTypeChange } from '@/core/ops/choices';
 import { setCells, type CellEdit } from '@/core/ops/cells';
 import { groupHiddenQuestionCount } from '@/core/ops/groups';
 import { insertRows } from '@/core/ops/rows';
@@ -443,7 +443,10 @@ export function SheetGrid({
       useWorkbookStore.getState().apply(
         `Edit ${edits.length} cell${edits.length === 1 ? '' : 's'}`,
         (current) => {
-          let next = setCells(current, sheetName, edits);
+          let next =
+            sheetName === 'choices'
+              ? applyChoiceEdits(current, edits)
+              : setCells(current, sheetName, edits);
           if (sheetName === 'survey') {
             for (const edit of edits) {
               if (resolveColumn(edit.column).base === 'type') {

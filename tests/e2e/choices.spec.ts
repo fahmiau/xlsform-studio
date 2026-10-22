@@ -156,3 +156,78 @@ test('outline lists groups and questions and jumps to the grid', async ({ page }
   await outline.getByText('outer', { exact: true }).click();
   await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (10)');
 });
+
+test('undo of an edit inside a collapsed group expands and reveals the row', async ({ page }) => {
+  await openFixture(page);
+  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await canvas.waitFor();
+  await canvas.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.down('Shift');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.up('Shift');
+  await page.keyboard.press('Control+g');
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (5)');
+
+  const outline = page.getByTestId('outline-panel');
+  await outline.getByText('respondent_name', { exact: true }).click();
+  await expect(page.getByTestId('formula-bar-column')).toHaveText('[Column: name]');
+  const formula = page.getByTestId('formula-bar-input');
+  await formula.fill('renamed');
+  await formula.press('Enter');
+  await expect(formula).toHaveValue('renamed');
+
+  await page.keyboard.press('Control+BracketLeft');
+  await expect(outline.getByText('(2 hidden)')).toBeVisible();
+
+  await page.getByTestId('undo-button').click();
+  await expect(outline.getByText('(2 hidden)')).toHaveCount(0);
+  await expect(formula).toHaveValue('respondent_name');
+});
+
+test('a name typed on the choices tab survives a later label edit', async ({ page }) => {
+  await openFixture(page);
+  await page.getByTestId('sheet-tab-choices').click();
+  const canvas = page.getByTestId('sheet-grid-choices').locator('canvas').first();
+  await canvas.waitFor();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('choices grid canvas has no layout box');
+  // list_name (140 px) follows the 48 px gutter; name is the next column.
+  await page.mouse.click(box.x + 48 + 140 + 40, box.y + 34 + 17);
+  const formula = page.getByTestId('formula-bar-input');
+  await expect(page.getByTestId('formula-bar-column')).toHaveText('[Column: name]');
+  await expect(formula).toHaveValue('yes');
+  await formula.fill('manual_code');
+  await formula.press('Enter');
+  await expect(formula).toHaveValue('manual_code');
+
+  await page.getByTestId('sheet-tab-survey').click();
+  const surveyCanvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await surveyCanvas.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByTestId('formula-bar-input')).toHaveValue('select_one yes_no');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByTestId('choices-drawer')).toBeVisible();
+
+  const drawerCanvas = page.getByTestId('drawer-grid').locator('canvas').first();
+  await drawerCanvas.waitFor();
+  await drawerCanvas.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByTestId('formula-bar-column')).toHaveText('[Column: label]');
+  const drawerFormula = page.getByTestId('formula-bar-input');
+  await expect(drawerFormula).toHaveValue('Yes');
+  await drawerFormula.fill('Yes indeed');
+  await drawerFormula.press('Enter');
+
+  await page.getByTestId('sheet-tab-choices').click();
+  const choicesCanvas = page.getByTestId('sheet-grid-choices').locator('canvas').first();
+  await choicesCanvas.waitFor();
+  // list_name (140 px) follows the 48 px gutter; name is the next column.
+  await page.mouse.click(box.x + 48 + 140 + 40, box.y + 34 + 17);
+  await expect(page.getByTestId('formula-bar-column')).toHaveText('[Column: name]');
+  await expect(page.getByTestId('formula-bar-input')).toHaveValue('manual_code');
+});

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { resolveColumn } from '@/core/model/columns';
 import { findColumnKey } from '@/core/indexes/columns';
 import { setCells } from '@/core/ops/cells';
+import { applyChoiceEdits } from '@/core/ops/choices';
 import { isCellEditable } from '@/features/grid/editability';
 import { useUiStore } from '@/state/uiStore';
 import { useWorkbookStore } from '@/state/workbookStore';
@@ -24,16 +25,16 @@ export function FormulaBarSlot() {
 
   const commit = (draft: string) => {
     if (!activeCell || !editable || draft === value) return;
-    useWorkbookStore
-      .getState()
-      .apply(
-        `Edit ${resolveColumn(activeCell.column).canonical}`,
-        (current) =>
-          setCells(current, activeCell.sheet, [
-            { rowId: activeCell.rowId, column: activeCell.column, value: draft },
-          ]),
-        { sheet: activeCell.sheet, rowIds: [activeCell.rowId] },
-      );
+    useWorkbookStore.getState().apply(
+      `Edit ${resolveColumn(activeCell.column).canonical}`,
+      (current) => {
+        const edit = { rowId: activeCell.rowId, column: activeCell.column, value: draft };
+        return activeCell.sheet === 'choices'
+          ? applyChoiceEdits(current, [edit])
+          : setCells(current, activeCell.sheet, [edit]);
+      },
+      { sheet: activeCell.sheet, rowIds: [activeCell.rowId] },
+    );
   };
 
   return (
