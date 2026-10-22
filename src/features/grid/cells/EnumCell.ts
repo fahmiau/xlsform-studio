@@ -13,6 +13,7 @@ import {
 } from '@glideapps/glide-data-grid';
 
 import type { RowId } from '@/core/model/types';
+import { usePrefsStore } from '@/state/prefsStore';
 import { useUiStore } from '@/state/uiStore';
 
 export const ENUM_CELL_KIND = 'xlsform-enum';
@@ -78,6 +79,7 @@ export const enumRenderer: CustomRenderer<EnumCell> = {
     if (cell.data.choiceCount === undefined) return undefined;
     if (posX < bounds.width - BADGE_WIDTH) return undefined;
     preventDefault();
+    usePrefsStore.getState().setPanelVisible('right', true);
     useUiStore.getState().openChoicesDrawer(cell.data.rowId);
     return cell;
   },
