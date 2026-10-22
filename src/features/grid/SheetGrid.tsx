@@ -21,6 +21,8 @@ import {
 import { toast } from 'sonner';
 
 import { findColumnKey } from '@/core/indexes/columns';
+import { diagnosticCellKey } from '@/core/lint/diagnostics';
+import type { DiagnosticIssue } from '@/core/lint';
 import type { ColumnBase } from '@/core/model/columns';
 import { resolveColumn } from '@/core/model/columns';
 import { parseType } from '@/core/model/parseType';
@@ -40,6 +42,7 @@ import { makeChoiceNameCell, choiceNameRenderer } from './cells/ChoiceNameCell';
 import { makeCollapsedPillCell, collapsedPillRenderer } from './cells/CollapsedPillCell';
 import { makeEnumCell, enumRenderer } from './cells/EnumCell';
 import { gutterRenderer } from './cells/GutterCell';
+import { makeXPathCell, xpathRenderer } from './cells/XPathCell';
 import { buildDisplayColumns, columnKeyAt, type SheetGridConfig } from './columns';
 import { pasteMatrix } from './clipboard';
 import { isCellEditable, structuralRowKind, type StructuralRowKind } from './editability';
@@ -122,6 +125,8 @@ export function SheetGrid({
   const data = useWorkbookStore((state) => state.data);
   const sheet = data[sheetName];
   const indexes = useDerivedStore((state) => state.indexes);
+  const diagnosticIndex = useDerivedStore((state) => state.diagnosticIndex);
+  const cellPreview = useUiStore((state) => state.cellPreview);
   const widths = useUiStore((state) => state.columnWidths[sheetName]);
   const hidden = useUiStore((state) => state.hiddenColumns[sheetName]);
   const collapsedGroupIds = useUiStore((state) => state.collapsedGroupIds);
@@ -141,6 +146,11 @@ export function SheetGrid({
   const [rowMenu, setRowMenu] = useState<RowContextMenuState | null>(null);
   const [headerMenu, setHeaderMenu] = useState<HeaderMenuState | null>(null);
   const [addColumnOpen, setAddColumnOpen] = useState(false);
+  const [diagnosticHover, setDiagnosticHover] = useState<{
+    x: number;
+    y: number;
+    issues: readonly DiagnosticIssue[];
+  } | null>(null);
 
   const viewSheet = useMemo(
     () => (columnKeys ? { ...sheet, columns: [...columnKeys] } : sheet),
@@ -286,6 +296,33 @@ export function SheetGrid({
     () => new Map(indexes.groups.groups.map((group) => [group.id, group])),
     [indexes.groups.groups],
   );
+
+  // Diagnostics draw through `drawCell`; damage the affected rows so markers
+  // and gutter dots appear even when only the lint result changed.
+  useEffect(() => {
+    const grid = gridRef.current;
+    if (!grid || diagnosticIndex.byRow.size === 0) return;
+    const cells: Array<{ cell: Item }> = [];
+    for (const rowId of diagnosticIndex.byRow.keys()) {
+      const visible = visibleRowIndex(projection, findRowIndex(sheet, rowId));
+      if (visible < 0) continue;
+      for (let column = 0; column <= display.keys.length; column += 1) {
+        cells.push({ cell: [column, visible] });
+      }
+    }
+    if (cells.length > 0) grid.updateCells(cells);
+  }, [diagnosticIndex, display.keys.length, projection, sheet]);
+
+  // Formula-bar previews are UI-only overrides; damage that cell to repaint it.
+  useEffect(() => {
+    if (!cellPreview || cellPreview.sheet !== sheetName) return;
+    const grid = gridRef.current;
+    if (!grid) return;
+    const visible = visibleRowIndex(projection, findRowIndex(sheet, cellPreview.rowId));
+    const column = display.keys.indexOf(cellPreview.column) + 1;
+    if (visible < 0 || column <= 0) return;
+    grid.updateCells([{ cell: [column, visible] }]);
+  }, [cellPreview, display.keys, projection, sheet, sheetName]);
   const primaryLabelKey = useMemo(() => {
     const labels = sheet.columns.filter((column) => resolveColumn(column).base === 'label');
     return labels.find((column) => !resolveColumn(column).language) ?? labels[0];
@@ -304,6 +341,7 @@ export function SheetGrid({
       if (columnIndex === 0) {
         const rowKind = structuralRowKind(typeValue);
         const group = groupByRowId.get(row.id);
+        const counts = diagnosticIndex.byRow.get(row.id);
         return {
           kind: GridCellKind.Custom,
           allowOverlay: false,
@@ -316,6 +354,12 @@ export function SheetGrid({
             collapsed: collapsedGroupIds.has(row.id),
             canCollapse: Boolean(group && group.endRowIndex >= 0),
             rowId: row.id,
+            ...(counts
+              ? {
+                  diagnosticSeverity:
+                    counts.errors > 0 ? 'error' : counts.warnings > 0 ? 'warning' : undefined,
+                }
+              : {}),
           },
         };
       }
@@ -323,6 +367,19 @@ export function SheetGrid({
       const key = display.keys[columnIndex - 1];
       if (key === undefined) return { kind: GridCellKind.Loading, allowOverlay: false };
       const columnBase: ColumnBase = resolveColumn(key).base;
+
+      const preview =
+        cellPreview &&
+        cellPreview.sheet === sheetName &&
+        cellPreview.rowId === row.id &&
+        cellPreview.column === key
+          ? cellPreview.value
+          : undefined;
+      if (preview !== undefined) {
+        return resolveColumn(key).isXPath
+          ? makeXPathCell({ value: preview, rowId: row.id, column: key })
+          : textCell(preview);
+      }
 
       const group = groupByRowId.get(row.id);
       const isCollapsedHeader =
@@ -353,6 +410,17 @@ export function SheetGrid({
         });
       }
 
+      if (resolveColumn(key).isXPath) {
+        const structural = structuralRowKind(typeValue);
+        return makeXPathCell({
+          value: row.cells[key] ?? '',
+          rowId: row.id,
+          column: key,
+          readonly: !isCellEditable(typeValue, key),
+          faded: structural === 'end_group' || structural === 'end_repeat',
+        });
+      }
+
       if (sheetName === 'choices' && onCommitEdits && columnBase === 'name') {
         return makeChoiceNameCell({
           value: row.cells[key] ?? '',
@@ -378,7 +446,9 @@ export function SheetGrid({
       return built;
     },
     [
+      cellPreview,
       collapsedGroupIds,
+      diagnosticIndex,
       display.keys,
       groupByRowId,
       indexes.choices.byList,
@@ -636,6 +706,50 @@ export function SheetGrid({
     };
   };
 
+  const drawDiagnosticMarker = useCallback<NonNullable<DataEditorProps['drawCell']>>(
+    (args, draw) => {
+      draw();
+      if (args.col <= 0) return;
+      const real = realRowIndex(projection, args.row);
+      const row = real >= 0 ? sheet.rows[real] : undefined;
+      const key = display.keys[args.col - 1];
+      if (!row || !key) return;
+      const issues = diagnosticIndex.byCell.get(diagnosticCellKey(row.id, key));
+      if (!issues || issues.length === 0) return;
+      const error = issues.some((issue) => issue.severity === 'error');
+      ctxMarker(args.ctx, args.rect, error ? '#dc2626' : '#d97706');
+    },
+    [diagnosticIndex.byCell, display.keys, projection, sheet.rows],
+  );
+
+  const hoverKey = useRef<string | null>(null);
+  const handleDiagnosticHover = useCallback<NonNullable<DataEditorProps['onItemHovered']>>(
+    (args) => {
+      if (args.kind !== 'cell') {
+        hoverKey.current = null;
+        setDiagnosticHover(null);
+        return;
+      }
+      const [columnIndex, visibleRow] = args.location;
+      const real = realRowIndex(projection, visibleRow);
+      const row = real >= 0 ? sheet.rows[real] : undefined;
+      const key = columnIndex > 0 ? display.keys[columnIndex - 1] : undefined;
+      if (!row || !key) {
+        hoverKey.current = null;
+        setDiagnosticHover(null);
+        return;
+      }
+      const identity = diagnosticCellKey(row.id, key);
+      if (identity === hoverKey.current) return;
+      hoverKey.current = identity;
+      const issues = diagnosticIndex.byCell.get(identity);
+      setDiagnosticHover(
+        issues && issues.length > 0 ? { x: args.localEventX, y: args.localEventY, issues } : null,
+      );
+    },
+    [diagnosticIndex.byCell, display.keys, projection, sheet.rows],
+  );
+
   return (
     <div
       className="flex h-full min-h-0 flex-col"
@@ -678,6 +792,8 @@ export function SheetGrid({
           getCellContent={getCellContent}
           getRowThemeOverride={getRowThemeOverride}
           onCellsEdited={onCellsEdited}
+          onItemHovered={handleDiagnosticHover}
+          drawCell={drawDiagnosticMarker}
           onDelete={() => {
             const rowIds = useUiStore.getState().selectedRowIds;
             if (rowIds.length === 0) return true;
@@ -730,6 +846,7 @@ export function SheetGrid({
             enumRenderer,
             choiceNameRenderer,
             collapsedPillRenderer,
+            xpathRenderer,
           ]}
           cellActivationBehavior="second-click"
           fillHandle={true}
@@ -738,6 +855,25 @@ export function SheetGrid({
           smoothScrollX={true}
           smoothScrollY={true}
         />
+        {diagnosticHover ? (
+          <div
+            className="bg-popover text-popover-foreground border-border pointer-events-none absolute z-50 max-w-xs rounded border px-2 py-1 text-[11px] shadow-lg"
+            style={{ left: diagnosticHover.x + 12, top: diagnosticHover.y + 12 }}
+            data-testid="cell-diagnostic-tooltip"
+            role="tooltip"
+          >
+            {diagnosticHover.issues.map((issue, index) => (
+              <div key={`${issue.ruleId}:${index}`} className="whitespace-nowrap">
+                <span
+                  className={issue.severity === 'error' ? 'text-destructive' : 'text-amber-600'}
+                >
+                  {issue.ruleId}
+                </span>{' '}
+                {issue.message}
+              </div>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       <RowContextMenu
@@ -798,4 +934,17 @@ function selectionColumnKeysForRange(keys: readonly ColumnKey[], range: Rectangl
   const start = skipped ? 0 : range.x - 1;
   const count = Math.max(0, range.width - (skipped ? 1 : 0));
   return keys.slice(start, start + count);
+}
+
+/** Small corner triangle for cells with diagnostics. */
+function ctxMarker(ctx: CanvasRenderingContext2D, rect: Rectangle, color: string): void {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(rect.x + rect.width - 9, rect.y + 2);
+  ctx.lineTo(rect.x + rect.width - 2, rect.y + 2);
+  ctx.lineTo(rect.x + rect.width - 2, rect.y + 9);
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
 }

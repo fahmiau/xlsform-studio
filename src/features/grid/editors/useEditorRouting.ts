@@ -9,7 +9,9 @@ import {
 
 import { CHOICE_NAME_CELL_KIND } from '../cells/ChoiceNameCell';
 import { ENUM_CELL_KIND, type EnumCell } from '../cells/EnumCell';
+import { XPATH_CELL_KIND } from '../cells/XPathCell';
 import { AppearanceEditor } from './AppearanceEditor';
+import { CellFormulaEditor } from './CellFormulaEditor';
 import { ChoiceNameEditor } from './ChoiceNameEditor';
 import { TypeEditor } from './TypeEditor';
 
@@ -32,6 +34,13 @@ export function useEditorRouting(): ProvideEditorCallback<GridCell> {
         editor: ChoiceNameEditor as unknown as ProvideEditorComponent<GridCell>,
         disablePadding: true,
         styleOverride: { minWidth: 180 },
+      };
+    }
+    if (kind === XPATH_CELL_KIND) {
+      return {
+        editor: CellFormulaEditor as unknown as ProvideEditorComponent<GridCell>,
+        disablePadding: true,
+        styleOverride: { minWidth: 420, minHeight: 96 },
       };
     }
     return undefined;

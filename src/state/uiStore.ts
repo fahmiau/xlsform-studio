@@ -11,6 +11,7 @@ import type { ListMode } from '@/core/slug/slugify';
 
 export type SheetTab = 'survey' | 'choices' | 'settings';
 export type RightTab = 'choices' | 'ai';
+export type LeftTab = 'outline' | 'lint';
 
 export interface CellRef {
   sheet: SheetTab;
@@ -33,6 +34,14 @@ export interface RevealRequest {
   nonce: number;
 }
 
+/** Live edit preview while the formula bar has focus (UI-only, no undo). */
+export interface CellPreview {
+  sheet: SheetTab;
+  rowId: RowId;
+  column: string;
+  value: string;
+}
+
 export interface UiState {
   activeSheet: SheetTab;
   /** Active cell on the current sheet (the formula bar reads this). */
@@ -52,6 +61,7 @@ export interface UiState {
   choiceModes: Record<string, ListMode>;
   dismissedSharedLists: Set<string>;
   rightTab: RightTab;
+  leftTab: LeftTab;
   panels: { outline: boolean; lint: boolean; ai: boolean };
   languageView: { mode: LanguageViewMode; language: string | null };
   /** Session-only per-sheet column widths (Task 2.2). */
@@ -59,6 +69,7 @@ export interface UiState {
   /** View-only hidden columns (Task 2.6). */
   hiddenColumns: Partial<Record<SheetTab, Set<ColumnKey>>>;
   reveal: RevealRequest | null;
+  cellPreview: CellPreview | null;
   setActiveSheet: (sheet: SheetTab) => void;
   setActiveCell: (cell: CellRef | null) => void;
   setSelection: (selection: Selection | null) => void;
@@ -73,12 +84,14 @@ export interface UiState {
   setChoiceMode: (listName: string, mode: ListMode) => void;
   dismissSharedList: (listName: string) => void;
   setRightTab: (tab: RightTab) => void;
+  setLeftTab: (tab: LeftTab) => void;
   setPanel: (panel: keyof UiState['panels'], visible: boolean) => void;
   setLanguageView: (mode: LanguageViewMode, language?: string | null) => void;
   setColumnWidth: (sheet: SheetTab, column: ColumnKey, width: number) => void;
   toggleColumnHidden: (sheet: SheetTab, column: ColumnKey) => void;
   showAllColumns: (sheet: SheetTab) => void;
   requestReveal: (sheet: SheetTab, rowId: RowId) => void;
+  setCellPreview: (preview: CellPreview | null) => void;
 }
 
 let revealNonce = 0;
@@ -96,11 +109,13 @@ export const useUiStore = create<UiState>()((set) => ({
   choiceModes: {},
   dismissedSharedLists: new Set(),
   rightTab: 'choices',
+  leftTab: 'outline',
   panels: { outline: true, lint: false, ai: false },
   languageView: { mode: 'all', language: null },
   columnWidths: {},
   hiddenColumns: {},
   reveal: null,
+  cellPreview: null,
 
   setActiveSheet: (activeSheet) =>
     set((state) => ({
@@ -156,6 +171,7 @@ export const useUiStore = create<UiState>()((set) => ({
   dismissSharedList: (listName) =>
     set((state) => ({ dismissedSharedLists: new Set(state.dismissedSharedLists).add(listName) })),
   setRightTab: (rightTab) => set({ rightTab }),
+  setLeftTab: (leftTab) => set({ leftTab }),
   setPanel: (panel, visible) => set((state) => ({ panels: { ...state.panels, [panel]: visible } })),
   setLanguageView: (mode, language = null) => set({ languageView: { mode, language } }),
 
@@ -181,4 +197,5 @@ export const useUiStore = create<UiState>()((set) => ({
       activeCell: state.activeCells[sheet] ?? null,
       reveal: { sheet, rowId, nonce: (revealNonce += 1) },
     })),
+  setCellPreview: (cellPreview) => set({ cellPreview }),
 }));
