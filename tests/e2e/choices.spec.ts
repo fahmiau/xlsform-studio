@@ -1,0 +1,158 @@
+/**
+ * Stage 3 smoke: type editor routing, drawer binding, and the Outline panel.
+ * The grid is canvas-based, so assertions use the formula bar and panels.
+ */
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+import { expect, test, type Page } from '@playwright/test';
+
+const BASIC = join(process.cwd(), 'tests/fixtures/xlsx/synthetic/01-basic.xlsx');
+const GROUPS = join(process.cwd(), 'tests/fixtures/xlsx/synthetic/15-unbalanced-groups.xlsx');
+
+async function mockTauri(page: Page, fixturePath = BASIC, fileName = '01-basic.xlsx') {
+  const base64 = (await readFile(fixturePath)).toString('base64');
+
+  await page.addInitScript(
+    (payload) => {
+      const internals = {
+        metadata: {
+          currentWindow: { label: 'main' },
+          currentWebview: { label: 'main', windowLabel: 'main' },
+        },
+        invoke: async (command: string, args: Record<string, unknown>) => {
+          switch (command) {
+            case 'app_info':
+              return { version: '0.1.0', platform: 'windows', arch: 'x86_64' };
+            case 'plugin:dialog|open':
+              return `C:/forms/${payload.fileName}`;
+            case 'plugin:dialog|save':
+              return 'C:/forms/saved.xlsx';
+            case 'read_workbook':
+              return payload.base64;
+            case 'save_workbook':
+              (window as unknown as { __savedWorkbook?: unknown }).__savedWorkbook = {
+                path: args.path,
+                base64: args.base64,
+              };
+              return null;
+            case 'plugin:event|listen':
+              return 1;
+            default:
+              return null;
+          }
+        },
+        transformCallback: (callback: (...args: unknown[]) => void) => {
+          const id = Math.floor(Math.random() * 1_000_000_000);
+          (window as unknown as Record<string, unknown>)[`_callback_${id}`] = callback;
+          return id;
+        },
+        unregisterCallback: () => undefined,
+      };
+      (window as unknown as { __TAURI_INTERNALS__: unknown }).__TAURI_INTERNALS__ = internals;
+    },
+    { base64, fileName },
+  );
+}
+
+async function openFixture(page: Page, fixture = BASIC, fileName = '01-basic.xlsx') {
+  await mockTauri(page, fixture, fileName);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Open' }).click();
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText(/^survey \(\d+\)$/);
+}
+
+test('type editor fuzzy search binds a list and undo restores the type', async ({ page }) => {
+  await openFixture(page);
+  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await canvas.waitFor();
+  await canvas.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowUp');
+  await expect(page.getByTestId('formula-bar-input')).toHaveValue('text');
+
+  await page.keyboard.press('Enter');
+  const input = page.getByTestId('type-editor-input');
+  await expect(input).toBeVisible();
+  await input.fill('');
+  await input.type('sel1');
+  await expect(page.getByText('select_one', { exact: true })).toBeVisible();
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('create-list-option')).toBeVisible();
+  await page.getByText('yes_no', { exact: true }).click();
+  await expect(page.getByTestId('formula-bar-input')).toHaveValue('select_one yes_no');
+
+  await page.keyboard.press('Control+z');
+  await expect(page.getByTestId('formula-bar-input')).toHaveValue('text');
+});
+
+test('choices drawer follows a select row and lists its choices', async ({ page }) => {
+  await openFixture(page);
+  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await canvas.waitFor();
+  await canvas.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByTestId('formula-bar-input')).toHaveValue('select_one yes_no');
+
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByTestId('choices-drawer')).toBeVisible();
+  await expect(page.getByTestId('drawer-list-name')).toHaveText('yes_no');
+  await expect(page.getByTestId('choice-count')).toHaveText('2 choices');
+  await expect(page.getByTestId('shared-list-banner')).toHaveCount(0);
+});
+
+test('changing a type to begin_repeat auto-inserts the end row in one undo step', async ({
+  page,
+}) => {
+  await openFixture(page);
+  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await canvas.waitFor();
+  await canvas.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.press('Enter');
+
+  const input = page.getByTestId('type-editor-input');
+  await expect(input).toBeVisible();
+  await input.fill('begin_repeat');
+  await page.keyboard.press('Enter');
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (4)');
+
+  await page.keyboard.press('Control+z');
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');
+});
+
+test('wrap with Ctrl+G, fold with Ctrl+[, and undo the wrap in one step', async ({ page }) => {
+  await openFixture(page);
+  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await canvas.waitFor();
+  await canvas.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowUp');
+  await page.keyboard.down('Shift');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.up('Shift');
+
+  await page.keyboard.press('Control+g');
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (5)');
+  const outline = page.getByTestId('outline-panel');
+  await expect(outline.getByText('group_1', { exact: true })).toBeVisible();
+
+  await page.keyboard.press('Control+BracketLeft');
+  await expect(outline.getByText('(2 hidden)')).toBeVisible();
+  await page.keyboard.press('Control+BracketRight');
+  await expect(outline.getByText('(2 hidden)')).toHaveCount(0);
+
+  await page.keyboard.press('Control+z');
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');
+});
+
+test('outline lists groups and questions and jumps to the grid', async ({ page }) => {
+  await openFixture(page, GROUPS, '15-unbalanced-groups.xlsx');
+  await expect(page.getByTestId('outline-tree')).toBeVisible();
+  const outline = page.getByTestId('outline-panel');
+  await expect(outline.getByText('outer', { exact: true })).toBeVisible();
+  await outline.getByText('outer', { exact: true }).click();
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (10)');
+});
