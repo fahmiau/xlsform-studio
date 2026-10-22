@@ -221,6 +221,43 @@ describe('pasteMatrix', () => {
     expect(result.rowIds).toEqual([data.survey.rows[1]?.id]);
   });
 
+  it('masks folded rows and pastes only into visible targets', () => {
+    const data = workbook([
+      { type: 'text', name: 'q1' },
+      { type: 'text', name: 'q2' },
+      { type: 'text', name: 'q3' },
+      { type: 'text', name: 'q4' },
+    ]);
+    const result = pasteMatrix(
+      data,
+      'survey',
+      { rowIndex: 0, columnIndex: 1 },
+      [['a'], ['b']],
+      KEYS,
+      { rowIndexes: [0, 2, 3] },
+    );
+    expect(result.data.survey.rows.map((row) => row.cells.name)).toEqual(['a', 'q2', 'b', 'q4']);
+    expect(result.appendedRows).toBe(0);
+  });
+
+  it('appends past the visible list when the matrix is longer', () => {
+    const data = workbook([
+      { type: 'text', name: 'q1' },
+      { type: 'text', name: 'q2' },
+      { type: 'text', name: 'q3' },
+    ]);
+    const result = pasteMatrix(
+      data,
+      'survey',
+      { rowIndex: 1, columnIndex: 1 },
+      [['a'], ['b']],
+      KEYS,
+      { rowIndexes: [0, 2] },
+    );
+    expect(result.appendedRows).toBe(1);
+    expect(result.data.survey.rows.map((row) => row.cells.name)).toEqual(['q1', 'q2', 'a', 'b']);
+  });
+
   it('pastes 500×10 in under 200 ms', () => {
     const data = workbook([]);
     const matrix = Array.from({ length: 500 }, (_, row) =>

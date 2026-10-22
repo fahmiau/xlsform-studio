@@ -21,24 +21,41 @@ import {
 import { toast } from 'sonner';
 
 import { findColumnKey } from '@/core/indexes/columns';
-import type { ColumnKey, ManagedSheetName } from '@/core/model/types';
+import type { ColumnBase } from '@/core/model/columns';
+import { resolveColumn } from '@/core/model/columns';
+import { parseType } from '@/core/model/parseType';
+import type { ColumnKey, ManagedSheetName, RowId } from '@/core/model/types';
+import { applyTypeChange } from '@/core/ops/choices';
 import { setCells, type CellEdit } from '@/core/ops/cells';
+import { groupHiddenQuestionCount } from '@/core/ops/groups';
 import { insertRows } from '@/core/ops/rows';
 import { useDerivedStore } from '@/state/derivedStore';
 import { usePrefsStore } from '@/state/prefsStore';
-import { useUiStore, type SheetTab } from '@/state/uiStore';
+import { useUiStore } from '@/state/uiStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 import { useIsDark } from '@/lib/theme';
 
 import { cellValue, editValueText, textCell } from './cells/cellContent';
+import { makeChoiceNameCell, choiceNameRenderer } from './cells/ChoiceNameCell';
+import { makeCollapsedPillCell, collapsedPillRenderer } from './cells/CollapsedPillCell';
+import { makeEnumCell, enumRenderer } from './cells/EnumCell';
 import { gutterRenderer } from './cells/GutterCell';
 import { buildDisplayColumns, columnKeyAt, type SheetGridConfig } from './columns';
 import { pasteMatrix } from './clipboard';
 import { isCellEditable, structuralRowKind, type StructuralRowKind } from './editability';
+import { useEditorRouting } from './editors/useEditorRouting';
 import { tileFill } from './fill';
+import { GRID_HEADER_HEIGHT, GRID_ROW_HEIGHT } from './geometry';
 import { HeaderMenu, type HeaderMenuState } from './HeaderMenu';
 import { AddColumnDialog } from './AddColumnDialog';
-import { identityProjection, realRowIndex } from './projection';
+import {
+  buildProjection,
+  identityProjection,
+  realRowIndex,
+  visibleRowCount,
+  visibleRowIndex,
+  type RowProjection,
+} from './projection';
 import { RowContextMenu, type RowContextMenuState } from './RowContextMenu';
 import { rowThemeOverride, type RowStyleKind } from './rowStyles';
 import {
@@ -58,26 +75,63 @@ import {
   insertRowsAtSelection,
   selectionRowIndex,
 } from './useRowCommands';
+import {
+  deleteGroupRow,
+  deleteRowsWithGroupPrompt,
+  isBeginRow,
+  unwrapGroupRow,
+} from './useGroupCommands';
 
-const scrollMemory = new Map<SheetTab, { tx: number; ty: number }>();
+const scrollMemory = new Map<string, { tx: number; ty: number }>();
 
-interface SheetGridProps {
+export interface SheetGridProps {
   sheetName: ManagedSheetName;
   config: SheetGridConfig;
+  /** Real sheet rows to show instead of the whole sheet (Choices Drawer). */
+  rowIndexes?: readonly number[];
+  /** Restrict/reorder data columns (Choices Drawer hides list_name). */
+  columnKeys?: readonly ColumnKey[];
+  /** Custom edit pipeline; defaults to a store `setCells` apply. */
+  onCommitEdits?: (edits: readonly CellEdit[]) => void;
+  /** Custom paste pipeline (drawer bulk insert). */
+  onPasteMatrix?: (targetVisibleRow: number, matrix: string[][]) => boolean;
+  /** Custom trailing-row append; returns the new row id. */
+  onAppendRow?: () => RowId | null;
+  /** Row drag reorder (drawer only); indexes are visible row indexes. */
+  onMoveRow?: (fromVisible: number, toVisible: number) => void;
+  /** Drawer delete action; defaults to the active sheet's row delete. */
+  onDeleteRows?: () => void;
+  onActiveRowChange?: (rowId: RowId) => void;
+  /** Drawer mode: no toolbar, compact sizing. */
+  compact?: boolean;
 }
 
-export function SheetGrid({ sheetName, config }: SheetGridProps) {
+export function SheetGrid({
+  sheetName,
+  config,
+  rowIndexes,
+  columnKeys,
+  onCommitEdits,
+  onPasteMatrix,
+  onAppendRow,
+  onMoveRow,
+  onDeleteRows,
+  onActiveRowChange,
+  compact = false,
+}: SheetGridProps) {
   const data = useWorkbookStore((state) => state.data);
   const sheet = data[sheetName];
   const indexes = useDerivedStore((state) => state.indexes);
   const widths = useUiStore((state) => state.columnWidths[sheetName]);
   const hidden = useUiStore((state) => state.hiddenColumns[sheetName]);
   const collapsedGroupIds = useUiStore((state) => state.collapsedGroupIds);
+  const flashRowId = useUiStore((state) => state.flashRowId);
   const reveal = useUiStore((state) => state.reveal);
   const activeCell = useUiStore((state) => state.activeCell);
   const themeMode = usePrefsStore((state) => state.theme);
   const dark = useIsDark(themeMode);
   const gridTheme = useMemo(() => buildGridTheme(dark), [dark]);
+  const provideEditor = useEditorRouting();
 
   const hostRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<DataEditorRef>(null);
@@ -88,24 +142,42 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
   const [headerMenu, setHeaderMenu] = useState<HeaderMenuState | null>(null);
   const [addColumnOpen, setAddColumnOpen] = useState(false);
 
-  const display = useMemo(
-    () => buildDisplayColumns(sheet, config, { widths, hidden }),
-    [sheet, config, widths, hidden],
+  const viewSheet = useMemo(
+    () => (columnKeys ? { ...sheet, columns: [...columnKeys] } : sheet),
+    [columnKeys, sheet],
   );
+  const display = useMemo(
+    () => buildDisplayColumns(viewSheet, config, { widths, hidden }),
+    [viewSheet, config, widths, hidden],
+  );
+  const projection = useMemo(() => {
+    if (rowIndexes) {
+      const realIndexes = Int32Array.from(rowIndexes);
+      const visibleIndexes = new Int32Array(sheet.rows.length).fill(-1);
+      rowIndexes.forEach((real, visible) => {
+        visibleIndexes[real] = visible;
+      });
+      return { realIndexes, visibleIndexes } as RowProjection;
+    }
+    if (sheetName === 'survey') {
+      return buildProjection(sheet, { groups: indexes.groups, collapsed: collapsedGroupIds });
+    }
+    return identityProjection(sheet);
+  }, [collapsedGroupIds, indexes.groups, rowIndexes, sheet, sheetName]);
+  const rowCount = rowIndexes?.length ?? visibleRowCount(projection);
   const gridSelection = useMemo(() => {
-    if (!storedGridSelection || sheet.rows.length === 0) return fallbackGridSelection;
+    if (!storedGridSelection || rowCount === 0) return fallbackGridSelection;
     const range = storedGridSelection.current?.range;
-    if (range && (range.y >= sheet.rows.length || range.x >= display.columns.length)) {
+    if (range && (range.y >= rowCount || range.x >= display.columns.length)) {
       return fallbackGridSelection;
     }
     return storedGridSelection;
-  }, [display.columns.length, fallbackGridSelection, sheet.rows.length, storedGridSelection]);
+  }, [display.columns.length, fallbackGridSelection, rowCount, storedGridSelection]);
 
   const setGridSelection = useCallback(
     (selection: GridSelection) => useUiStore.getState().setGridSelection(sheetName, selection),
     [sheetName],
   );
-  const projection = useMemo(() => identityProjection(sheet), [sheet]);
   const typeKey = findColumnKey(sheet, 'type') ?? 'type';
   const listNameKey =
     sheetName === 'choices' ? (findColumnKey(sheet, 'list_name') ?? 'list_name') : undefined;
@@ -115,7 +187,7 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
     [indexes.groups.orphans, sheetName],
   );
 
-  const clipboard = useClipboard(sheetName, display.keys, gridSelection);
+  const clipboard = useClipboard(sheetName, display.keys, gridSelection, projection);
   const cellCache = useRef(new WeakMap<object, Map<ColumnKey, GridCell>>());
   const handledReveal = useRef(0);
 
@@ -138,34 +210,53 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
   // Restore the per-sheet scroll position once the canvas has a size.
   useEffect(() => {
     if (size.width === 0) return;
-    const memory = scrollMemory.get(sheetName);
+    const memory = scrollMemory.get(compact ? `${sheetName}:drawer` : sheetName);
     if (!memory) return;
     gridRef.current?.scrollTo({ amount: memory.tx, unit: 'px' }, { amount: memory.ty, unit: 'px' });
-  }, [sheetName, size.width]);
+  }, [compact, sheetName, size.width]);
 
   // Restore the active cell when the columns change or the sheet mounts.
   const keySignature = display.keys.join('\u0000');
   useEffect(() => {
     const cell = useUiStore.getState().activeCells[sheetName];
-    const rowIndex = cell ? findRowIndex(sheet, cell.rowId) : -1;
+    const rowIndex = cell ? visibleRowIndex(projection, findRowIndex(sheet, cell.rowId)) : -1;
     const columnIndex = cell ? display.keys.indexOf(cell.column) + 1 : -1;
     if (rowIndex >= 0 && columnIndex > 0) {
       setGridSelection(gridSelectionForCell(columnIndex, rowIndex));
-    } else if (sheet.rows.length > 0) {
+    } else if (rowCount > 0) {
       setGridSelection(gridSelectionForCell(Math.min(1, display.keys.length), 0));
     }
     // Only react to a changed column signature; edits must not reset selection.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keySignature, sheetName, setGridSelection]);
 
-  // Scroll to and select the rows an undo/redo touched.
+  // Reveal expands collapsed ancestors before scrolling to the row (Task 3.7).
   useEffect(() => {
     if (!reveal || reveal.sheet !== sheetName || reveal.nonce === handledReveal.current) return;
     handledReveal.current = reveal.nonce;
-    const rowIndex = findRowIndex(sheet, reveal.rowId);
-    if (rowIndex < 0) return;
+    const realIndex = findRowIndex(sheet, reveal.rowId);
+    if (realIndex < 0) return;
+
+    const ancestors = indexes.groups.groups
+      .filter((group) => {
+        const end = group.endRowIndex < 0 ? Number.POSITIVE_INFINITY : group.endRowIndex;
+        return realIndex >= group.startRowIndex && realIndex <= end;
+      })
+      .map((group) => group.id);
+    const expanded = new Set(collapsedGroupIds);
+    for (const id of ancestors) expanded.delete(id);
+    const expandedProjection =
+      sheetName === 'survey'
+        ? buildProjection(sheet, { groups: indexes.groups, collapsed: expanded })
+        : projection;
+    const visibleIndex = visibleRowIndex(expandedProjection, realIndex);
+    if (visibleIndex < 0) return;
+    if (ancestors.some((id) => collapsedGroupIds.has(id))) {
+      useUiStore.getState().expandGroups(ancestors);
+    }
+
     const columnIndex = Math.max(1, display.keys.indexOf(activeCell?.column ?? '') + 1);
-    setGridSelection(gridSelectionForCell(columnIndex, rowIndex));
+    setGridSelection(gridSelectionForCell(columnIndex, visibleIndex));
     useUiStore.getState().setActiveCell({
       sheet: sheetName,
       rowId: reveal.rowId,
@@ -173,13 +264,32 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
     });
     gridRef.current?.scrollTo(
       { amount: 0, unit: 'px' },
-      { amount: rowIndex, unit: 'cell' },
+      { amount: visibleIndex, unit: 'cell' },
       'vertical',
       0,
       4,
     );
     gridRef.current?.focus();
-  }, [reveal, sheetName, sheet, display.keys, activeCell?.column, setGridSelection]);
+  }, [
+    reveal,
+    sheetName,
+    sheet,
+    display.keys,
+    activeCell?.column,
+    collapsedGroupIds,
+    indexes.groups,
+    projection,
+    setGridSelection,
+  ]);
+
+  const groupByRowId = useMemo(
+    () => new Map(indexes.groups.groups.map((group) => [group.id, group])),
+    [indexes.groups.groups],
+  );
+  const primaryLabelKey = useMemo(() => {
+    const labels = sheet.columns.filter((column) => resolveColumn(column).base === 'label');
+    return labels.find((column) => !resolveColumn(column).language) ?? labels[0];
+  }, [sheet.columns]);
 
   const getCellContent = useCallback(
     (cell: Item): GridCell => {
@@ -193,6 +303,7 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
       const typeValue = row.cells[typeKey] ?? '';
       if (columnIndex === 0) {
         const rowKind = structuralRowKind(typeValue);
+        const group = groupByRowId.get(row.id);
         return {
           kind: GridCellKind.Custom,
           allowOverlay: false,
@@ -203,12 +314,52 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
             rowKind,
             orphan: orphanRows.has(row.id),
             collapsed: collapsedGroupIds.has(row.id),
+            canCollapse: Boolean(group && group.endRowIndex >= 0),
+            rowId: row.id,
           },
         };
       }
 
       const key = display.keys[columnIndex - 1];
       if (key === undefined) return { kind: GridCellKind.Loading, allowOverlay: false };
+      const columnBase: ColumnBase = resolveColumn(key).base;
+
+      const group = groupByRowId.get(row.id);
+      const isCollapsedHeader =
+        sheetName === 'survey' &&
+        group !== undefined &&
+        group.endRowIndex >= 0 &&
+        collapsedGroupIds.has(row.id) &&
+        key === primaryLabelKey;
+      if (isCollapsedHeader && group) {
+        return makeCollapsedPillCell({
+          label: row.cells[key] ?? '',
+          count: groupHiddenQuestionCount(sheet, group),
+          rowId: row.id,
+        });
+      }
+
+      if (columnBase === 'type' || columnBase === 'appearance') {
+        const parsed = parseType(typeValue);
+        const choices = parsed.listName ? indexes.choices.byList[parsed.listName] : undefined;
+        return makeEnumCell({
+          column: columnBase,
+          value: row.cells[key] ?? '',
+          rowId: row.id,
+          baseType: parsed.base,
+          ...(columnBase === 'type' && parsed.listName
+            ? { choiceCount: choices?.length ?? 0 }
+            : {}),
+        });
+      }
+
+      if (sheetName === 'choices' && onCommitEdits && columnBase === 'name') {
+        return makeChoiceNameCell({
+          value: row.cells[key] ?? '',
+          locked: row.meta?.nameLocked === true,
+          rowId: row.id,
+        });
+      }
 
       let cache = cellCache.current.get(row);
       if (!cache) {
@@ -229,8 +380,12 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
     [
       collapsedGroupIds,
       display.keys,
+      groupByRowId,
+      indexes.choices.byList,
       indexes.groups.depthByRowIndex,
+      onCommitEdits,
       orphanRows,
+      primaryLabelKey,
       projection,
       sheet,
       sheetName,
@@ -246,6 +401,9 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
       const typeValue = row.cells[typeKey] ?? '';
       const kind: StructuralRowKind = structuralRowKind(typeValue);
       let style: RowStyleKind = null;
+      if (row.id === flashRowId) {
+        return { bgCell: dark ? '#334155' : '#dbeafe' };
+      }
       if (orphanRows.has(row.id)) style = 'orphan';
       else if (kind === 'begin_group') style = 'group';
       else if (kind === 'begin_repeat') style = 'repeat';
@@ -257,7 +415,7 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
       }
       return rowThemeOverride(gridTheme, dark, style);
     },
-    [dark, gridTheme, listNameKey, orphanRows, projection, sheet, typeKey],
+    [dark, flashRowId, gridTheme, listNameKey, orphanRows, projection, sheet, typeKey],
   );
 
   const commitEdits = useCallback(
@@ -278,15 +436,27 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
         rowIds.add(row.id);
       }
       if (edits.length === 0) return;
-      useWorkbookStore
-        .getState()
-        .apply(
-          `Edit ${edits.length} cell${edits.length === 1 ? '' : 's'}`,
-          (current) => setCells(current, sheetName, edits),
-          { sheet: sheetName, rowIds: [...rowIds] },
-        );
+      if (onCommitEdits) {
+        onCommitEdits(edits);
+        return;
+      }
+      useWorkbookStore.getState().apply(
+        `Edit ${edits.length} cell${edits.length === 1 ? '' : 's'}`,
+        (current) => {
+          let next = setCells(current, sheetName, edits);
+          if (sheetName === 'survey') {
+            for (const edit of edits) {
+              if (resolveColumn(edit.column).base === 'type') {
+                next = applyTypeChange(next, edit.rowId, edit.value);
+              }
+            }
+          }
+          return next;
+        },
+        { sheet: sheetName, rowIds: [...rowIds] },
+      );
     },
-    [display, projection, sheet, sheetName, typeKey],
+    [display, onCommitEdits, projection, sheet, sheetName, typeKey],
   );
 
   const onCellsEdited = useCallback<NonNullable<DataEditorProps['onCellsEdited']>>(
@@ -301,6 +471,11 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
     (target: Item, values: readonly (readonly string[])[]): boolean => {
       const matrix = values.map((row) => [...row]);
       if (matrix.length === 0) return false;
+      if (onPasteMatrix) {
+        // The drawer applied the bulk insert in one store action.
+        onPasteMatrix(target[1], matrix);
+        return false;
+      }
       let result: ReturnType<typeof pasteMatrix> | undefined;
       const cellCount = matrix.reduce((total, row) => total + row.length, 0);
       useWorkbookStore.getState().apply(
@@ -312,6 +487,7 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
             { rowIndex: target[1], columnIndex: Math.max(0, target[0] - 1) },
             matrix,
             display.keys,
+            { rowIndexes: projection.realIndexes },
           );
           return result.data;
         },
@@ -326,7 +502,7 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
       // We already applied the paste in one store action.
       return false;
     },
-    [display.keys, sheetName],
+    [display.keys, onPasteMatrix, projection.realIndexes, sheetName],
   );
 
   const onFillPattern = useCallback<NonNullable<DataEditorProps['onFillPattern']>>(
@@ -335,9 +511,11 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
       const source = event.patternSource;
       const destination = event.fillDestination;
       const sourceKeys = selectionColumnKeysForRange(display.keys, source);
-      const rowIndexes = Array.from({ length: source.height }, (_, offset) => source.y + offset);
-      const sourceMatrix = rowIndexes.map((row) =>
-        sourceKeys.map((key) => sheet.rows[row]?.cells[key] ?? ''),
+      const rowIndexes = Array.from({ length: source.height }, (_, offset) =>
+        realRowIndex(projection, source.y + offset),
+      );
+      const sourceMatrix = rowIndexes.map((real) =>
+        sourceKeys.map((key) => (real >= 0 ? (sheet.rows[real]?.cells[key] ?? '') : '')),
       );
       const matrix = tileFill(sourceMatrix, destination.height, destination.width);
       let result: ReturnType<typeof pasteMatrix> | undefined;
@@ -353,6 +531,7 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
             },
             matrix,
             display.keys,
+            { rowIndexes: projection.realIndexes },
           );
           return result.data;
         },
@@ -362,10 +541,15 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
         toast.warning(`Skipped ${result.skippedReadOnly} read-only cell(s).`);
       }
     },
-    [display.keys, sheet.rows, sheetName],
+    [display.keys, projection, sheet.rows, sheetName],
   );
 
   const onRowAppended = useCallback<NonNullable<DataEditorProps['onRowAppended']>>(async () => {
+    if (onAppendRow) {
+      const rowId = onAppendRow();
+      if (rowId) useUiStore.getState().setSelectedRowIds([rowId]);
+      return 'bottom' as const;
+    }
     let rowId: string | undefined;
     useWorkbookStore.getState().apply(
       'Add row',
@@ -380,7 +564,7 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
     );
     if (rowId) useUiStore.getState().setSelectedRowIds([rowId]);
     return 'bottom' as const;
-  }, [sheetName]);
+  }, [onAppendRow, sheetName]);
 
   const onColumnResize = useCallback<NonNullable<DataEditorProps['onColumnResizeEnd']>>(
     (_column, newSize, columnIndex) => {
@@ -396,14 +580,24 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
       setGridSelection(selection);
       const bounds = selectionBounds(selection);
       if (bounds) {
-        const ref = refFromItem(sheet, display.keys, [bounds.x, bounds.y], sheetName);
-        const rangeSelection = selectionFromRange(sheet, display.keys, bounds, sheetName);
+        const ref = refFromItem(sheet, display.keys, [bounds.x, bounds.y], sheetName, projection);
+        const rangeSelection = selectionFromRange(
+          sheet,
+          display.keys,
+          bounds,
+          sheetName,
+          projection,
+        );
         if (ref) useUiStore.getState().setActiveCell(ref);
         if (rangeSelection) useUiStore.getState().setSelection(rangeSelection);
+        if (ref) {
+          onActiveRowChange?.(ref.rowId);
+          if (sheetName === 'survey') useUiStore.getState().setDrawerRow(ref.rowId);
+        }
       }
-      useUiStore.getState().setSelectedRowIds(selectionToRowIds(sheet, selection));
+      useUiStore.getState().setSelectedRowIds(selectionToRowIds(sheet, selection, projection));
     },
-    [display.keys, setGridSelection, sheet, sheetName],
+    [display.keys, onActiveRowChange, projection, setGridSelection, sheet, sheetName],
   );
 
   const openRowMenu = useCallback(
@@ -411,11 +605,17 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
       const real = realRowIndex(projection, item[1]);
       const row = real >= 0 ? sheet.rows[real] : undefined;
       if (!row) return;
-      const ref = refFromItem(sheet, display.keys, [Math.max(1, item[0]), item[1]], sheetName);
+      const ref = refFromItem(
+        sheet,
+        display.keys,
+        [Math.max(1, item[0]), item[1]],
+        sheetName,
+        projection,
+      );
       if (ref) useUiStore.getState().setActiveCell(ref);
       const existing = useUiStore.getState().selectedRowIds;
       if (!existing.includes(row.id)) useUiStore.getState().setSelectedRowIds([row.id]);
-      setRowMenu({ x: clientX, y: clientY });
+      setRowMenu({ x: clientX, y: clientY, rowId: row.id });
     },
     [display.keys, projection, sheet, sheetName],
   );
@@ -434,52 +634,71 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col" data-testid={`sheet-grid-${sheetName}`}>
-      <div className="text-muted-foreground flex items-center gap-2 border-b px-2 py-1 text-xs">
-        <span className="font-medium">{sheetName}</span>
-        <span>{sheet.rows.length} rows</span>
-        <span>{sheet.columns.length} columns</span>
-        <div className="ml-auto flex items-center gap-1">
-          {hidden && hidden.size > 0 ? (
+    <div
+      className="flex h-full min-h-0 flex-col"
+      data-testid={compact ? 'drawer-grid' : `sheet-grid-${sheetName}`}
+    >
+      {compact ? null : (
+        <div className="text-muted-foreground flex items-center gap-2 border-b px-2 py-1 text-xs">
+          <span className="font-medium">{sheetName}</span>
+          <span>{sheet.rows.length} rows</span>
+          <span>{sheet.columns.length} columns</span>
+          <div className="ml-auto flex items-center gap-1">
+            {hidden && hidden.size > 0 ? (
+              <button
+                type="button"
+                className="hover:bg-accent rounded px-2 py-0.5"
+                onClick={() => useUiStore.getState().showAllColumns(sheetName)}
+              >
+                {hidden.size} hidden — show all
+              </button>
+            ) : null}
             <button
               type="button"
               className="hover:bg-accent rounded px-2 py-0.5"
-              onClick={() => useUiStore.getState().showAllColumns(sheetName)}
+              data-testid="add-column-button"
+              onClick={() => setAddColumnOpen(true)}
             >
-              {hidden.size} hidden — show all
+              + Column
             </button>
-          ) : null}
-          <button
-            type="button"
-            className="hover:bg-accent rounded px-2 py-0.5"
-            data-testid="add-column-button"
-            onClick={() => setAddColumnOpen(true)}
-          >
-            + Column
-          </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div ref={hostRef} className="relative min-h-0 flex-1">
         <DataEditor
           ref={gridRef}
           width={size.width}
           height={size.height}
-          rows={sheet.rows.length}
+          rows={rowCount}
           columns={display.columns}
           getCellContent={getCellContent}
           getRowThemeOverride={getRowThemeOverride}
           onCellsEdited={onCellsEdited}
+          onDelete={() => {
+            const rowIds = useUiStore.getState().selectedRowIds;
+            if (rowIds.length === 0) return true;
+            if (onDeleteRows) {
+              onDeleteRows();
+              return false;
+            }
+            deleteRowsWithGroupPrompt(rowIds);
+            // The row delete already happened; suppress Glide's cell clear.
+            return false;
+          }}
           onPaste={onPaste}
           onFillPattern={onFillPattern}
           onRowAppended={onRowAppended}
+          onRowMoved={onMoveRow}
           onGridSelectionChange={handleSelectionChange}
           gridSelection={gridSelection}
+          provideEditor={provideEditor}
           onVisibleRegionChanged={(_range, tx, ty) => {
-            scrollMemory.set(sheetName, { tx, ty });
+            scrollMemory.set(compact ? `${sheetName}:drawer` : sheetName, { tx, ty });
           }}
           onColumnResizeEnd={onColumnResize}
           onHeaderContextMenu={(columnIndex, event) => {
+            if (compact) return;
             const key = display.keys[columnIndex - 1];
             if (!key) return;
             event.preventDefault();
@@ -500,14 +719,18 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
           }}
           freezeColumns={display.frozenCount}
           rowMarkers="number"
-          rowHeight={34}
-          headerHeight={34}
+          rowHeight={GRID_ROW_HEIGHT}
+          headerHeight={GRID_HEADER_HEIGHT}
           theme={gridTheme}
-          customRenderers={[gutterRenderer]}
+          customRenderers={[
+            gutterRenderer,
+            enumRenderer,
+            choiceNameRenderer,
+            collapsedPillRenderer,
+          ]}
           cellActivationBehavior="second-click"
           fillHandle={true}
           getCellsForSelection={true}
-          // Stage 3/4 replace the default text editor via `provideEditor`.
           keybindings={{ search: false }}
           smoothScrollX={true}
           smoothScrollY={true}
@@ -517,6 +740,7 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
       <RowContextMenu
         state={rowMenu}
         onClose={() => setRowMenu(null)}
+        compact={compact}
         actions={{
           insertAbove: () => insertRowsAtSelection('above'),
           insertBelow: () => insertRowsAtSelection('below'),
@@ -528,7 +752,8 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
           },
           duplicate: () => duplicateSelectedRows(),
           deleteRows: () => {
-            deleteSelectedRows();
+            if (onDeleteRows) onDeleteRows();
+            else deleteSelectedRows();
           },
           copy: () => {
             void clipboard.copy();
@@ -539,11 +764,27 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
           paste: () => {
             void clipboard.paste(activeTarget());
           },
+          ...(sheetName === 'survey' && isBeginRow(rowMenu?.rowId)
+            ? {
+                group: {
+                  unwrap: () => {
+                    if (rowMenu?.rowId) unwrapGroupRow(rowMenu.rowId);
+                  },
+                  deleteWithContents: () => {
+                    if (rowMenu?.rowId) deleteGroupRow(rowMenu.rowId);
+                  },
+                },
+              }
+            : {}),
         }}
       />
 
-      <HeaderMenu sheet={sheetName} state={headerMenu} onClose={() => setHeaderMenu(null)} />
-      <AddColumnDialog open={addColumnOpen} onOpenChange={setAddColumnOpen} sheet={sheetName} />
+      {compact ? null : (
+        <>
+          <HeaderMenu sheet={sheetName} state={headerMenu} onClose={() => setHeaderMenu(null)} />
+          <AddColumnDialog open={addColumnOpen} onOpenChange={setAddColumnOpen} sheet={sheetName} />
+        </>
+      )}
     </div>
   );
 }

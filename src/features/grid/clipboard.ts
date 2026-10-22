@@ -124,6 +124,14 @@ export interface PasteMatrixResult {
   rowIds: RowId[];
 }
 
+export interface PasteMatrixOptions {
+  /**
+   * Real row index for each visible row. Folding passes the projection so a
+   * paste across a collapsed region lands only on visible rows (Task 3.7).
+   */
+  rowIndexes?: ArrayLike<number>;
+}
+
 /**
  * Paste at a data-column start. Extra rows are appended, columns beyond the
  * available ones are dropped, and read-only cells are skipped. Callers wrap the
@@ -135,6 +143,7 @@ export function pasteMatrix(
   start: { rowIndex: number; columnIndex: number },
   matrix: readonly (readonly string[])[],
   keys: readonly ColumnKey[],
+  options: PasteMatrixOptions = {},
 ): PasteMatrixResult {
   const cleaned: string[][] = matrix.length > 0 ? matrix.map((row) => [...row]) : [];
   if (cleaned.length === 0) {
@@ -146,7 +155,19 @@ export function pasteMatrix(
   const height = cleaned.length;
   const existing = data[sheetName].rows.length;
   const startRow = Math.max(0, start.rowIndex);
-  const missing = Math.max(0, startRow + height - existing);
+
+  const targets: number[] = [];
+  let missing = 0;
+  if (options.rowIndexes) {
+    for (let offset = 0; offset < height; offset += 1) {
+      const real = options.rowIndexes[startRow + offset];
+      if (real === undefined || real < 0) missing += 1;
+      else targets.push(real);
+    }
+  } else {
+    missing = Math.max(0, startRow + height - existing);
+    for (let offset = 0; offset < height - missing; offset += 1) targets.push(startRow + offset);
+  }
 
   let next = data;
   if (missing > 0) {
@@ -156,6 +177,7 @@ export function pasteMatrix(
       existing,
       Array.from({ length: missing }, () => ({ cells: {} })),
     );
+    for (let offset = 0; offset < missing; offset += 1) targets.push(existing + offset);
   }
 
   const sheet = next[sheetName];
@@ -165,7 +187,8 @@ export function pasteMatrix(
   let skippedReadOnly = 0;
 
   for (let rowOffset = 0; rowOffset < height; rowOffset += 1) {
-    const row = sheet.rows[startRow + rowOffset];
+    const target = targets[rowOffset];
+    const row = target === undefined ? undefined : sheet.rows[target];
     if (!row) continue;
     rowIds.push(row.id);
     const sourceRow = cleaned[rowOffset] ?? [];

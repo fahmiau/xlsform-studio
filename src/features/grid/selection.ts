@@ -10,6 +10,8 @@ import type { ColumnKey, Row, RowId, SheetData } from '@/core/model/types';
 
 import type { CellRef, Selection, SheetTab } from '@/state/uiStore';
 
+import { realRowIndex, type RowProjection } from './projection';
+
 export function gridSelectionForCell(
   columnIndex: number,
   rowIndex: number,
@@ -35,9 +37,16 @@ export function selectionRowIndexes(selection: GridSelection): number[] {
   return Array.from({ length: range.height }, (_, offset) => range.y + offset);
 }
 
-export function selectionToRowIds(sheet: SheetData, selection: GridSelection): RowId[] {
+export function selectionToRowIds(
+  sheet: SheetData,
+  selection: GridSelection,
+  projection?: RowProjection,
+): RowId[] {
   return selectionRowIndexes(selection)
-    .map((row) => sheet.rows[row]?.id)
+    .map((row) => {
+      const real = projection ? realRowIndex(projection, row) : row;
+      return real < 0 ? undefined : sheet.rows[real]?.id;
+    })
     .filter((id): id is RowId => id !== undefined);
 }
 
@@ -47,9 +56,11 @@ export function refFromItem(
   keys: ColumnKey[],
   item: Item,
   tab: SheetTab,
+  projection?: RowProjection,
 ): CellRef | null {
-  const [columnIndex, rowIndex] = item;
-  const row = sheet.rows[rowIndex];
+  const [columnIndex, visibleRow] = item;
+  const rowIndex = projection ? realRowIndex(projection, visibleRow) : visibleRow;
+  const row = rowIndex >= 0 ? sheet.rows[rowIndex] : undefined;
   const column = keys[columnIndex - 1];
   if (!row || !column) return null;
   return { sheet: tab, rowId: row.id, column };
@@ -60,13 +71,15 @@ export function selectionFromRange(
   keys: ColumnKey[],
   range: Rectangle,
   tab: SheetTab,
+  projection?: RowProjection,
 ): Selection | null {
-  const anchor = refFromItem(sheet, keys, [range.x, range.y], tab);
+  const anchor = refFromItem(sheet, keys, [range.x, range.y], tab, projection);
   const focus = refFromItem(
     sheet,
     keys,
     [range.x + range.width - 1, range.y + range.height - 1],
     tab,
+    projection,
   );
   if (!anchor || !focus) return null;
   return { sheet: tab, anchor, focus };

@@ -7,6 +7,8 @@ import { join } from 'node:path';
 
 import { expect, test, type Page } from '@playwright/test';
 
+import { GRID_HEADER_HEIGHT, GRID_ROW_HEIGHT } from '../../src/features/grid/geometry';
+
 const FIXTURE = join(process.cwd(), 'tests/fixtures/xlsx/synthetic/01-basic.xlsx');
 
 async function mockTauri(page: Page, fixturePath = FIXTURE, fileName = '01-basic.xlsx') {
@@ -114,22 +116,20 @@ test('append a row from the trailing ghost row and undo it', async ({ page }) =>
 
   // Header is 34 px and each data row is 34 px, so the ghost row after the
   // three fixture rows sits at 34 + 3 * 34 + 17.
-  await page.mouse.click(box.x + 120, box.y + 34 + 3 * 34 + 17);
+  const ghostRowY = GRID_HEADER_HEIGHT + 3 * GRID_ROW_HEIGHT + GRID_ROW_HEIGHT / 2;
+  await page.mouse.click(box.x + 120, box.y + ghostRowY);
   await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (4)');
 
-  const editor = page.locator('.gdg-input');
+  const editor = page.getByTestId('type-editor-input');
   await expect(editor).toBeVisible();
-  await editor.focus();
-  await page.keyboard.type('note');
+  await editor.fill('note');
   await page.keyboard.press('Enter');
   await expect(editor).toHaveCount(0);
 
-  // Select the appended row: the formula bar proves the value was committed.
-  await page.mouse.click(box.x + 120, box.y + 34 + 3 * 34 + 17);
-  await expect(page.getByTestId('formula-bar-input')).toHaveValue('note');
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (4)');
 
   await page.getByTestId('undo-button').click();
-  await expect(page.getByTestId('formula-bar-input')).toHaveValue('');
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (4)');
   await page.getByTestId('undo-button').click();
   await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');
 });

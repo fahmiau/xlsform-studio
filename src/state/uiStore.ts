@@ -7,8 +7,10 @@ import { create } from 'zustand';
 import type { GridSelection } from '@glideapps/glide-data-grid';
 
 import type { ColumnKey, RowId } from '@/core/model/types';
+import type { ListMode } from '@/core/slug/slugify';
 
 export type SheetTab = 'survey' | 'choices' | 'settings';
+export type RightTab = 'choices' | 'ai';
 
 export interface CellRef {
   sheet: SheetTab;
@@ -43,6 +45,13 @@ export interface UiState {
   /** Non-contiguous row selection in the grid, as real row ids. */
   selectedRowIds: RowId[];
   collapsedGroupIds: Set<RowId>;
+  /** Row flashed by outline/reveal navigation (Task 3.9). */
+  flashRowId: RowId | null;
+  /** Choices Drawer binding + session list naming mode (Tasks 3.4/3.5). */
+  choiceDrawer: { open: boolean; rowId: RowId | null };
+  choiceModes: Record<string, ListMode>;
+  dismissedSharedLists: Set<string>;
+  rightTab: RightTab;
   panels: { outline: boolean; lint: boolean; ai: boolean };
   languageView: { mode: LanguageViewMode; language: string | null };
   /** Session-only per-sheet column widths (Task 2.2). */
@@ -56,6 +65,14 @@ export interface UiState {
   setGridSelection: (sheet: SheetTab, selection: GridSelection) => void;
   setSelectedRowIds: (rowIds: RowId[]) => void;
   toggleGroupCollapsed: (groupId: RowId) => void;
+  expandGroups: (groupIds: readonly RowId[]) => void;
+  flashRow: (rowId: RowId | null) => void;
+  openChoicesDrawer: (rowId?: RowId | null) => void;
+  closeChoicesDrawer: () => void;
+  setDrawerRow: (rowId: RowId) => void;
+  setChoiceMode: (listName: string, mode: ListMode) => void;
+  dismissSharedList: (listName: string) => void;
+  setRightTab: (tab: RightTab) => void;
   setPanel: (panel: keyof UiState['panels'], visible: boolean) => void;
   setLanguageView: (mode: LanguageViewMode, language?: string | null) => void;
   setColumnWidth: (sheet: SheetTab, column: ColumnKey, width: number) => void;
@@ -74,6 +91,11 @@ export const useUiStore = create<UiState>()((set) => ({
   gridSelections: {},
   selectedRowIds: [],
   collapsedGroupIds: new Set(),
+  flashRowId: null,
+  choiceDrawer: { open: false, rowId: null },
+  choiceModes: {},
+  dismissedSharedLists: new Set(),
+  rightTab: 'choices',
   panels: { outline: true, lint: false, ai: false },
   languageView: { mode: 'all', language: null },
   columnWidths: {},
@@ -107,6 +129,33 @@ export const useUiStore = create<UiState>()((set) => ({
       else collapsedGroupIds.add(groupId);
       return { collapsedGroupIds };
     }),
+  expandGroups: (groupIds) =>
+    set((state) => {
+      if (groupIds.length === 0) return {};
+      const collapsedGroupIds = new Set(state.collapsedGroupIds);
+      let changed = false;
+      for (const groupId of groupIds) {
+        if (collapsedGroupIds.delete(groupId)) changed = true;
+      }
+      return changed ? { collapsedGroupIds } : {};
+    }),
+  flashRow: (flashRowId) => set({ flashRowId }),
+  openChoicesDrawer: (rowId = null) =>
+    set((state) => ({
+      rightTab: 'choices',
+      choiceDrawer: { open: true, rowId: rowId ?? state.choiceDrawer.rowId },
+    })),
+  closeChoicesDrawer: () =>
+    set((state) => ({ choiceDrawer: { ...state.choiceDrawer, open: false } })),
+  setDrawerRow: (rowId) =>
+    set((state) =>
+      state.choiceDrawer.open ? { choiceDrawer: { ...state.choiceDrawer, rowId } } : {},
+    ),
+  setChoiceMode: (listName, mode) =>
+    set((state) => ({ choiceModes: { ...state.choiceModes, [listName]: mode } })),
+  dismissSharedList: (listName) =>
+    set((state) => ({ dismissedSharedLists: new Set(state.dismissedSharedLists).add(listName) })),
+  setRightTab: (rightTab) => set({ rightTab }),
   setPanel: (panel, visible) => set((state) => ({ panels: { ...state.panels, [panel]: visible } })),
   setLanguageView: (mode, language = null) => set({ languageView: { mode, language } }),
 

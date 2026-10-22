@@ -8,6 +8,10 @@ import {
   type CustomRenderer,
   type DrawArgs,
 } from '@glideapps/glide-data-grid';
+import { toast } from 'sonner';
+
+import type { RowId } from '@/core/model/types';
+import { useUiStore } from '@/state/uiStore';
 
 export const GUTTER_CELL_KIND = 'xlsform-gutter';
 
@@ -19,6 +23,10 @@ export interface GutterCellData {
   rowKind: GutterRowKind;
   orphan: boolean;
   collapsed: boolean;
+  /** False for unclosed groups; the chevron is disabled (XLS-003). */
+  canCollapse: boolean;
+  /** Begin row id, for toggling. */
+  rowId?: RowId;
 }
 
 export type GutterCell = CustomCell<GutterCellData>;
@@ -60,7 +68,7 @@ function drawChevron(
 
 function drawGutter(args: DrawArgs<GutterCell>): void {
   const { ctx, rect, theme, cell } = args;
-  const { depth, rowKind, orphan, collapsed } = cell.data;
+  const { depth, rowKind, orphan, collapsed, canCollapse } = cell.data;
   if (depth <= 0 && rowKind === null && !orphan) return;
 
   ctx.save();
@@ -89,8 +97,14 @@ function drawGutter(args: DrawArgs<GutterCell>): void {
   }
 
   if (rowKind === 'group' || rowKind === 'repeat') {
-    ctx.fillStyle = theme.textMedium;
-    drawChevron(ctx, rect.x + rect.width - 8, centerY, collapsed);
+    ctx.fillStyle = canCollapse ? theme.textMedium : theme.textLight;
+    if (canCollapse) drawChevron(ctx, rect.x + rect.width - 8, centerY, collapsed);
+    else {
+      // Unclosed group: show a muted chevron so the affordance is discoverable.
+      ctx.globalAlpha = 0.35;
+      drawChevron(ctx, rect.x + rect.width - 8, centerY, false);
+      ctx.globalAlpha = 1;
+    }
   }
 
   if (orphan) {
@@ -106,6 +120,20 @@ export const gutterRenderer: CustomRenderer<GutterCell> = {
   kind: GridCellKind.Custom,
   isMatch: isGutterCell,
   draw: drawGutter,
+  onClick: ({ cell, posX, bounds, preventDefault }) => {
+    const rowKind = cell.data.rowKind;
+    if (rowKind !== 'group' && rowKind !== 'repeat') return undefined;
+    if (posX < bounds.width - 20) return undefined;
+    preventDefault();
+    if (!cell.data.canCollapse || !cell.data.rowId) {
+      toast.info('This group is never closed', {
+        description: 'Add its matching end row first (lint rule XLS-003).',
+      });
+      return cell;
+    }
+    useUiStore.getState().toggleGroupCollapsed(cell.data.rowId);
+    return cell;
+  },
   // Gutter cells are never edited or pasted into.
   onPaste: () => undefined,
 };

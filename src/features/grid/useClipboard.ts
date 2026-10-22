@@ -15,6 +15,7 @@ import { useWorkbookStore } from '@/state/workbookStore';
 
 import { matrixFromSheet, parseTsv, pasteMatrix, serializeTsv, toHtmlTable } from './clipboard';
 import { isCellEditable } from './editability';
+import { realRowIndex, type RowProjection } from './projection';
 import { selectionBounds, selectionColumnKeys, selectionRowIndexes } from './selection';
 
 export interface ClipboardTarget {
@@ -50,15 +51,19 @@ export function useClipboard(
   sheetName: ManagedSheetName,
   keys: readonly ColumnKey[],
   selection: GridSelection,
+  projection?: RowProjection,
 ) {
   const readSelection = useCallback(() => {
     const bounds = selectionBounds(selection);
-    const rowIndexes = bounds
+    const visibleRows = bounds
       ? Array.from({ length: bounds.height }, (_, offset) => bounds.y + offset)
       : selectionRowIndexes(selection);
+    const rowIndexes = projection
+      ? visibleRows.map((row) => realRowIndex(projection, row)).filter((row) => row >= 0)
+      : visibleRows;
     const columnKeys = bounds ? selectionColumnKeys([...keys], bounds).keys : [...keys];
     return { rowIndexes, columnKeys };
-  }, [keys, selection]);
+  }, [keys, projection, selection]);
 
   const copy = useCallback(async (): Promise<boolean> => {
     const { rowIndexes, columnKeys } = readSelection();
@@ -117,7 +122,9 @@ export function useClipboard(
       useWorkbookStore
         .getState()
         .apply(`Paste ${cellCount} cell${cellCount === 1 ? '' : 's'}`, (data) => {
-          result = pasteMatrix(data, sheetName, target, matrix, [...keys]);
+          result = pasteMatrix(data, sheetName, target, matrix, [...keys], {
+            ...(projection ? { rowIndexes: projection.realIndexes } : {}),
+          });
           return result.data;
         });
       if (result?.droppedColumns) {
@@ -128,7 +135,7 @@ export function useClipboard(
       }
       return (result?.applied ?? 0) > 0;
     },
-    [keys, sheetName],
+    [keys, projection, sheetName],
   );
 
   return { copy, cut, paste };
