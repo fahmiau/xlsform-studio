@@ -181,6 +181,11 @@ export function applyChoiceEdits(
   options: ChoiceEditOptions = {},
 ): WorkbookData {
   if (edits.length === 0) return data;
+  for (const edit of edits) {
+    if (!data.choices.columns.includes(edit.column)) {
+      throw new Error(`Column "${edit.column}" does not exist in the choices sheet.`);
+    }
+  }
   const listKey = listNameKey(data);
   const nameKey = nameColumn(data);
   const labelKey = primaryLabelKey(data);
