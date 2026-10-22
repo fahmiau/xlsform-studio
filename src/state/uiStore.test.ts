@@ -25,6 +25,16 @@ describe('uiStore', () => {
     expect(useWorkbookStore.temporal.getState().pastStates).toHaveLength(0);
   });
 
+  it('switches sheets when revealing a row from another sheet', () => {
+    useUiStore.getState().setActiveSheet('survey');
+    useUiStore.getState().requestReveal('choices', 'choice-row');
+    expect(useUiStore.getState().activeSheet).toBe('choices');
+    expect(useUiStore.getState().reveal).toMatchObject({
+      sheet: 'choices',
+      rowId: 'choice-row',
+    });
+  });
+
   it('tracks active sheet, cell, selection, panels, and language view', () => {
     const cell = { sheet: 'survey' as const, rowId: 'r1', column: 'label' };
     useUiStore.getState().setActiveSheet('choices');

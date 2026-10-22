@@ -5,6 +5,7 @@ import { isTauriRuntime } from '@/features/shell/StatusBar';
 import { selectIsDirty, useWorkbookStore } from '@/state/workbookStore';
 import { requestUnsavedChoice } from './unsavedGuard';
 import { fileActions } from './fileActions';
+import { clearRecoverySnapshot } from './useAutosave';
 
 /**
  * Native window close guard (Task 1.10). Cancelling keeps the window open;
@@ -24,6 +25,7 @@ export function useCloseGuard(): void {
         const choice = await requestUnsavedChoice();
         if (choice === 'cancel') return;
         if (choice === 'save' && !(await fileActions.saveFile())) return;
+        if (choice === 'discard') await clearRecoverySnapshot();
         closing = true;
         await getCurrentWindow().close();
       })

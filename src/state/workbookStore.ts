@@ -15,9 +15,28 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 
 import { createEmptyWorkbook } from '@/core/model/factory';
-import type { WorkbookData } from '@/core/model/types';
+import type { ManagedSheetName, RowId, WorkbookData } from '@/core/model/types';
 
 export type DataUpdate = (data: WorkbookData) => WorkbookData;
+
+export interface ActionMeta {
+  label: string;
+  /** Sheet the action edited, for scroll-to-change after undo/redo. */
+  sheet?: ManagedSheetName;
+  /** Rows the action touched, in the result. */
+  rowIds?: RowId[];
+}
+
+/**
+ * History entries only store `data` (zundo partialize). Action metadata is
+ * keyed by the resulting data reference, so undo/redo can reveal the change
+ * without storing extra state inside the undo entry.
+ */
+const actionMeta = new WeakMap<WorkbookData, ActionMeta>();
+
+export function getActionMeta(data: WorkbookData): ActionMeta | undefined {
+  return actionMeta.get(data);
+}
 
 export interface LoadOptions {
   filePath?: string | null;
@@ -34,8 +53,10 @@ export interface WorkbookState {
   sourceHandle: ExcelJS.Workbook | null;
   warnings: string[];
   lastAction: string | null;
-  apply: (label: string, update: DataUpdate) => void;
+  apply: (label: string, update: DataUpdate, meta?: Omit<ActionMeta, 'label'>) => void;
   load: (data: WorkbookData, options?: LoadOptions) => void;
+  /** Restore a crash-recovery snapshot. Always marks the document dirty. */
+  restore: (data: WorkbookData, options?: LoadOptions) => void;
   newWorkbook: () => void;
   markSaved: (filePath?: string | null) => void;
 }
@@ -52,10 +73,11 @@ export const useWorkbookStore = create<WorkbookState>()(
       warnings: [],
       lastAction: null,
 
-      apply: (label, update) =>
+      apply: (label, update, meta) =>
         set((state) => {
           const next = update(state.data);
           if (next === state.data) return {};
+          actionMeta.set(next, { label, ...meta });
           return { data: next, lastAction: label };
         }),
 
@@ -63,6 +85,20 @@ export const useWorkbookStore = create<WorkbookState>()(
         set({
           data,
           savedData: data,
+          filePath: options.filePath ?? null,
+          sourceHandle: options.sourceHandle ?? null,
+          warnings: options.warnings ?? [],
+          lastAction: null,
+        });
+        useWorkbookStore.temporal.getState().clear();
+      },
+
+      restore: (data, options = {}) => {
+        set({
+          data,
+          // A recovered snapshot has no known saved reference: keep the
+          // document dirty until the user saves.
+          savedData: createEmptyWorkbook(),
           filePath: options.filePath ?? null,
           sourceHandle: options.sourceHandle ?? null,
           warnings: options.warnings ?? [],

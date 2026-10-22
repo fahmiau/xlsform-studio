@@ -1,14 +1,12 @@
 import { useEffect } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { FilePlus2, FolderOpen, Save, SaveAll } from 'lucide-react';
 import { Toaster } from 'sonner';
 
-import { Button } from '@/components/ui/button';
-import { StatusBar, isTauriRuntime } from '@/features/shell/StatusBar';
-import { fileActions, basename } from '@/features/file/fileActions';
+import { fileActions } from '@/features/file/fileActions';
 import { UnsavedDialog } from '@/features/file/UnsavedDialog';
 import { useCloseGuard } from '@/features/file/useCloseGuard';
-import { WorkbookSummary } from '@/features/file/WorkbookSummary';
+import { AppShell } from '@/features/shell/AppShell';
+import { isTauriRuntime } from '@/features/shell/StatusBar';
 import { registerCommands } from '@/lib/commands';
 import { installShortcuts } from '@/lib/shortcuts';
 import { useIsDirty, useWorkbookStore } from '@/state/workbookStore';
@@ -22,7 +20,7 @@ export default function App() {
   useCloseGuard();
 
   useEffect(() => {
-    const title = `xlsform-studio — ${basename(filePath)}${isDirty ? '*' : ''}`;
+    const title = `xlsform-studio — ${filePath ? filePath.split(/[\\/]/).at(-1) : 'Untitled form'}${isDirty ? '*' : ''}`;
     document.title = title;
     if (isTauriRuntime()) {
       void getCurrentWindow()
@@ -74,38 +72,10 @@ export default function App() {
   }, []);
 
   return (
-    <main className="flex h-full flex-col">
-      <header className="flex items-center gap-3 border-b px-4 py-2">
-        <span className="flex min-w-0 items-center gap-2">
-          <span className="text-sm font-semibold">xlsform-studio</span>
-          <span className="text-muted-foreground truncate text-sm" data-testid="document-title">
-            — {basename(filePath)}
-            {isDirty ? '*' : ''}
-          </span>
-        </span>
-        <div className="ml-auto flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={() => void fileActions.newFile()}>
-            <FilePlus2 aria-hidden /> New
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => void fileActions.openFile()}>
-            <FolderOpen aria-hidden /> Open
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => void fileActions.saveFile()}>
-            <Save aria-hidden /> Save
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => void fileActions.saveFileAs()}>
-            <SaveAll aria-hidden /> Save As
-          </Button>
-        </div>
-      </header>
-
-      <div className="flex-1 overflow-auto">
-        <WorkbookSummary />
-      </div>
-
-      <StatusBar />
+    <>
+      <AppShell />
       <UnsavedDialog />
       <Toaster richColors closeButton position="bottom-right" />
-    </main>
+    </>
   );
 }

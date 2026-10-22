@@ -59,16 +59,17 @@ test('open a fixture and save it back through the mocked IPC bridge', async ({ p
   );
 
   await page.goto('/');
-  await expect(page.getByTestId('summary')).toBeVisible();
-  await expect(page.getByTestId('summary-file-name')).toHaveText('Untitled form');
+  await expect(page.getByTestId('app-shell')).toBeVisible();
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (0)');
+  await expect(page.getByTestId('document-title')).toContainText('Untitled form');
 
   await page.getByRole('button', { name: 'Open' }).click();
 
-  await expect(page.getByTestId('summary-file-name')).toHaveText('01-basic.xlsx');
-  await expect(page.getByTestId('summary-survey')).toContainText('3');
-  await expect(page.getByTestId('summary-choices')).toContainText('2');
-  await expect(page.getByTestId('summary-settings')).toContainText('1');
   await expect(page.getByTestId('document-title')).toContainText('01-basic.xlsx');
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');
+  await expect(page.getByTestId('sheet-tab-choices')).toHaveText('choices (1 lists)');
+  await expect(page.getByTestId('sheet-tab-settings')).toHaveText('settings');
+  await expect(page.getByTestId('sheet-grid-survey')).toBeVisible();
 
   await page.getByRole('button', { name: 'Save As' }).click();
 

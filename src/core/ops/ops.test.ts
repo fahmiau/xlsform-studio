@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { addColumn, removeColumn } from './columns';
+import { addColumn, removeColumn, renameColumn } from './columns';
 import { getCell, setCells } from './cells';
 import { createEmptyWorkbook, createRow } from '../model/factory';
 import { deleteRows, duplicateRows, insertRows } from './rows';
@@ -103,5 +103,32 @@ describe('columns', () => {
     const data = workbookWithRows();
     expect(addColumn(data, 'survey', 'type')).toBe(data);
     expect(removeColumn(data, 'survey', 'nope')).toBe(data);
+  });
+
+  it('renames a header and moves its values and original header text', () => {
+    const data = workbookWithRows();
+    const withColumn = addColumn(data, 'survey', 'media::image');
+    const rowId = withColumn.survey.rows[0]!.id;
+    const withValue = setCells(withColumn, 'survey', [
+      { rowId, column: 'media::image', value: 'a.png' },
+    ]);
+    const source = {
+      ...withValue,
+      survey: { ...withValue.survey, headerText: { 'media::image': 'image' } },
+    };
+
+    const renamed = renameColumn(source, 'survey', 'media::image', 'media::photo');
+    expect(renamed.survey.columns).toContain('media::photo');
+    expect(renamed.survey.columns).not.toContain('media::image');
+    expect(renamed.survey.rows[0]?.cells['media::photo']).toBe('a.png');
+    expect(renamed.survey.rows[0]?.cells['media::image']).toBeUndefined();
+    expect(renamed.survey.headerText).toEqual({ 'media::photo': 'image' });
+  });
+
+  it('rejects empty and duplicate rename targets', () => {
+    const data = workbookWithRows();
+    expect(renameColumn(data, 'survey', 'type', '  ')).toBe(data);
+    expect(renameColumn(data, 'survey', 'type', 'name')).toBe(data);
+    expect(renameColumn(data, 'survey', 'missing', 'x')).toBe(data);
   });
 });

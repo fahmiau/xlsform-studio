@@ -8,7 +8,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { generateSyntheticFixtures } from '../../../tests/fixtures/generate-fixtures';
 import { createEmptyWorkbook } from '../model/factory';
 import type { SheetData, WorkbookData } from '../model/types';
-import { removeColumn } from '../ops/columns';
+import { removeColumn, addColumn } from '../ops/columns';
+import { setCells } from '../ops/cells';
 import { coerceCell } from './coerce';
 import { readWorkbook } from './read';
 import { writeWorkbook } from './write';
@@ -286,5 +287,20 @@ describe('new workbooks', () => {
     const reread = await readWorkbook(second);
     expect(reread.data.survey.columns.at(-1)).toBe('new_custom');
     expect(reread.data.survey.rows[0]?.cells.new_custom).toBe('value');
+  });
+
+  it('persists a media::image column added through the column op', async () => {
+    const data = createEmptyWorkbook();
+    data.survey.rows.push({ id: 'row1', cells: { type: 'text', name: 'photo', label: 'Photo' } });
+    const withColumn = addColumn(data, 'survey', 'media::image');
+    const rowId = withColumn.survey.rows[0]!.id;
+    const withValue = setCells(withColumn, 'survey', [
+      { rowId, column: 'media::image', value: 'images/a.png' },
+    ]);
+
+    const bytes = await writeWorkbook(withValue);
+    const reread = await readWorkbook(bytes);
+    expect(reread.data.survey.columns).toContain('media::image');
+    expect(reread.data.survey.rows[0]?.cells['media::image']).toBe('images/a.png');
   });
 });

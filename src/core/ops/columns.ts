@@ -32,3 +32,34 @@ export function removeColumn(
     }
   });
 }
+
+/**
+ * Rename a column header (the model key is the verbatim header, AD-5). Values
+ * move with the header so no data is lost; the original header text is removed.
+ */
+export function renameColumn(
+  data: WorkbookData,
+  sheet: ManagedSheetName,
+  from: ColumnKey,
+  to: ColumnKey,
+): WorkbookData {
+  const trimmed = to.trim();
+  if (!trimmed || from === trimmed) return data;
+  const target = data[sheet];
+  if (!target.columns.includes(from) || target.columns.includes(trimmed)) return data;
+  return produce(data, (draft) => {
+    draft[sheet].columns = draft[sheet].columns.map((column) =>
+      column === from ? trimmed : column,
+    );
+    for (const row of draft[sheet].rows) {
+      if (from in row.cells) {
+        row.cells[trimmed] = row.cells[from] ?? '';
+        delete row.cells[from];
+      }
+    }
+    if (draft[sheet].headerText && from in draft[sheet].headerText) {
+      draft[sheet].headerText[trimmed] = draft[sheet].headerText[from] ?? '';
+      delete draft[sheet].headerText[from];
+    }
+  });
+}

@@ -4,7 +4,7 @@ import { setCells } from '@/core/ops/cells';
 import { insertRows, type RowInsert } from '@/core/ops/rows';
 import { createEmptyWorkbook, createRow } from '@/core/model/factory';
 import { useDerivedStore } from './derivedStore';
-import { selectIsDirty, useWorkbookStore } from './workbookStore';
+import { getActionMeta, selectIsDirty, useWorkbookStore } from './workbookStore';
 
 function reset() {
   useWorkbookStore.getState().newWorkbook();
@@ -102,6 +102,33 @@ describe('dirty tracking', () => {
     expect(state.filePath).toBe('C:/forms/open.xlsx');
     expect(state.warnings).toEqual(['w']);
     expect(useWorkbookStore.temporal.getState().pastStates).toHaveLength(0);
+  });
+
+  it('restores a snapshot as dirty and clears history', () => {
+    addQuestion('q1');
+    const recovered = createEmptyWorkbook();
+    recovered.survey.rows.push(createRow({ type: 'text', name: 'recovered' }));
+
+    useWorkbookStore.getState().restore(recovered, { filePath: 'C:/forms/recovered.xlsx' });
+    expect(selectIsDirty(useWorkbookStore.getState())).toBe(true);
+    expect(useWorkbookStore.getState().filePath).toBe('C:/forms/recovered.xlsx');
+    expect(useWorkbookStore.getState().data.survey.rows[0]?.cells.name).toBe('recovered');
+    expect(useWorkbookStore.temporal.getState().pastStates).toHaveLength(0);
+  });
+
+  it('records action metadata for undo/redo reveal', () => {
+    useWorkbookStore
+      .getState()
+      .apply(
+        'Insert one row',
+        (data) => insertRows(data, 'survey', 0, [{ cells: { type: 'text', name: 'q1' } }]),
+        { sheet: 'survey', rowIds: ['row-1'] },
+      );
+    const meta = getActionMeta(useWorkbookStore.getState().data);
+    expect(meta).toMatchObject({ label: 'Insert one row', sheet: 'survey', rowIds: ['row-1'] });
+
+    useWorkbookStore.temporal.getState().undo();
+    expect(getActionMeta(useWorkbookStore.getState().data)).toBeUndefined();
   });
 });
 

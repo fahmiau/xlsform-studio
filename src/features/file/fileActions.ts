@@ -9,6 +9,7 @@ import { writeWorkbook } from '@/core/xlsx/write';
 import { selectIsDirty, useWorkbookStore } from '@/state/workbookStore';
 
 import { requestUnsavedChoice } from './unsavedGuard';
+import { clearRecoverySnapshot } from './useAutosave';
 
 const XLSX_FILTER = [{ name: 'XLSForm workbook', extensions: ['xlsx'] }];
 
@@ -30,6 +31,7 @@ async function writeTo(path: string): Promise<boolean> {
     });
     await commands.saveWorkbook(path, bytesToBase64(bytes));
     useWorkbookStore.getState().markSaved(path);
+    await clearRecoverySnapshot();
     toast.success(`Saved ${basename(path)}`);
     return true;
   } catch (error) {
@@ -68,6 +70,7 @@ async function confirmDiscard(): Promise<boolean> {
   const choice = await requestUnsavedChoice();
   if (choice === 'cancel') return false;
   if (choice === 'save') return saveFile();
+  await clearRecoverySnapshot();
   return true;
 }
 
@@ -88,6 +91,7 @@ async function openFile(): Promise<void> {
       sourceHandle: result.sourceHandle,
       warnings: result.warnings,
     });
+    await clearRecoverySnapshot();
     if (result.warnings.length > 0) {
       toast.warning(`${result.warnings.length} reader warning(s)`, {
         description: result.warnings[0],
@@ -103,6 +107,7 @@ async function openFile(): Promise<void> {
 async function newFile(): Promise<void> {
   if (!(await confirmDiscard())) return;
   useWorkbookStore.getState().newWorkbook();
+  await clearRecoverySnapshot();
 }
 
 export const fileActions = {

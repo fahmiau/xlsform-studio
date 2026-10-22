@@ -304,3 +304,36 @@ export const DEFAULT_SETTINGS_COLUMNS: readonly ColumnKey[] = [
   'style',
   'instance_name',
 ];
+
+/**
+ * Headers offered by the Add-column dialog (Task 2.6). This is a UX list only;
+ * any header the user types is accepted.
+ */
+export const KNOWN_XLSFORM_COLUMNS: readonly ColumnKey[] = [
+  'required_message',
+  'read_only',
+  'trigger',
+  'note',
+  'parameter',
+  'style',
+  'media::image',
+  'media::audio',
+  'media::video',
+  'bind::esri:fieldType',
+  'bind::esri:fieldLength',
+  'bind::odk:length',
+  'bind::odk:required',
+  'bind::odk:relevant',
+  'choice_filter',
+  'repeat_count',
+  'appearance',
+  'default',
+  'constraint',
+  'constraint_message',
+  'calculation',
+  'relevant',
+  'hint',
+  'label::English (en)',
+  'label::French (fr)',
+  'allow_choice_duplicates',
+];

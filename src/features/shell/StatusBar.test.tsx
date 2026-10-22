@@ -9,6 +9,7 @@ vi.mock('@/ipc/bindings', () => ({
 }));
 
 const { StatusBar } = await import('./StatusBar');
+const { useWorkbookStore } = await import('@/state/workbookStore');
 
 describe('StatusBar', () => {
   it('renders the version reported by the Rust command', async () => {
@@ -19,6 +20,7 @@ describe('StatusBar', () => {
 
     await waitFor(() => expect(screen.getByTestId('app-version')).toHaveTextContent('v0.1.0'));
     expect(screen.getByText('Offline')).toBeInTheDocument();
+    expect(screen.getByTestId('save-state')).toHaveTextContent('Saved');
   });
 
   it('stays quiet outside the Tauri runtime (browser previews and tests)', () => {
@@ -27,5 +29,15 @@ describe('StatusBar', () => {
     render(<StatusBar />);
     expect(appInfo).not.toHaveBeenCalled();
     expect(screen.queryByTestId('app-version')).not.toBeInTheDocument();
+  });
+
+  it('shows Unsaved after a document change', () => {
+    useWorkbookStore.getState().newWorkbook();
+    useWorkbookStore
+      .getState()
+      .apply('Edit cells', (data) => ({ ...data, survey: { ...data.survey } }));
+    render(<StatusBar />);
+    expect(screen.getByTestId('save-state')).toHaveTextContent('Unsaved');
+    useWorkbookStore.getState().newWorkbook();
   });
 });
