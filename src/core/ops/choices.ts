@@ -356,9 +356,15 @@ export function renumberList(
     rows.forEach((row, index) => {
       if (row.meta?.nameLocked) return;
       const label = labelKey ? (row.cells[labelKey] ?? '') : '';
-      let name = autoChoiceName(label, mode, index + 1, index + 1);
-      for (let attempt = index + 1; used.has(name) && attempt < index + 10_000; attempt += 1) {
-        name = autoChoiceName(label, mode, attempt + 1, attempt + 1);
+      const expected = autoChoiceName(label, mode, index + 1, index + 1);
+      // Snake names ignore position, so a repeated slug needs the same `_2`
+      // suffix the auto-fill path uses. Numeric/prefix names still skip
+      // positions until the next free number.
+      let name = mode.kind === 'snake' ? uniqueName(expected, used) : expected;
+      if (mode.kind !== 'snake') {
+        for (let attempt = index + 1; used.has(name) && attempt < index + 10_000; attempt += 1) {
+          name = autoChoiceName(label, mode, attempt + 1, attempt + 1);
+        }
       }
       row.cells[nameKeyValue] = name;
       used.add(name);

@@ -184,6 +184,21 @@ describe('inferNameLocks (reader hook)', () => {
     ]);
   });
 
+  it('reads mixed-case name and label headers', () => {
+    const choices = sheet(
+      [
+        row({ list_name: 'yes_no', Name: 'yes', Label: 'Yes' }),
+        row({ list_name: 'yes_no', Name: 'n', Label: 'No' }),
+      ],
+      ['list_name', 'Name', 'Label'],
+    );
+    inferNameLocks(choices);
+    expect(choices.rows.map((candidate) => candidate.meta?.nameLocked ?? false)).toEqual([
+      false,
+      true,
+    ]);
+  });
+
   it('uses the primary localized label column and clears stale locks', () => {
     const choices = sheet(
       [

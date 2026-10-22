@@ -229,6 +229,13 @@ describe('drawer insertion and bulk paste (Tasks 3.4/3.5)', () => {
     const renumbered = renumberList(data, 'scale', { kind: 'numeric' });
     expect(renumbered.choices.rows.map((row) => row.cells.name)).toEqual(['1', '3', '4']);
   });
+
+  it('gives colliding snake labels unique names', () => {
+    const data = workbook();
+    data.choices.rows = [choice('colors', 'other', 'Other'), choice('colors', 'other', 'Other')];
+    const renumbered = renumberList(data, 'colors', { kind: 'snake' });
+    expect(renumbered.choices.rows.map((row) => row.cells.name)).toEqual(['other', 'other_2']);
+  });
 });
 
 describe('shared lists and filters (Task 3.6)', () => {

@@ -138,7 +138,10 @@ export function inferNameLocks(choices: SheetData): void {
     const mode = detectListMode(rows.map((row) => row.cells[nameKey] ?? ''));
     rows.forEach((row, index) => {
       const label = labelKey ? (row.cells[labelKey] ?? '') : '';
-      const normalized: Row = { ...row, cells: { ...row.cells, label } };
+      const normalized: Row = {
+        ...row,
+        cells: { ...row.cells, label, name: row.cells[nameKey] ?? '' },
+      };
       if (inferNameLocked(normalized, mode, index + 1)) {
         row.meta = { ...row.meta, nameLocked: true };
       } else if (row.meta?.nameLocked) {
