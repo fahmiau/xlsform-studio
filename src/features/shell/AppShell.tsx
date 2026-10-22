@@ -5,15 +5,18 @@ import { Group, Panel, Separator } from 'react-resizable-panels';
 
 import { registerCommands } from '@/lib/commands';
 import { applyTheme } from '@/lib/theme';
-import { useDerivedStore } from '@/state/derivedStore';
 import { usePrefsStore } from '@/state/prefsStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 import { useUiStore, type SheetTab } from '@/state/uiStore';
 import { RecoveryDialog } from '@/features/file/RecoveryDialog';
 import { useAutosave } from '@/features/file/useAutosave';
+import { ChoicesDrawer } from '@/features/choices-drawer/ChoicesDrawer';
 import { SheetGrid } from '@/features/grid/SheetGrid';
 import { CHOICES_GRID_CONFIG, SURVEY_GRID_CONFIG } from '@/features/grid/columns';
+import { useFoldingCommands } from '@/features/grid/useFolding';
+import { useGroupCommands } from '@/features/grid/useGroupCommands';
 import { useRegisterRowCommands } from '@/features/grid/useRowCommands';
+import { OutlinePanel } from '@/features/outline/OutlinePanel';
 import { SettingsForm } from '@/features/settings-sheet/SettingsForm';
 
 import { FormulaBarSlot } from './FormulaBarSlot';
@@ -24,8 +27,6 @@ import { redoWithReveal, undoWithReveal } from './UndoRedoButtons';
 
 function LeftPanel() {
   const [tab, setTab] = useState<'outline' | 'lint'>('outline');
-  const groups = useDerivedStore((state) => state.indexes.groups);
-  const requestReveal = useUiStore((state) => state.requestReveal);
 
   return (
     <section className="flex h-full flex-col" data-testid="left-panel">
@@ -45,30 +46,11 @@ function LeftPanel() {
           </button>
         ))}
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-2 text-xs">
+      <div className="min-h-0 flex-1 overflow-hidden">
         {tab === 'outline' ? (
-          groups.roots.length === 0 ? (
-            <p className="text-muted-foreground">No groups or repeats yet.</p>
-          ) : (
-            <ul className="space-y-0.5" data-testid="outline-tree">
-              {groups.groups.map((group) => (
-                <li key={group.id} style={{ paddingLeft: group.depth * 10 }}>
-                  <button
-                    type="button"
-                    className="hover:bg-accent w-full truncate rounded px-1 py-0.5 text-left"
-                    onClick={() => requestReveal('survey', group.id)}
-                  >
-                    <span className="text-muted-foreground">
-                      {group.groupType === 'repeat' ? '[R]' : '[G]'}
-                    </span>{' '}
-                    {group.name || group.label || '(unnamed)'}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )
+          <OutlinePanel />
         ) : (
-          <p className="text-muted-foreground" data-testid="lint-placeholder">
+          <p className="text-muted-foreground p-2 text-xs" data-testid="lint-placeholder">
             Linter arrives in Stage 4.
           </p>
         )}
@@ -78,8 +60,8 @@ function LeftPanel() {
 }
 
 function RightPanel() {
-  const [tab, setTab] = useState<'choices' | 'ai'>('choices');
-  const lists = useDerivedStore((state) => state.indexes.choices.byList);
+  const tab = useUiStore((state) => state.rightTab);
+  const setRightTab = useUiStore((state) => state.setRightTab);
 
   return (
     <section className="flex h-full flex-col" data-testid="right-panel">
@@ -93,28 +75,17 @@ function RightPanel() {
             className={`rounded px-2 py-0.5 text-xs capitalize ${
               tab === name ? 'bg-accent font-medium' : 'text-muted-foreground'
             }`}
-            onClick={() => setTab(name)}
+            onClick={() => setRightTab(name)}
           >
             {name === 'ai' ? 'AI Assistant' : 'Choices'}
           </button>
         ))}
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-2 text-xs">
+      <div className="min-h-0 flex-1 overflow-hidden">
         {tab === 'choices' ? (
-          Object.keys(lists).length === 0 ? (
-            <p className="text-muted-foreground">No choice lists yet.</p>
-          ) : (
-            <ul className="space-y-0.5" data-testid="choices-summary">
-              {Object.entries(lists).map(([name, rows]) => (
-                <li key={name} className="flex justify-between gap-2 px-1 py-0.5">
-                  <span className="truncate">{name}</span>
-                  <span className="text-muted-foreground">{rows.length}</span>
-                </li>
-              ))}
-            </ul>
-          )
+          <ChoicesDrawer />
         ) : (
-          <p className="text-muted-foreground" data-testid="ai-placeholder">
+          <p className="text-muted-foreground p-2 text-xs" data-testid="ai-placeholder">
             AI assistant arrives in Stage 6.
           </p>
         )}
@@ -161,6 +132,8 @@ export function AppShell() {
   const activeSheet = useUiStore((state) => state.activeSheet);
 
   useRegisterRowCommands();
+  useFoldingCommands();
+  useGroupCommands();
   useAutosave();
 
   useEffect(() => {
@@ -190,6 +163,17 @@ export function AppShell() {
         title: 'Redo',
         shortcut: { code: 'KeyZ', ctrlOrMeta: true, shift: true },
         run: redoWithReveal,
+      },
+      {
+        id: 'drawer.open',
+        title: 'Open choices drawer',
+        shortcut: { code: 'Enter', ctrlOrMeta: true },
+        run: () => {
+          const ui = useUiStore.getState();
+          const rowId = ui.activeCell?.sheet === 'survey' ? ui.activeCell.rowId : null;
+          usePrefsStore.getState().setPanelVisible('right', true);
+          ui.openChoicesDrawer(rowId);
+        },
       },
     ]);
   }, []);
