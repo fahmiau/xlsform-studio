@@ -66,12 +66,8 @@ test('edit a grid cell with the keyboard and undo it', async ({ page }) => {
 
   const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
   await canvas.waitFor();
-  const box = await canvas.boundingBox();
-  if (!box) throw new Error('Grid canvas has no bounds');
-  await page.mouse.click(box.x + 160, box.y + 85);
-  await page.waitForTimeout(200);
-  await page.mouse.click(box.x + 160, box.y + 85);
-  await page.waitForTimeout(200);
+  await canvas.focus();
+  await page.keyboard.press('ArrowDown');
 
   await expect(page.getByTestId('formula-bar-input')).toHaveValue('integer');
   const formula = page.getByTestId('formula-bar-input');
