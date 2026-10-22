@@ -179,6 +179,8 @@ function parseManagedSheet(
 
   const headerText: Record<ColumnKey, string> = {};
   for (const column of usedColumns) {
+    // An empty original header is still meaningful: the writer must reuse the
+    // headerless worksheet column instead of appending a new one.
     if (column.original !== column.header) headerText[column.header] = column.original;
   }
 

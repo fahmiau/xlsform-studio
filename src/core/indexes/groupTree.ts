@@ -5,6 +5,7 @@
 import { resolveColumn } from '../model/columns';
 import { parseType } from '../model/parseType';
 import type { RowId, SheetData } from '../model/types';
+import { columnKey } from './columns';
 import type { VariableOptions } from './variables';
 
 export interface QuestionNode {
@@ -68,9 +69,11 @@ export function buildGroupTree(sheet: SheetData, options: VariableOptions = {}):
   const groups: GroupNode[] = [];
   const stack: OpenGroup[] = [];
   const labelKey = primaryLabelKey(sheet, options);
+  const typeKey = columnKey(sheet, 'type');
+  const nameKey = columnKey(sheet, 'name');
 
   sheet.rows.forEach((row, rowIndex) => {
-    const type = parseType(row.cells.type ?? '');
+    const type = parseType(row.cells[typeKey] ?? '');
     const base = type.base;
     const depth = stack.length;
     depthByRowIndex[rowIndex] = depth;
@@ -78,7 +81,7 @@ export function buildGroupTree(sheet: SheetData, options: VariableOptions = {}):
     if (base === 'begin_group' || base === 'begin_repeat') {
       const node: GroupNode = {
         id: row.id,
-        name: (row.cells.name ?? '').trim(),
+        name: (row.cells[nameKey] ?? '').trim(),
         label: labelKey ? (row.cells[labelKey] ?? '') : '',
         groupType: base === 'begin_repeat' ? 'repeat' : 'group',
         startRowIndex: rowIndex,
@@ -114,7 +117,7 @@ export function buildGroupTree(sheet: SheetData, options: VariableOptions = {}):
     if (parent) {
       parent.node.children.push({
         id: row.id,
-        name: (row.cells.name ?? '').trim(),
+        name: (row.cells[nameKey] ?? '').trim(),
         type: base,
         rowIndex,
       });

@@ -5,6 +5,7 @@
 import { parseType } from '../model/parseType';
 import { resolveColumn } from '../model/columns';
 import type { RowId, SheetData } from '../model/types';
+import { columnKey } from './columns';
 
 export interface VariableMetadata {
   rowId: RowId;
@@ -53,18 +54,23 @@ function labelColumn(sheet: SheetData, options: VariableOptions): string | undef
 
 export function buildVariableMap(sheet: SheetData, options: VariableOptions = {}): VariableMap {
   const labelKey = labelColumn(sheet, options);
+  const typeKey = columnKey(sheet, 'type');
+  const nameKey = columnKey(sheet, 'name');
   const variables: Record<string, VariableMetadata> = {};
   const duplicates: Record<string, RowId[]> = {};
   const order: VariableMetadata[] = [];
-  const groupStack: string[] = [];
+  const groupStack: Array<{ name: string; kind: 'group' | 'repeat' }> = [];
 
   sheet.rows.forEach((row, rowIndex) => {
-    const type = parseType(row.cells.type ?? '');
+    const type = parseType(row.cells[typeKey] ?? '');
     const base = type.base;
-    const name = (row.cells.name ?? '').trim();
+    const name = (row.cells[nameKey] ?? '').trim();
 
     if (base === 'end_group' || base === 'end_repeat') {
-      groupStack.pop();
+      // Match the open kind like `groupTree` does; a mismatched end tag is an
+      // orphan, not a reason to pop an unrelated group off the stack.
+      const expected = base === 'end_repeat' ? 'repeat' : 'group';
+      if (groupStack[groupStack.length - 1]?.kind === expected) groupStack.pop();
       return;
     }
 
@@ -76,7 +82,7 @@ export function buildVariableMap(sheet: SheetData, options: VariableOptions = {}
       name,
       questionType: base,
       primaryLabel: labelKey ? (row.cells[labelKey] ?? '') : '',
-      groupPath: [...groupStack],
+      groupPath: groupStack.map((entry) => entry.name),
     };
     if (type.listName) metadata.listName = type.listName;
 
@@ -88,7 +94,7 @@ export function buildVariableMap(sheet: SheetData, options: VariableOptions = {}
     order.push(metadata);
 
     if (base === 'begin_group' || base === 'begin_repeat') {
-      groupStack.push(name);
+      groupStack.push({ name, kind: base === 'begin_repeat' ? 'repeat' : 'group' });
     }
   });
 

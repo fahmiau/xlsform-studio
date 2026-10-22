@@ -529,4 +529,21 @@ export async function generateSyntheticFixtures() {
     );
     await write('20-unicode.xlsx', workbook);
   }
+
+  // 21 — data in a column without a header. The reader keeps it as `column_4`;
+  // the writer must reuse the same worksheet column instead of appending a copy.
+  {
+    const workbook = newWorkbook();
+    const survey = workbook.addWorksheet('survey');
+    survey.addRow(['type', 'name', 'label', '', 'hint']);
+    survey.addRow(['text', 'q1', 'Question one', 'unlabelled note', 'Hint one']);
+    survey.addRow(['integer', 'q2', 'Question two', '42', '']);
+    styleHeader(survey, 5);
+    survey.getColumn(4).width = 28;
+    addSheet(workbook, 'choices', STANDARD_CHOICES_HEADERS, []);
+    addSheet(workbook, 'settings', STANDARD_SETTINGS_HEADERS, [
+      ['Headerless column', 'headerless_column', '1'],
+    ]);
+    await write('21-headerless-column.xlsx', workbook);
+  }
 }

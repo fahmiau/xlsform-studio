@@ -2,7 +2,7 @@
 
 Two fixture sets feed the reader/writer tests (Task 1.3, master plan §6).
 
-- `synthetic/` — 20 generated edge cases, committed. Regenerate with `pnpm fixtures`.
+- `synthetic/` — 21 generated edge cases, committed. Regenerate with `pnpm fixtures`.
 - `real-world/` — 7 forms from the [pyxform](https://github.com/XLSForm/pyxform)
   test suite, BSD-2-Clause. See `real-world/README.md` for provenance.
 - `../../generated/` — the 2,000-row reference form; generated on demand, not
@@ -32,3 +32,4 @@ Two fixture sets feed the reader/writer tests (Task 1.3, master plan §6).
 | `18-settings-custom.xlsx` | Empty `survey`/`choices`, settings row with custom keys. |
 | `19-empty-form.xlsx` | Headers only, no data rows. |
 | `20-unicode.xlsx` | Arabic labels, emoji, 500-character text, non-ASCII choice values. |
+| `21-headerless-column.xlsx` | Data in a column with no header (kept as `column_4`; save must not duplicate it). |

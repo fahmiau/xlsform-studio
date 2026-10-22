@@ -59,12 +59,18 @@ function targetColumns(
   headerRow: number,
 ): { targets: ColumnTarget[]; maxColumn: number } {
   const existing = new Map<string, number[]>();
+  const emptyHeaderColumns: number[] = [];
   const header = worksheet.getRow(headerRow);
   const maxColumn = Math.max(worksheet.columnCount, sheet.columns.length);
   for (let column = 1; column <= maxColumn; column += 1) {
     const cell = header.getCell(column);
     const text = cell.value === null || cell.value === undefined ? '' : String(cell.text ?? '');
-    if (text === '') continue;
+    if (text === '') {
+      // Headerless columns are matched positionally: the reader names them
+      // `column_N` but keeps the original empty header in `headerText`.
+      emptyHeaderColumns.push(column);
+      continue;
+    }
     const list = existing.get(text) ?? [];
     list.push(column);
     existing.set(text, list);
@@ -75,6 +81,20 @@ function targetColumns(
   let nextIndex = maxColumn + 1;
   for (const key of sheet.columns) {
     const original = headerCellValue(sheet, key);
+    if (original === '') {
+      const encoded = /^column_(\d+)$/.exec(key)?.[1];
+      const preferred = encoded === undefined ? undefined : Number(encoded);
+      const index =
+        (preferred !== undefined &&
+        emptyHeaderColumns.includes(preferred) &&
+        !claimed.has(preferred)
+          ? preferred
+          : emptyHeaderColumns.find((candidate) => !claimed.has(candidate))) ?? nextIndex;
+      if (index === nextIndex) nextIndex += 1;
+      claimed.add(index);
+      targets.push({ key, original, index, isNew: !emptyHeaderColumns.includes(index) });
+      continue;
+    }
     const candidates = existing.get(original) ?? [];
     const index = candidates.find((candidate) => !claimed.has(candidate));
     if (index !== undefined) {
@@ -103,12 +123,15 @@ function copyHeaderStyle(
 
 function rewriteManagedSheet(sheet: SheetData, worksheet: Worksheet): void {
   const headerRow = firstValueRow(worksheet);
+  const oldMaxColumn = worksheet.columnCount;
+  const oldLastRow = lastValueRow(worksheet);
   const { targets, maxColumn } = targetColumns(sheet, worksheet, headerRow);
   const header = worksheet.getRow(headerRow);
   const styleSource = targets[0]?.index ?? 1;
 
   for (const target of targets) {
     const cell = header.getCell(target.index);
+    if (target.original === '') continue;
     if (target.isNew) {
       cell.value = target.original;
       copyHeaderStyle(worksheet, headerRow, styleSource, target.index);
@@ -117,7 +140,6 @@ function rewriteManagedSheet(sheet: SheetData, worksheet: Worksheet): void {
     }
   }
 
-  const oldLastRow = lastValueRow(worksheet);
   const dataRowCount = sheet.rows.length;
   for (let offset = 0; offset < dataRowCount; offset += 1) {
     const sourceRow = sheet.rows[offset];
@@ -138,33 +160,19 @@ function rewriteManagedSheet(sheet: SheetData, worksheet: Worksheet): void {
     row.commit();
   }
 
-  // A deleted column must not leave its data behind under an old header.
-  for (const [original, indices] of groupOldHeaders(worksheet, headerRow)) {
-    if (sheet.columns.some((key) => headerCellValue(sheet, key) === original)) continue;
-    for (const index of indices) {
-      for (
-        let rowNumber = headerRow;
-        rowNumber <= headerRow + Math.max(oldLastRow, dataRowCount);
-        rowNumber += 1
-      ) {
-        worksheet.getRow(rowNumber).getCell(index).value = null;
-      }
+  // A deleted column must not leave its header or data behind. Headerless
+  // columns are included here, so removing `column_N` also clears its cells.
+  const claimed = new Set(targets.map((target) => target.index));
+  for (let column = 1; column <= oldMaxColumn; column += 1) {
+    if (claimed.has(column)) continue;
+    for (
+      let rowNumber = headerRow;
+      rowNumber <= Math.max(oldLastRow, headerRow + dataRowCount);
+      rowNumber += 1
+    ) {
+      worksheet.getRow(rowNumber).getCell(column).value = null;
     }
   }
-}
-
-function groupOldHeaders(worksheet: Worksheet, headerRow: number): Map<string, number[]> {
-  const result = new Map<string, number[]>();
-  const header = worksheet.getRow(headerRow);
-  for (let column = 1; column <= worksheet.columnCount; column += 1) {
-    const cell = header.getCell(column);
-    const text = cell.value === null || cell.value === undefined ? '' : String(cell.text ?? '');
-    if (!text) continue;
-    const list = result.get(text) ?? [];
-    list.push(column);
-    result.set(text, list);
-  }
-  return result;
 }
 
 function buildFreshSheet(workbook: ExcelJS.Workbook, sheet: SheetData): Worksheet {

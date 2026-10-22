@@ -8,6 +8,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { generateSyntheticFixtures } from '../../../tests/fixtures/generate-fixtures';
 import { createEmptyWorkbook } from '../model/factory';
 import type { SheetData, WorkbookData } from '../model/types';
+import { removeColumn } from '../ops/columns';
 import { coerceCell } from './coerce';
 import { readWorkbook } from './read';
 import { writeWorkbook } from './write';
@@ -154,6 +155,44 @@ describe('round-trip golden suite', () => {
       'label',
       'label',
     ]);
+  });
+
+  it('keeps data in a headerless column in place instead of duplicating it', async () => {
+    const bytes = new Uint8Array(await readFile(join(SYNTHETIC_DIR, '21-headerless-column.xlsx')));
+    const read = await readWorkbook(bytes);
+    expect(read.data.survey.columns).toContain('column_4');
+    expect(read.data.survey.headerText).toEqual({ column_4: '' });
+
+    const written = await writeWorkbook(read.data, { sourceHandle: read.sourceHandle });
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(toExcelBuffer(written));
+    const survey = workbook.getWorksheet('survey');
+    expect(survey?.columnCount).toBe(5);
+    expect(survey?.getRow(1).getCell(4).text).toBe('');
+    expect(survey?.getRow(2).getCell(4).text).toBe('unlabelled note');
+
+    const reread = await readWorkbook(written);
+    expect(reread.data.survey.columns).toEqual(read.data.survey.columns);
+    expect(normaliseSheet(reread.data.survey)).toEqual(normaliseSheet(read.data.survey));
+  });
+
+  it('clears a deleted column so its header and data do not linger', async () => {
+    const bytes = new Uint8Array(await readFile(join(SYNTHETIC_DIR, '02-custom-columns.xlsx')));
+    const read = await readWorkbook(bytes);
+    const data = removeColumn(read.data, 'survey', 'media::image');
+    expect(data.survey.columns).not.toContain('media::image');
+    expect(data.survey.rows[0]?.cells['media::image']).toBeUndefined();
+
+    const written = await writeWorkbook(data, { sourceHandle: read.sourceHandle });
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(toExcelBuffer(written));
+    const survey = workbook.getWorksheet('survey');
+    const headerTexts = (survey?.getRow(1).values as ExcelJS.CellValue[] | undefined) ?? [];
+    expect(headerTexts).not.toContain('media::image');
+    expect(survey?.getRow(2).values).not.toContain('images/note.png');
+
+    const reread = await readWorkbook(written);
+    expect(reread.data.survey.columns).not.toContain('media::image');
   });
 });
 

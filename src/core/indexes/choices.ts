@@ -4,6 +4,7 @@
  */
 import { parseType } from '../model/parseType';
 import type { Row, RowId, SheetData } from '../model/types';
+import { columnKey } from './columns';
 
 export interface ChoicesIndex {
   byList: Record<string, Row[]>;
@@ -13,16 +14,18 @@ export interface ChoicesIndex {
 
 export function buildChoicesByList(choices: SheetData, survey?: SheetData): ChoicesIndex {
   const byList: Record<string, Row[]> = {};
+  const listNameKey = columnKey(choices, 'list_name');
   for (const row of choices.rows) {
-    const listName = (row.cells.list_name ?? '').trim();
+    const listName = (row.cells[listNameKey] ?? '').trim();
     if (!listName) continue;
     (byList[listName] ??= []).push(row);
   }
 
   const listUsage: Record<string, RowId[]> = {};
   if (survey) {
+    const typeKey = columnKey(survey, 'type');
     for (const row of survey.rows) {
-      const { listName } = parseType(row.cells.type ?? '');
+      const { listName } = parseType(row.cells[typeKey] ?? '');
       if (!listName) continue;
       (listUsage[listName] ??= []).push(row.id);
     }
