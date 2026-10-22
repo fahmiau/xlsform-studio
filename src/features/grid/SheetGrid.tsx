@@ -302,8 +302,9 @@ export function SheetGrid({ sheetName, config }: SheetGridProps) {
       const matrix = values.map((row) => [...row]);
       if (matrix.length === 0) return false;
       let result: ReturnType<typeof pasteMatrix> | undefined;
+      const cellCount = matrix.reduce((total, row) => total + row.length, 0);
       useWorkbookStore.getState().apply(
-        `Paste ${matrix.length} row${matrix.length === 1 ? '' : 's'}`,
+        `Paste ${cellCount} cell${cellCount === 1 ? '' : 's'}`,
         (current) => {
           result = pasteMatrix(
             current,

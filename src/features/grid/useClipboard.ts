@@ -9,7 +9,7 @@ import type { GridSelection } from '@glideapps/glide-data-grid';
 import { toast } from 'sonner';
 
 import { findColumnKey } from '@/core/indexes/columns';
-import type { ColumnKey, ManagedSheetName } from '@/core/model/types';
+import type { ColumnKey, ManagedSheetName, RowId } from '@/core/model/types';
 import { setCells } from '@/core/ops/cells';
 import { useWorkbookStore } from '@/state/workbookStore';
 
@@ -84,8 +84,15 @@ export function useClipboard(
     if (edits.length > 0) {
       useWorkbookStore
         .getState()
-        .apply(`Cut ${edits.length} cell${edits.length === 1 ? '' : 's'}`, (data) =>
-          setCells(data, sheetName, edits),
+        .apply(
+          `Cut ${edits.length} cell${edits.length === 1 ? '' : 's'}`,
+          (data) => setCells(data, sheetName, edits),
+          {
+            sheet: sheetName,
+            rowIds: rowIndexes
+              .map((rowIndex) => sheet.rows[rowIndex]?.id)
+              .filter((id): id is RowId => id !== undefined),
+          },
         );
     }
     return true;
@@ -106,9 +113,10 @@ export function useClipboard(
       if (matrix.length === 0) return false;
 
       let result: ReturnType<typeof pasteMatrix> | undefined;
+      const cellCount = matrix.reduce((total, row) => total + row.length, 0);
       useWorkbookStore
         .getState()
-        .apply(`Paste ${matrix.length} row${matrix.length === 1 ? '' : 's'}`, (data) => {
+        .apply(`Paste ${cellCount} cell${cellCount === 1 ? '' : 's'}`, (data) => {
           result = pasteMatrix(data, sheetName, target, matrix, [...keys]);
           return result.data;
         });

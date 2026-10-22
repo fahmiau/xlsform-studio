@@ -103,6 +103,37 @@ test('insert rows with the keyboard and undo/redo them', async ({ page }) => {
   await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (4)');
 });
 
+test('append a row from the trailing ghost row and undo it', async ({ page }) => {
+  await mockTauri(page);
+  await openFixture(page);
+
+  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await canvas.waitFor();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('grid canvas has no layout box');
+
+  // Header is 34 px and each data row is 34 px, so the ghost row after the
+  // three fixture rows sits at 34 + 3 * 34 + 17.
+  await page.mouse.click(box.x + 120, box.y + 34 + 3 * 34 + 17);
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (4)');
+
+  const editor = page.locator('.gdg-input');
+  await expect(editor).toBeVisible();
+  await editor.focus();
+  await page.keyboard.type('note');
+  await page.keyboard.press('Enter');
+  await expect(editor).toHaveCount(0);
+
+  // Select the appended row: the formula bar proves the value was committed.
+  await page.mouse.click(box.x + 120, box.y + 34 + 3 * 34 + 17);
+  await expect(page.getByTestId('formula-bar-input')).toHaveValue('note');
+
+  await page.getByTestId('undo-button').click();
+  await expect(page.getByTestId('formula-bar-input')).toHaveValue('');
+  await page.getByTestId('undo-button').click();
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');
+});
+
 test('edit the settings form and undo it', async ({ page }) => {
   await mockTauri(page);
   await page.goto('/');
