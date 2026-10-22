@@ -108,9 +108,9 @@ describe('choice edits (Task 3.4)', () => {
   it('rejects edits for a column the sheet does not have', () => {
     const data = workbook();
     const rowId = data.choices.rows[0]!.id;
-    expect(() =>
-      applyChoiceEdits(data, [{ rowId, column: 'not_a_column', value: 'x' }]),
-    ).toThrow(/does not exist in the choices sheet/);
+    expect(() => applyChoiceEdits(data, [{ rowId, column: 'not_a_column', value: 'x' }])).toThrow(
+      /does not exist in the choices sheet/,
+    );
   });
 
   it('auto-fills unique names from labels', () => {

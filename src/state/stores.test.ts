@@ -1,9 +1,9 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { setCells } from '@/core/ops/cells';
 import { insertRows, type RowInsert } from '@/core/ops/rows';
 import { createEmptyWorkbook, createRow } from '@/core/model/factory';
-import { useDerivedStore } from './derivedStore';
+import { LINT_DEBOUNCE_MS, useDerivedStore } from './derivedStore';
 import { getActionMeta, selectIsDirty, useWorkbookStore } from './workbookStore';
 
 function reset() {
@@ -152,5 +152,34 @@ describe('derivedStore', () => {
       },
     }));
     expect(useDerivedStore.getState().indexes.choices.byList.yes_no).toHaveLength(1);
+  });
+
+  it('debounces diagnostics and runs them immediately on load', () => {
+    vi.useFakeTimers();
+    try {
+      useWorkbookStore
+        .getState()
+        .apply('Add unlabeled', (data) =>
+          insertRows(data, 'survey', data.survey.rows.length, [
+            { cells: { type: 'text', name: 'no_label' } },
+          ]),
+        );
+      expect(useDerivedStore.getState().diagnostics).toEqual([]);
+      vi.advanceTimersByTime(LINT_DEBOUNCE_MS - 1);
+      expect(useDerivedStore.getState().diagnostics).toEqual([]);
+      vi.advanceTimersByTime(1);
+      expect(useDerivedStore.getState().diagnostics.map((issue) => issue.ruleId)).toContain(
+        'XLS-010',
+      );
+
+      const data = createEmptyWorkbook();
+      data.survey.rows.push(createRow({ type: 'calculate', name: 'c' }));
+      useWorkbookStore.getState().load(data);
+      expect(useDerivedStore.getState().diagnostics.map((issue) => issue.ruleId)).toContain(
+        'XLS-009',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

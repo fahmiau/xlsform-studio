@@ -3,7 +3,7 @@
  * Pure functions over `SheetData`.
  */
 import { parseType } from '../model/parseType';
-import { resolveColumn } from '../model/columns';
+import { defaultLabelColumn } from '../model/labelColumn';
 import type { RowId, SheetData } from '../model/types';
 import { columnKey } from './columns';
 
@@ -33,23 +33,7 @@ export interface VariableOptions {
 }
 
 function labelColumn(sheet: SheetData, options: VariableOptions): string | undefined {
-  const labelColumns = sheet.columns.filter((column) => resolveColumn(column).base === 'label');
-  if (labelColumns.length === 0) return undefined;
-
-  const preferred = options.defaultLanguage?.trim().toLowerCase();
-  if (preferred) {
-    const localized = labelColumns.find((column) => {
-      const language = resolveColumn(column).language;
-      if (!language) return false;
-      return (
-        language.code?.toLowerCase() === preferred || language.name.toLowerCase() === preferred
-      );
-    });
-    if (localized) return localized;
-  }
-
-  const plain = labelColumns.find((column) => !resolveColumn(column).language);
-  return plain ?? labelColumns[0];
+  return defaultLabelColumn(sheet, options.defaultLanguage);
 }
 
 export function buildVariableMap(sheet: SheetData, options: VariableOptions = {}): VariableMap {
