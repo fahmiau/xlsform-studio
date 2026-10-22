@@ -27,6 +27,8 @@ export interface GutterCellData {
   canCollapse: boolean;
   /** Begin row id, for toggling. */
   rowId?: RowId;
+  /** Worst diagnostic in the row, for the gutter dot (XLS-001…011). */
+  diagnosticSeverity?: 'error' | 'warning';
 }
 
 export type GutterCell = CustomCell<GutterCellData>;
@@ -68,8 +70,8 @@ function drawChevron(
 
 function drawGutter(args: DrawArgs<GutterCell>): void {
   const { ctx, rect, theme, cell } = args;
-  const { depth, rowKind, orphan, collapsed, canCollapse } = cell.data;
-  if (depth <= 0 && rowKind === null && !orphan) return;
+  const { depth, rowKind, orphan, collapsed, canCollapse, diagnosticSeverity } = cell.data;
+  if (depth <= 0 && rowKind === null && !orphan && !diagnosticSeverity) return;
 
   ctx.save();
   ctx.lineWidth = 1;
@@ -111,6 +113,13 @@ function drawGutter(args: DrawArgs<GutterCell>): void {
     ctx.fillStyle = '#dc2626';
     ctx.beginPath();
     ctx.arc(rect.x + 4, centerY, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  if (diagnosticSeverity) {
+    ctx.fillStyle = diagnosticSeverity === 'error' ? '#dc2626' : '#d97706';
+    ctx.beginPath();
+    ctx.arc(rect.x + rect.width - 5, rect.y + 5, 2.5, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();

@@ -57,6 +57,7 @@ export function OutlineNode({
   onJump,
   onToggle,
   onActivate,
+  severity,
 }: {
   item: OutlineItem;
   group?: GroupNode;
@@ -65,6 +66,7 @@ export function OutlineNode({
   onJump: () => void;
   onToggle: () => void;
   onActivate: () => void;
+  severity?: 'error' | 'warning';
 }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: item.key,
@@ -154,6 +156,17 @@ export function OutlineNode({
 
       {hidden > 0 ? (
         <span className="text-muted-foreground shrink-0 text-[10px]">({hidden} hidden)</span>
+      ) : null}
+
+      {severity ? (
+        <span
+          className={`size-1.5 shrink-0 rounded-full ${
+            severity === 'error' ? 'bg-destructive' : 'bg-amber-500'
+          }`}
+          title={severity === 'error' ? 'Has errors' : 'Has warnings'}
+          aria-label={severity === 'error' ? 'Has errors' : 'Has warnings'}
+          data-testid={`outline-diagnostic-${item.rowId}`}
+        />
       ) : null}
     </div>
   );

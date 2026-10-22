@@ -63,7 +63,7 @@ test('open a fixture and save it back through the mocked IPC bridge', async ({ p
   await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (0)');
   await expect(page.getByTestId('document-title')).toContainText('Untitled form');
 
-  await page.getByRole('button', { name: 'Open' }).click();
+  await page.getByRole('button', { name: 'Open', exact: true }).click();
 
   await expect(page.getByTestId('document-title')).toContainText('01-basic.xlsx');
   await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');

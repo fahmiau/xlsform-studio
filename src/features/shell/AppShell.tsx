@@ -1,5 +1,5 @@
 /** Full IDE layout shell (Task 2.1, PRD §6.1). */
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 
@@ -11,6 +11,8 @@ import { useUiStore, type SheetTab } from '@/state/uiStore';
 import { RecoveryDialog } from '@/features/file/RecoveryDialog';
 import { useAutosave } from '@/features/file/useAutosave';
 import { ChoicesDrawer } from '@/features/choices-drawer/ChoicesDrawer';
+import { LintPanel } from '@/features/lint-panel/LintPanel';
+import { nextProblem } from '@/features/lint-panel/navigate';
 import { SheetGrid } from '@/features/grid/SheetGrid';
 import { CHOICES_GRID_CONFIG, SURVEY_GRID_CONFIG } from '@/features/grid/columns';
 import { useFoldingCommands } from '@/features/grid/useFolding';
@@ -26,7 +28,8 @@ import { TopBar } from './TopBar';
 import { redoWithReveal, undoWithReveal } from './UndoRedoButtons';
 
 function LeftPanel() {
-  const [tab, setTab] = useState<'outline' | 'lint'>('outline');
+  const tab = useUiStore((state) => state.leftTab);
+  const setLeftTab = useUiStore((state) => state.setLeftTab);
 
   return (
     <section className="flex h-full flex-col" data-testid="left-panel">
@@ -40,20 +43,14 @@ function LeftPanel() {
             className={`rounded px-2 py-0.5 text-xs capitalize ${
               tab === name ? 'bg-accent font-medium' : 'text-muted-foreground'
             }`}
-            onClick={() => setTab(name)}
+            onClick={() => setLeftTab(name)}
           >
             {name}
           </button>
         ))}
       </div>
       <div className="min-h-0 flex-1 overflow-hidden">
-        {tab === 'outline' ? (
-          <OutlinePanel />
-        ) : (
-          <p className="text-muted-foreground p-2 text-xs" data-testid="lint-placeholder">
-            Linter arrives in Stage 4.
-          </p>
-        )}
+        {tab === 'outline' ? <OutlinePanel /> : <LintPanel />}
       </div>
     </section>
   );
@@ -174,6 +171,20 @@ export function AppShell() {
           usePrefsStore.getState().setPanelVisible('right', true);
           ui.openChoicesDrawer(rowId);
         },
+      },
+      {
+        id: 'lint.nextProblem',
+        title: 'Go to next lint problem',
+        shortcut: { code: 'F8' },
+        allowInInput: true,
+        run: () => nextProblem(1),
+      },
+      {
+        id: 'lint.previousProblem',
+        title: 'Go to previous lint problem',
+        shortcut: { code: 'F8', shift: true },
+        allowInInput: true,
+        run: () => nextProblem(-1),
       },
     ]);
   }, []);

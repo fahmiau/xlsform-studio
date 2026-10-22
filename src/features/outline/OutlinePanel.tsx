@@ -20,6 +20,7 @@ export function OutlinePanel() {
   const indexes = useDerivedStore((state) => state.indexes);
   const collapsed = useUiStore((state) => state.collapsedGroupIds);
   const flashRowId = useUiStore((state) => state.flashRowId);
+  const diagnosticsByRow = useDerivedStore((state) => state.diagnosticIndex.byRow);
   const [filter, setFilter] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -140,6 +141,13 @@ export function OutlinePanel() {
                       group={groupsById.get(item.rowId)}
                       active={boundedIndex === virtualRow.index || flashRowId === item.rowId}
                       dragging={dnd.activeId === item.key}
+                      severity={
+                        (diagnosticsByRow.get(item.rowId)?.errors ?? 0) > 0
+                          ? 'error'
+                          : (diagnosticsByRow.get(item.rowId)?.warnings ?? 0) > 0
+                            ? 'warning'
+                            : undefined
+                      }
                       onActivate={() => setActiveIndex(virtualRow.index)}
                       onJump={() => jump(item)}
                       onToggle={() => useUiStore.getState().toggleGroupCollapsed(item.rowId)}

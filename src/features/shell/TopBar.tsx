@@ -1,6 +1,5 @@
 /** Application top bar (Task 2.1). */
 import {
-  BadgeCheck,
   FilePlus2,
   FolderOpen,
   Languages,
@@ -13,6 +12,7 @@ import {
 
 import { Button } from '@/components/ui/button';
 import { basename, fileActions } from '@/features/file/fileActions';
+import { LintBadge } from '@/features/lint-panel/LintBadge';
 import { nextTheme } from '@/lib/theme';
 import { usePrefsStore } from '@/state/prefsStore';
 import { useIsDirty, useWorkbookStore } from '@/state/workbookStore';
@@ -87,10 +87,7 @@ export function TopBar() {
           <Languages aria-hidden />
           <span className="text-xs">All</span>
         </Button>
-        <Button variant="ghost" size="sm" disabled title="Linter arrives in Stage 4">
-          <BadgeCheck aria-hidden />
-          <span className="text-xs">0 errors</span>
-        </Button>
+        <LintBadge />
         <Button
           variant="ghost"
           size="sm"

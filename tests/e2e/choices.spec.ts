@@ -58,7 +58,7 @@ async function mockTauri(page: Page, fixturePath = BASIC, fileName = '01-basic.x
 async function openFixture(page: Page, fixture = BASIC, fileName = '01-basic.xlsx') {
   await mockTauri(page, fixture, fileName);
   await page.goto('/');
-  await page.getByRole('button', { name: 'Open' }).click();
+  await page.getByRole('button', { name: 'Open', exact: true }).click();
   await expect(page.getByTestId('sheet-tab-survey')).toHaveText(/^survey \(\d+\)$/);
 }
 
