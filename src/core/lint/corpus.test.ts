@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { buildAllIndexes } from '../indexes';
+import { readSettings } from '../model/settings';
 import { readWorkbook } from '../xlsx/read';
 import { runLint } from './runner';
 
@@ -24,9 +25,10 @@ describe('real-world corpus', () => {
 
     for (const file of files) {
       const parsed = await readWorkbook(new Uint8Array(await readFile(join(CORPUS, file))));
+      const settings = readSettings(parsed.data.settings);
       const issues = runLint(
         parsed.data,
-        buildAllIndexes(parsed.data, { defaultLanguage: 'English (en)' }),
+        buildAllIndexes(parsed.data, { defaultLanguage: settings.defaultLanguage }),
       );
       expect(
         issues.map((issue) => `${issue.ruleId} ${issue.sheet} ${issue.message}`),

@@ -74,3 +74,12 @@ jobs:
           name: playwright-report
           path: playwright-report
           retention-days: 7
+
+      # Last step so the measurement runs on an otherwise idle runner. Local
+      # gate is <= 15 ms; shared GitHub runners are noisier (13-16.5 ms observed
+      # for green code), so CI asserts only gross regressions. See
+      # docs/perf/stage-4.md and Task 4.9's notes.
+      - name: Lint performance gate (15 ms local / 25 ms shared CI runner)
+        env:
+          LINT_BENCH_LIMIT_MS: '25'
+        run: pnpm bench:lint
