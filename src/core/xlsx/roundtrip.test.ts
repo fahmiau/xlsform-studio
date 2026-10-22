@@ -8,7 +8,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { generateSyntheticFixtures } from '../../../tests/fixtures/generate-fixtures';
 import { createEmptyWorkbook } from '../model/factory';
 import type { SheetData, WorkbookData } from '../model/types';
-import { removeColumn, addColumn } from '../ops/columns';
+import { removeColumn, addColumn, renameColumn } from '../ops/columns';
 import { setCells } from '../ops/cells';
 import { coerceCell } from './coerce';
 import { readWorkbook } from './read';
@@ -175,6 +175,51 @@ describe('round-trip golden suite', () => {
     const reread = await readWorkbook(written);
     expect(reread.data.survey.columns).toEqual(read.data.survey.columns);
     expect(normaliseSheet(reread.data.survey)).toEqual(normaliseSheet(read.data.survey));
+  });
+
+  it('persists a rename of a headerless column instead of reverting it', async () => {
+    const bytes = new Uint8Array(await readFile(join(SYNTHETIC_DIR, '21-headerless-column.xlsx')));
+    const read = await readWorkbook(bytes);
+    const renamed = renameColumn(read.data, 'survey', 'column_4', 'extra_note');
+    expect(renamed.survey.headerText).toBeUndefined();
+
+    const written = await writeWorkbook(renamed, { sourceHandle: read.sourceHandle });
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.load(toExcelBuffer(written));
+    const headerTexts =
+      (workbook.getWorksheet('survey')?.getRow(1).values as ExcelJS.CellValue[] | undefined) ?? [];
+    expect(headerTexts).toContain('extra_note');
+
+    const reread = await readWorkbook(written);
+    expect(reread.data.survey.columns).toContain('extra_note');
+    expect(reread.data.survey.columns).not.toContain('column_4');
+    expect(reread.data.survey.headerText ?? {}).not.toHaveProperty('extra_note');
+    expect(reread.data.survey.rows[0]?.cells.extra_note).toBe('unlabelled note');
+    expect(reread.data.survey.rows[1]?.cells.extra_note).toBe('42');
+    // The value moved with the header; it must not also stay in an old column.
+    expect(
+      Object.values(reread.data.survey.rows[0]?.cells ?? {}).filter(
+        (value) => value === 'unlabelled note',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('renames a normal column and renames it back across saves', async () => {
+    const bytes = new Uint8Array(await readFile(join(SYNTHETIC_DIR, '01-basic.xlsx')));
+    const read = await readWorkbook(bytes);
+    const renamed = renameColumn(read.data, 'survey', 'label', 'title');
+    const firstSave = await writeWorkbook(renamed, { sourceHandle: read.sourceHandle });
+    const afterRename = await readWorkbook(firstSave);
+    expect(afterRename.data.survey.columns).toContain('title');
+    expect(afterRename.data.survey.columns).not.toContain('label');
+    expect(afterRename.data.survey.rows[0]?.cells.title).toBe('Respondent name');
+
+    const back = renameColumn(afterRename.data, 'survey', 'title', 'label');
+    const secondSave = await writeWorkbook(back, { sourceHandle: afterRename.sourceHandle });
+    const final = await readWorkbook(secondSave);
+    expect(final.data.survey.columns).toContain('label');
+    expect(final.data.survey.columns).not.toContain('title');
+    expect(final.data.survey.rows[0]?.cells.label).toBe('Respondent name');
   });
 
   it('clears a deleted column so its header and data do not linger', async () => {

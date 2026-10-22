@@ -58,8 +58,12 @@ export function renameColumn(
       }
     }
     if (draft[sheet].headerText && from in draft[sheet].headerText) {
-      draft[sheet].headerText[trimmed] = draft[sheet].headerText[from] ?? '';
+      const original = draft[sheet].headerText[from] ?? '';
       delete draft[sheet].headerText[from];
+      // A headerless column's key is its own (new) header. Copying the empty
+      // original text forward would make the writer keep it headerless.
+      if (original !== '') draft[sheet].headerText[trimmed] = original;
+      if (Object.keys(draft[sheet].headerText).length === 0) delete draft[sheet].headerText;
     }
   });
 }

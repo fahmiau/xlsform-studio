@@ -125,6 +125,27 @@ describe('columns', () => {
     expect(renamed.survey.headerText).toEqual({ 'media::photo': 'image' });
   });
 
+  it('drops empty original header text when renaming a headerless column', () => {
+    const data = workbookWithRows();
+    const headerless = {
+      ...data,
+      survey: {
+        ...data.survey,
+        columns: [...data.survey.columns, 'column_4'],
+        headerText: { column_4: '' },
+      },
+    };
+    const rowId = headerless.survey.rows[0]!.id;
+    const withValue = setCells(headerless, 'survey', [
+      { rowId, column: 'column_4', value: 'unlabelled note' },
+    ]);
+
+    const renamed = renameColumn(withValue, 'survey', 'column_4', 'extra_note');
+    expect(renamed.survey.columns).toContain('extra_note');
+    expect(renamed.survey.headerText).toBeUndefined();
+    expect(renamed.survey.rows[0]?.cells.extra_note).toBe('unlabelled note');
+  });
+
   it('rejects empty and duplicate rename targets', () => {
     const data = workbookWithRows();
     expect(renameColumn(data, 'survey', 'type', '  ')).toBe(data);
