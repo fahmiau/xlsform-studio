@@ -62,9 +62,13 @@ export const xls002: LintRule = {
       }
     }
 
-    for (const [key, entries] of lowerDuplicates) {
-      if (exactDuplicates.has(key)) continue;
-      for (const entry of entries) {
+    for (const entries of lowerDuplicates.values()) {
+      // Rows already reported as exact duplicates are not case-warnings too.
+      // Filter by exact name (not by the lower-case key): two exact `age` rows
+      // still leave an `AGE` row to warn about.
+      const caseEntries = entries.filter((entry) => !exactDuplicates.has(entry.name));
+      if (caseEntries.length === 0) continue;
+      for (const entry of caseEntries) {
         const others = entries.filter((candidate) => candidate !== entry);
         issues.push({
           ruleId: 'XLS-002',

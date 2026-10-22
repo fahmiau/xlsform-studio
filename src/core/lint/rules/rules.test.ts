@@ -179,6 +179,50 @@ describe('XLS-002 duplicate name', () => {
     );
   });
 
+  it('does not case-warn rows already reported as exact duplicates', () => {
+    positive(
+      xls002,
+      {
+        surveyRows: [
+          { type: 'text', name: 'AGE' },
+          { type: 'text', name: 'AGE' },
+          { type: 'text', name: 'age' },
+        ],
+      },
+      3,
+      (issues) => {
+        const errors = issues.filter((issue) => issue.severity === 'error');
+        const warnings = issues.filter((issue) => issue.severity === 'warning');
+        expect(errors).toHaveLength(2);
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0]?.rowId).toBe('s3');
+        expect(warnings[0]?.message).toContain('"AGE" (row 1), "AGE" (row 2)');
+        expect(warnings[0]?.message).not.toContain('"age" (row 3)');
+      },
+    );
+  });
+
+  it('still warns for the case variant when the exact duplicates are lowercase', () => {
+    positive(
+      xls002,
+      {
+        surveyRows: [
+          { type: 'text', name: 'age' },
+          { type: 'text', name: 'age' },
+          { type: 'text', name: 'AGE' },
+        ],
+      },
+      3,
+      (issues) => {
+        expect(issues.filter((issue) => issue.severity === 'error')).toHaveLength(2);
+        const warnings = issues.filter((issue) => issue.severity === 'warning');
+        expect(warnings).toHaveLength(1);
+        expect(warnings[0]?.rowId).toBe('s3');
+        expect(warnings[0]?.message).not.toContain('"AGE" (row 3)');
+      },
+    );
+  });
+
   it('reports duplicates across question kinds and groups', () => {
     positive(
       xls002,
