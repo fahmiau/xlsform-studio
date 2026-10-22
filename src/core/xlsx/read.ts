@@ -13,14 +13,15 @@ import {
   DEFAULT_SETTINGS_COLUMNS,
   DEFAULT_SURVEY_COLUMNS,
 } from '../model/columns';
+import { inferNameLocks } from '../slug/slugify';
 import type { ColumnKey, ManagedSheetName, Row, SheetData, WorkbookData } from '../model/types';
 import { coerceCell } from './coerce';
 import { toExcelBuffer } from './io';
 
 export interface ReadOptions {
   /**
-   * AD-14 hook: infer `meta.nameLocked` on choices. The slugifier lands in
-   * Stage 3; until then this is a no-op.
+   * AD-14 hook: infer `meta.nameLocked` on choices. Defaults to
+   * {@link inferNameLocks}; override only in tests that need fixed metadata.
    */
   inferNameLocks?: (choices: SheetData) => void;
 }
@@ -270,7 +271,7 @@ export async function readWorkbook(
     sheetOrder,
   };
 
-  options.inferNameLocks?.(choices);
+  (options.inferNameLocks ?? inferNameLocks)(choices);
 
   return { data, warnings, sourceHandle: workbook };
 }

@@ -178,6 +178,8 @@ describe('round-trip golden suite', () => {
   });
 
   it('persists a rename of a headerless column instead of reverting it', async () => {
+    // Known side effect (recorded for Stage 2 Task 2.6): renaming a headerless
+    // column moves it to the sheet end and leaves its old slot empty.
     const bytes = new Uint8Array(await readFile(join(SYNTHETIC_DIR, '21-headerless-column.xlsx')));
     const read = await readWorkbook(bytes);
     const renamed = renameColumn(read.data, 'survey', 'column_4', 'extra_note');

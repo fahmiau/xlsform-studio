@@ -63,3 +63,33 @@ export function duplicateRows(
     draft[sheet].rows = next;
   });
 }
+
+/**
+ * Move a contiguous block to `toIndex` (an insertion point in the pre-move
+ * coordinate space). Dropping inside the block or at either edge is a no-op.
+ */
+export function moveBlock(
+  data: WorkbookData,
+  sheet: ManagedSheetName,
+  fromStart: number,
+  fromEnd: number,
+  toIndex: number,
+): WorkbookData {
+  const rows = data[sheet].rows;
+  const start = Math.max(0, Math.min(fromStart, fromEnd));
+  const end = Math.min(rows.length - 1, Math.max(fromStart, fromEnd));
+  if (start > end || rows.length === 0) return data;
+  if (toIndex > start && toIndex <= end + 1) return data;
+
+  const block = rows.slice(start, end + 1);
+  const rest = rows.filter((_row, index) => index < start || index > end);
+  let insertAt = toIndex;
+  if (toIndex > end) insertAt = toIndex - block.length;
+  insertAt = Math.max(0, Math.min(insertAt, rest.length));
+  const next = [...rest.slice(0, insertAt), ...block, ...rest.slice(insertAt)];
+  if (next.length === rows.length && next.every((row, index) => row === rows[index])) return data;
+
+  return produce(data, (draft) => {
+    draft[sheet].rows = next;
+  });
+}

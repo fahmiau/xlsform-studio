@@ -193,6 +193,25 @@ describe('readWorkbook: rows', () => {
   });
 });
 
+describe('readWorkbook: AD-14 name locks', () => {
+  it('marks imported choice codes that differ from the auto slug as locked', async () => {
+    const workbook = new ExcelJS.Workbook();
+    workbook.addWorksheet('survey').addRow(['type', 'name', 'label']);
+    workbook.getWorksheet('survey')?.addRow(['select_one gender', 'gender', 'Gender']);
+    const choices = workbook.addWorksheet('choices');
+    choices.addRow(['list_name', 'name', 'label']);
+    choices.addRow(['gender', 'm', 'Male']);
+    choices.addRow(['gender', 'female', 'Female']);
+    const bytes = new Uint8Array(await workbook.xlsx.writeBuffer());
+
+    const result = await readWorkbook(bytes);
+    expect(result.data.choices.rows.map((row) => row.meta?.nameLocked ?? false)).toEqual([
+      true,
+      false,
+    ]);
+  });
+});
+
 describe('readWorkbook: errors', () => {
   it('rejects a workbook without a survey sheet', async () => {
     const workbook = new ExcelJS.Workbook();
