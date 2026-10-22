@@ -26,6 +26,8 @@ const CASES: Case[] = [
   { raw: 'calculate', base: 'calculate' },
   { raw: 'select_one', base: 'select_one' },
   { raw: 'select_one gender', base: 'select_one', listName: 'gender' },
+  { raw: 'select_one from gender', base: 'select_one', listName: 'gender' },
+  { raw: 'select all that apply from reasons', base: 'select_multiple', listName: 'reasons' },
   { raw: 'select_one    gender', base: 'select_one', listName: 'gender' },
   { raw: 'SELECT_ONE gender', base: 'select_one', listName: 'gender' },
   { raw: 'select one gender', base: 'select_one', listName: 'gender' },

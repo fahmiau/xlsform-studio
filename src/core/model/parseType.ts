@@ -89,8 +89,11 @@ export function parseType(raw: string): ParsedType {
     return result;
   }
 
-  const orOther = tokens.length > 1 && tokens[tokens.length - 1] === 'or_other';
-  const argument = tokens[0];
+  // pyxform also accepts `select_one from list` and
+  // `select all that apply from list` spellings.
+  const argumentIndex = tokens[0]?.toLowerCase() === 'from' ? 1 : 0;
+  const orOther = tokens.length > argumentIndex + 1 && tokens[tokens.length - 1] === 'or_other';
+  const argument = tokens[argumentIndex];
   if (orOther) result.orOther = true;
 
   if (argument) {
