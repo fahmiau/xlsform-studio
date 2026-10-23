@@ -2,7 +2,6 @@
 import {
   FilePlus2,
   FolderOpen,
-  Languages,
   PanelLeft,
   PanelRight,
   Save,
@@ -12,9 +11,11 @@ import {
 
 import { Button } from '@/components/ui/button';
 import { basename, fileActions } from '@/features/file/fileActions';
+import { LanguageSelector } from '@/features/languages/LanguageSelector';
 import { LintBadge } from '@/features/lint-panel/LintBadge';
-import { nextTheme } from '@/lib/theme';
+import { PreferencesDialog } from '@/features/preferences/PreferencesDialog';
 import { usePrefsStore } from '@/state/prefsStore';
+import { useUiStore } from '@/state/uiStore';
 import { useIsDirty, useWorkbookStore } from '@/state/workbookStore';
 
 import { UndoRedoButtons } from './UndoRedoButtons';
@@ -22,11 +23,11 @@ import { UndoRedoButtons } from './UndoRedoButtons';
 export function TopBar() {
   const filePath = useWorkbookStore((state) => state.filePath);
   const isDirty = useIsDirty();
-  const theme = usePrefsStore((state) => state.theme);
-  const setTheme = usePrefsStore((state) => state.setTheme);
   const leftPanel = usePrefsStore((state) => state.leftPanel);
   const rightPanel = usePrefsStore((state) => state.rightPanel);
   const setPanelVisible = usePrefsStore((state) => state.setPanelVisible);
+  const preferencesOpen = useUiStore((state) => state.preferencesOpen);
+  const setPreferencesOpen = useUiStore((state) => state.setPreferencesOpen);
 
   return (
     <header className="flex items-center gap-2 border-b px-3 py-1.5" data-testid="top-bar">
@@ -77,16 +78,7 @@ export function TopBar() {
         </Button>
         <span className="bg-border mx-1 h-4 w-px" />
         <UndoRedoButtons />
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled
-          title="Language view arrives in Stage 5"
-          aria-label="Language view"
-        >
-          <Languages aria-hidden />
-          <span className="text-xs">All</span>
-        </Button>
+        <LanguageSelector />
         <LintBadge />
         <Button
           variant="ghost"
@@ -111,13 +103,15 @@ export function TopBar() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setTheme(nextTheme(theme))}
-          title={`Theme: ${theme} (click to change)`}
-          data-testid="theme-toggle"
+          onClick={() => setPreferencesOpen(true)}
+          title="Preferences"
+          aria-label="Preferences"
+          data-testid="open-preferences"
         >
           <Settings2 aria-hidden />
         </Button>
       </div>
+      <PreferencesDialog open={preferencesOpen} onOpenChange={setPreferencesOpen} />
     </header>
   );
 }

@@ -1,10 +1,9 @@
 /** In-grid folding shortcuts (Task 3.7): Ctrl+[ collapse, Ctrl+] expand. */
-import { useEffect } from 'react';
 import { toast } from 'sonner';
 
 import { buildGroupTree } from '@/core/indexes/groupTree';
 import { groupContainingRow } from '@/core/ops/groups';
-import { registerCommands } from '@/lib/commands';
+import type { AppCommand } from '@/lib/commands';
 import { useUiStore } from '@/state/uiStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 
@@ -52,23 +51,20 @@ export function expandActiveGroup(): void {
   }
 }
 
-export function useFoldingCommands(): void {
-  useEffect(
-    () =>
-      registerCommands([
-        {
-          id: 'grid.group.collapse',
-          title: 'Collapse group',
-          shortcut: { code: 'BracketLeft', ctrlOrMeta: true },
-          run: collapseActiveGroup,
-        },
-        {
-          id: 'grid.group.expand',
-          title: 'Expand group',
-          shortcut: { code: 'BracketRight', ctrlOrMeta: true },
-          run: expandActiveGroup,
-        },
-      ]),
-    [],
-  );
+/** Folding commands, shared by shortcuts and the palette (Task 3.7). */
+export function foldingCommands(): AppCommand[] {
+  return [
+    {
+      id: 'grid.group.collapse',
+      title: 'Collapse group',
+      shortcut: { code: 'BracketLeft', ctrlOrMeta: true },
+      run: collapseActiveGroup,
+    },
+    {
+      id: 'grid.group.expand',
+      title: 'Expand group',
+      shortcut: { code: 'BracketRight', ctrlOrMeta: true },
+      run: expandActiveGroup,
+    },
+  ];
 }

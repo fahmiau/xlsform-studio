@@ -51,14 +51,14 @@ export function formulaTheme(dark: boolean): FormulaTheme {
       };
 }
 
-export function xlsformTheme(dark: boolean) {
+export function xlsformTheme(dark: boolean, fontSize = 12) {
   const palette = formulaTheme(dark);
   return EditorView.theme(
     {
       '&': {
         color: palette.text,
         backgroundColor: palette.background,
-        fontSize: '12px',
+        fontSize: `${fontSize}px`,
       },
       '&.cm-focused': {
         outline: 'none',

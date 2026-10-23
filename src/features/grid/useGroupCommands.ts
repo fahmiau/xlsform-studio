@@ -2,7 +2,6 @@
  * Wrap/unwrap/delete-group commands (Task 3.8). Every command is one store
  * `apply`, so one undo step.
  */
-import { useEffect } from 'react';
 import { toast } from 'sonner';
 
 import { buildGroupTree } from '@/core/indexes/groupTree';
@@ -15,7 +14,7 @@ import {
   unwrapGroup,
   wrapSelection,
 } from '@/core/ops/groups';
-import { registerCommands } from '@/lib/commands';
+import type { AppCommand } from '@/lib/commands';
 import { useUiStore } from '@/state/uiStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 
@@ -126,25 +125,22 @@ export function isBeginRow(rowId: string | undefined): boolean {
   return base === 'begin_group' || base === 'begin_repeat';
 }
 
-export function useGroupCommands(): void {
-  useEffect(
-    () =>
-      registerCommands([
-        {
-          id: 'grid.group.wrap',
-          title: 'Wrap rows in group',
-          shortcut: { code: 'KeyG', ctrlOrMeta: true },
-          when: () => useUiStore.getState().activeSheet === 'survey',
-          run: () => wrapSelectedRows('group'),
-        },
-        {
-          id: 'grid.group.wrapRepeat',
-          title: 'Wrap rows in repeat',
-          shortcut: { code: 'KeyG', ctrlOrMeta: true, shift: true },
-          when: () => useUiStore.getState().activeSheet === 'survey',
-          run: () => wrapSelectedRows('repeat'),
-        },
-      ]),
-    [],
-  );
+/** Wrap commands, shared by shortcuts and the palette (Task 3.8). */
+export function groupCommands(): AppCommand[] {
+  return [
+    {
+      id: 'grid.group.wrap',
+      title: 'Wrap rows in group',
+      shortcut: { code: 'KeyG', ctrlOrMeta: true },
+      when: () => useUiStore.getState().activeSheet === 'survey',
+      run: () => wrapSelectedRows('group'),
+    },
+    {
+      id: 'grid.group.wrapRepeat',
+      title: 'Wrap rows in repeat',
+      shortcut: { code: 'KeyG', ctrlOrMeta: true, shift: true },
+      when: () => useUiStore.getState().activeSheet === 'survey',
+      run: () => wrapSelectedRows('repeat'),
+    },
+  ];
 }

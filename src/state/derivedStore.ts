@@ -9,6 +9,7 @@ import { create } from 'zustand';
 
 import { buildAllIndexes, type AllIndexes } from '@/core/indexes';
 import type { VariableOptions } from '@/core/indexes/variables';
+import { discoverLanguages, type Language } from '@/core/languages/discover';
 import { runLint, type DiagnosticIssue } from '@/core/lint';
 import { buildDiagnosticsIndex, type DiagnosticsIndex } from '@/core/lint/diagnostics';
 import { readSettings } from '@/core/model/settings';
@@ -21,6 +22,8 @@ export const LINT_DEBOUNCE_MS = 150;
 export interface DerivedState {
   indexes: AllIndexes;
   options: VariableOptions;
+  /** Discovered languages for the toolbar and grid view modes (Task 5.3). */
+  languages: Language[];
   diagnostics: DiagnosticIssue[];
   diagnosticIndex: DiagnosticsIndex;
   rebuild: () => void;
@@ -47,6 +50,7 @@ let lintTimer: ReturnType<typeof setTimeout> | null = null;
 export const useDerivedStore = create<DerivedState>()((set, get) => ({
   indexes: initialIndexes,
   options: initialOptions,
+  languages: discoverLanguages(initialData),
   diagnostics: initialDiagnostics,
   diagnosticIndex: buildDiagnosticsIndex(initialDiagnostics),
   rebuild: () => {
@@ -57,6 +61,7 @@ export const useDerivedStore = create<DerivedState>()((set, get) => ({
     set({
       indexes,
       options,
+      languages: discoverLanguages(data),
       diagnostics,
       diagnosticIndex: buildDiagnosticsIndex(diagnostics),
     });
@@ -89,6 +94,7 @@ useWorkbookStore.subscribe((state, previous) => {
   useDerivedStore.setState({
     indexes: computeIndexes(state.data, options),
     options,
+    languages: discoverLanguages(state.data),
   });
   // `lastAction === null` means load/restore/new, where linting immediately is
   // cheap enough and avoids an empty badge on first paint.

@@ -3,6 +3,7 @@
  * navigation, and drag-and-drop all work on the same ordered model.
  */
 import type { GroupTreeIndex } from '@/core/indexes/groupTree';
+import { labelColumnFor } from '@/core/languages/discover';
 import { resolveColumn } from '@/core/model/columns';
 import { parseType } from '@/core/model/parseType';
 import type { RowId, SheetData } from '@/core/model/types';
@@ -31,8 +32,7 @@ export interface FlattenOptions {
 }
 
 function primaryLabelKey(sheet: SheetData): string | undefined {
-  const labels = sheet.columns.filter((column) => resolveColumn(column).base === 'label');
-  return labels.find((column) => !resolveColumn(column).language) ?? labels[0];
+  return labelColumnFor(sheet);
 }
 
 function ancestorsOf(items: readonly OutlineItem[], item: OutlineItem): OutlineItem[] {

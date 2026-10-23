@@ -51,4 +51,35 @@ describe('uiStore', () => {
       languageView: { mode: 'single', language: 'id' },
     });
   });
+
+  it('stores dialog flags and the split-view source/target', () => {
+    const ui = useUiStore.getState();
+    ui.setPaletteOpen(true);
+    ui.setShortcutsOpen(true);
+    ui.setPreferencesOpen(true);
+    ui.setAddLanguageOpen(true);
+    ui.setLanguageViewState({
+      mode: 'split',
+      language: null,
+      source: 'Default',
+      target: 'English (en)',
+    });
+
+    const state = useUiStore.getState();
+    expect(state.paletteOpen).toBe(true);
+    expect(state.shortcutsOpen).toBe(true);
+    expect(state.preferencesOpen).toBe(true);
+    expect(state.addLanguageOpen).toBe(true);
+    expect(state.languageView).toEqual({
+      mode: 'split',
+      language: null,
+      source: 'Default',
+      target: 'English (en)',
+    });
+
+    ui.setPaletteOpen(false);
+    ui.setShortcutsOpen(false);
+    ui.setPreferencesOpen(false);
+    ui.setAddLanguageOpen(false);
+  });
 });

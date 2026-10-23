@@ -6,6 +6,7 @@ import { EditorState, type Extension } from '@codemirror/state';
 import { EditorView, type KeyBinding } from '@codemirror/view';
 
 import type { DiagnosticIssue } from '@/core/lint';
+import { AUTOCOMPLETE_EVENT } from '@/lib/commands';
 import { useDerivedStore } from '@/state/derivedStore';
 
 import { baseExtensions } from './baseExtensions';
@@ -36,6 +37,10 @@ export interface CodeMirrorEditorProps {
   commitOnTab?: boolean;
   onTabCommit?: (value: string) => void;
   testId?: string;
+  /** Typing triggers completions (Preferences → Editor). */
+  autocomplete?: boolean;
+  /** Formula font size (Preferences → Editor). */
+  fontSize?: number;
 }
 
 export function CodeMirrorEditor({
@@ -53,6 +58,8 @@ export function CodeMirrorEditor({
   commitOnTab = false,
   onTabCommit,
   testId,
+  autocomplete = true,
+  fontSize = 12,
 }: CodeMirrorEditorProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
@@ -116,6 +123,7 @@ export function CodeMirrorEditor({
         dark,
         ariaLabel: ariaLabel ?? 'Formula editor',
         keymap: bindings,
+        fontSize,
       }),
     ];
     if (xpath) {
@@ -126,7 +134,7 @@ export function CodeMirrorEditor({
               () => callbacks.current.completionData?.() ?? EMPTY_COMPLETION_DATA,
             ),
           ],
-          activateOnTyping: true,
+          activateOnTyping: autocomplete,
           defaultKeymap: false,
         }),
         signatureHelp(() => callbacks.current.completionData?.() ?? EMPTY_COMPLETION_DATA),
@@ -159,7 +167,7 @@ export function CodeMirrorEditor({
     // `value` is intentionally not a dependency: external updates are synced
     // by the effect below so remounting does not steal focus.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ariaLabel, autoFocus, commitOnTab, dark, xpath]);
+  }, [ariaLabel, autoFocus, autocomplete, commitOnTab, dark, fontSize, xpath]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -180,6 +188,16 @@ export function CodeMirrorEditor({
     const view = viewRef.current;
     if (view) forceLinting(view);
   }, [diagnostics]);
+
+  // `Ctrl+Space` is a global command; the focused editor opens completions.
+  useEffect(() => {
+    const onAutocomplete = () => {
+      const view = viewRef.current;
+      if (view?.hasFocus) startCompletion(view);
+    };
+    window.addEventListener(AUTOCOMPLETE_EVENT, onAutocomplete);
+    return () => window.removeEventListener(AUTOCOMPLETE_EVENT, onAutocomplete);
+  }, []);
 
   return (
     <div

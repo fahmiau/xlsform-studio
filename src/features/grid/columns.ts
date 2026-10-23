@@ -61,6 +61,13 @@ export interface BuildDisplayColumnsOptions {
   widths?: Record<ColumnKey, number>;
   /** View-only hidden headers. */
   hidden?: ReadonlySet<ColumnKey>;
+  /**
+   * Display keys when a language view restricts the sheet (Task 5.4). File
+   * order is ignored; the provided order wins.
+   */
+  keys?: readonly ColumnKey[];
+  /** Frozen subset of `keys`, leftmost in this order. */
+  frozen?: readonly ColumnKey[];
 }
 
 function columnWidth(
@@ -83,14 +90,20 @@ export function buildDisplayColumns(
 ): DisplayColumns {
   const widths = options.widths ?? {};
   const hidden = options.hidden ?? new Set<ColumnKey>();
-  const available = sheet.columns.filter((key) => !hidden.has(key));
+  const available = (options.keys ?? sheet.columns).filter((key) => !hidden.has(key));
 
   const frozen: ColumnKey[] = [];
-  for (const base of config.frozenBases) {
-    const key = available.find(
-      (candidate) => resolveColumn(candidate).base === base && !frozen.includes(candidate),
-    );
-    if (key !== undefined) frozen.push(key);
+  if (options.frozen) {
+    for (const key of options.frozen) {
+      if (available.includes(key) && !frozen.includes(key)) frozen.push(key);
+    }
+  } else {
+    for (const base of config.frozenBases) {
+      const key = available.find(
+        (candidate) => resolveColumn(candidate).base === base && !frozen.includes(candidate),
+      );
+      if (key !== undefined) frozen.push(key);
+    }
   }
 
   const keys = [...frozen, ...available.filter((key) => !frozen.includes(key))];

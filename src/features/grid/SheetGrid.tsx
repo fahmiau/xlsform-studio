@@ -21,16 +21,19 @@ import {
 import { toast } from 'sonner';
 
 import { findColumnKey } from '@/core/indexes/columns';
+import { primaryLabelColumn } from '@/core/languages/discover';
+import { splitPair, untranslatedCellKeys, visibleColumns } from '@/core/languages/viewModes';
 import { diagnosticCellKey } from '@/core/lint/diagnostics';
 import type { DiagnosticIssue } from '@/core/lint';
 import type { ColumnBase } from '@/core/model/columns';
 import { resolveColumn } from '@/core/model/columns';
 import { parseType } from '@/core/model/parseType';
 import type { ColumnKey, ManagedSheetName, RowId } from '@/core/model/types';
-import { applyChoiceEdits, applyTypeChange } from '@/core/ops/choices';
-import { setCells, type CellEdit } from '@/core/ops/cells';
+import type { CellEdit } from '@/core/ops/cells';
 import { groupHiddenQuestionCount } from '@/core/ops/groups';
 import { insertRows } from '@/core/ops/rows';
+import { applyCellEdits, type CellEditOutcome } from '@/features/grid/cellEditPipeline';
+import { notifyCellEdits } from '@/features/shell/toasts';
 import { useDerivedStore } from '@/state/derivedStore';
 import { usePrefsStore } from '@/state/prefsStore';
 import { useUiStore } from '@/state/uiStore';
@@ -60,7 +63,7 @@ import {
   type RowProjection,
 } from './projection';
 import { RowContextMenu, type RowContextMenuState } from './RowContextMenu';
-import { rowThemeOverride, type RowStyleKind } from './rowStyles';
+import { rowThemeOverride, translationCellTheme, type RowStyleKind } from './rowStyles';
 import {
   gridSelectionForCell,
   refFromItem,
@@ -156,10 +159,31 @@ export function SheetGrid({
     () => (columnKeys ? { ...sheet, columns: [...columnKeys] } : sheet),
     [columnKeys, sheet],
   );
-  const display = useMemo(
-    () => buildDisplayColumns(viewSheet, config, { widths, hidden }),
-    [viewSheet, config, widths, hidden],
+  const languageView = useUiStore((state) => state.languageView);
+  const languages = useDerivedStore((state) => state.languages);
+  // Language view filtering is display-only: `sheet.columns` (and export) keep
+  // every column (Task 5.4). The drawer passes explicit `columnKeys` instead.
+  const view = useMemo(
+    () =>
+      columnKeys || sheetName === 'settings'
+        ? null
+        : visibleColumns(sheetName, viewSheet.columns, languages, languageView),
+    [columnKeys, languages, languageView, sheetName, viewSheet.columns],
   );
+  const display = useMemo(
+    () =>
+      buildDisplayColumns(viewSheet, config, {
+        widths,
+        hidden,
+        ...(view ? { keys: view.columns, frozen: view.frozen } : {}),
+      }),
+    [config, hidden, view, viewSheet, widths],
+  );
+  const untranslated = useMemo(() => {
+    if (!view || languageView.mode !== 'split') return new Set<string>();
+    const { source, target } = splitPair(languages, languageView);
+    return untranslatedCellKeys(sheet, languages, source?.id, target?.id);
+  }, [languageView, languages, sheet, view]);
   const projection = useMemo(() => {
     if (rowIndexes) {
       const realIndexes = Int32Array.from(rowIndexes);
@@ -323,10 +347,7 @@ export function SheetGrid({
     if (visible < 0 || column <= 0) return;
     grid.updateCells([{ cell: [column, visible] }]);
   }, [cellPreview, display.keys, projection, sheet, sheetName]);
-  const primaryLabelKey = useMemo(() => {
-    const labels = sheet.columns.filter((column) => resolveColumn(column).base === 'label');
-    return labels.find((column) => !resolveColumn(column).language) ?? labels[0];
-  }, [sheet.columns]);
+  const primaryLabelKey = useMemo(() => primaryLabelColumn(sheet, data), [sheet, data]);
 
   const getCellContent = useCallback(
     (cell: Item): GridCell => {
@@ -429,25 +450,30 @@ export function SheetGrid({
         });
       }
 
+      const needsTranslation = untranslated.has(`${row.id}\u0000${key}`);
       let cache = cellCache.current.get(row);
       if (!cache) {
         cache = new Map();
         cellCache.current.set(row, cache);
       }
-      const cached = cache.get(key);
-      if (cached) return cached;
+      if (!needsTranslation) {
+        const cached = cache.get(key);
+        if (cached) return cached;
+      }
 
       const kind = structuralRowKind(typeValue);
       const built = textCell(cellValue(sheet, real, key), {
         readonly: !isCellEditable(typeValue, key),
         faded: kind === 'end_group' || kind === 'end_repeat',
+        ...(needsTranslation ? { themeOverride: translationCellTheme(dark) } : {}),
       });
-      cache.set(key, built);
+      if (!needsTranslation) cache.set(key, built);
       return built;
     },
     [
       cellPreview,
       collapsedGroupIds,
+      dark,
       diagnosticIndex,
       display.keys,
       groupByRowId,
@@ -460,6 +486,7 @@ export function SheetGrid({
       sheet,
       sheetName,
       typeKey,
+      untranslated,
     ],
   );
 
@@ -510,26 +537,19 @@ export function SheetGrid({
         onCommitEdits(edits);
         return;
       }
+      const maxLength = usePrefsStore.getState().slugMaxLength;
+      let outcome: CellEditOutcome | undefined;
       useWorkbookStore.getState().apply(
         `Edit ${edits.length} cell${edits.length === 1 ? '' : 's'}`,
         (current) => {
-          let next =
-            sheetName === 'choices'
-              ? applyChoiceEdits(current, edits)
-              : setCells(current, sheetName, edits);
-          if (sheetName === 'survey') {
-            for (const edit of edits) {
-              if (resolveColumn(edit.column).base === 'type') {
-                next = applyTypeChange(next, edit.rowId, edit.value);
-              }
-            }
-          }
-          return next;
+          outcome = applyCellEdits(current, sheetName, edits, { maxLength });
+          return outcome.data;
         },
         { sheet: sheetName, rowIds: [...rowIds] },
       );
+      if (outcome) notifyCellEdits(outcome);
     },
-    [display, onCommitEdits, projection, sheet, sheetName, typeKey],
+    [display, onCommitEdits, projection, sheet, sheetName],
   );
 
   const onCellsEdited = useCallback<NonNullable<DataEditorProps['onCellsEdited']>>(

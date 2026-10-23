@@ -3,7 +3,6 @@ import { useEffect } from 'react';
 import { AlertTriangle } from 'lucide-react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 
-import { registerCommands } from '@/lib/commands';
 import { applyTheme } from '@/lib/theme';
 import { usePrefsStore } from '@/state/prefsStore';
 import { useWorkbookStore } from '@/state/workbookStore';
@@ -11,13 +10,10 @@ import { useUiStore, type SheetTab } from '@/state/uiStore';
 import { RecoveryDialog } from '@/features/file/RecoveryDialog';
 import { useAutosave } from '@/features/file/useAutosave';
 import { ChoicesDrawer } from '@/features/choices-drawer/ChoicesDrawer';
+import { useLanguageViewBootstrap } from '@/features/languages/useLanguageView';
 import { LintPanel } from '@/features/lint-panel/LintPanel';
-import { nextProblem } from '@/features/lint-panel/navigate';
 import { SheetGrid } from '@/features/grid/SheetGrid';
 import { CHOICES_GRID_CONFIG, SURVEY_GRID_CONFIG } from '@/features/grid/columns';
-import { useFoldingCommands } from '@/features/grid/useFolding';
-import { useGroupCommands } from '@/features/grid/useGroupCommands';
-import { useRegisterRowCommands } from '@/features/grid/useRowCommands';
 import { OutlinePanel } from '@/features/outline/OutlinePanel';
 import { SettingsForm } from '@/features/settings-sheet/SettingsForm';
 
@@ -25,7 +21,6 @@ import { FormulaBarSlot } from './FormulaBarSlot';
 import { SheetTabs } from './SheetTabs';
 import { StatusBar } from './StatusBar';
 import { TopBar } from './TopBar';
-import { redoWithReveal, undoWithReveal } from './UndoRedoButtons';
 
 function LeftPanel() {
   const tab = useUiStore((state) => state.leftTab);
@@ -128,10 +123,8 @@ export function AppShell() {
   const hydrated = usePrefsStore((state) => state.hydrated);
   const activeSheet = useUiStore((state) => state.activeSheet);
 
-  useRegisterRowCommands();
-  useFoldingCommands();
-  useGroupCommands();
   useAutosave();
+  useLanguageViewBootstrap();
 
   useEffect(() => {
     void usePrefsStore.getState().hydrate();
@@ -140,54 +133,6 @@ export function AppShell() {
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
-
-  useEffect(() => {
-    return registerCommands([
-      {
-        id: 'edit.undo',
-        title: 'Undo',
-        shortcut: { code: 'KeyZ', ctrlOrMeta: true },
-        run: undoWithReveal,
-      },
-      {
-        id: 'edit.redo',
-        title: 'Redo',
-        shortcut: { code: 'KeyY', ctrlOrMeta: true },
-        run: redoWithReveal,
-      },
-      {
-        id: 'edit.redoAlt',
-        title: 'Redo',
-        shortcut: { code: 'KeyZ', ctrlOrMeta: true, shift: true },
-        run: redoWithReveal,
-      },
-      {
-        id: 'drawer.open',
-        title: 'Open choices drawer',
-        shortcut: { code: 'Enter', ctrlOrMeta: true },
-        run: () => {
-          const ui = useUiStore.getState();
-          const rowId = ui.activeCell?.sheet === 'survey' ? ui.activeCell.rowId : null;
-          usePrefsStore.getState().setPanelVisible('right', true);
-          ui.openChoicesDrawer(rowId);
-        },
-      },
-      {
-        id: 'lint.nextProblem',
-        title: 'Go to next lint problem',
-        shortcut: { code: 'F8' },
-        allowInInput: true,
-        run: () => nextProblem(1),
-      },
-      {
-        id: 'lint.previousProblem',
-        title: 'Go to previous lint problem',
-        shortcut: { code: 'F8', shift: true },
-        allowInInput: true,
-        run: () => nextProblem(-1),
-      },
-    ]);
-  }, []);
 
   const leftSize = layout.left ?? 18;
   const rightSize = layout.right ?? 18;

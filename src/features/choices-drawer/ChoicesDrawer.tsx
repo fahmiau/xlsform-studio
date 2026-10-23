@@ -11,17 +11,17 @@ import { findColumnKey } from '@/core/indexes/columns';
 import { parseType } from '@/core/model/parseType';
 import { Button } from '@/components/ui/button';
 import type { CellEdit } from '@/core/ops/cells';
-import {
-  applyChoiceEdits,
-  applyTypeChange,
-  insertChoiceRow,
-  listReferencedInFormulas,
-  renumberList,
-  suggestListName,
-} from '@/core/ops/choices';
+import { applyTypeChange, insertChoiceRow, suggestListName } from '@/core/ops/choices';
 import type { ListMode } from '@/core/slug/slugify';
 import { deleteRows, moveBlock } from '@/core/ops/rows';
+import {
+  applyCellEdits,
+  applyListMode,
+  type CellEditOutcome,
+} from '@/features/grid/cellEditPipeline';
 import { SheetGrid } from '@/features/grid/SheetGrid';
+import { notifyCellEdits } from '@/features/shell/toasts';
+import { usePrefsStore } from '@/state/prefsStore';
 import { useUiStore } from '@/state/uiStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 
@@ -35,6 +35,8 @@ import { useDrawerPaste } from './useDrawerPaste';
 export function ChoicesDrawer() {
   const bound = useBoundList();
   const [filterOpen, setFilterOpen] = useState(false);
+  const listNamePattern = usePrefsStore((state) => state.listNamePattern);
+  const slugMaxLength = usePrefsStore((state) => state.slugMaxLength);
   const paste = useDrawerPaste(bound.listName, bound.columns, bound.mode);
 
   if (!bound.surveyRowId) {
@@ -60,7 +62,13 @@ export function ChoicesDrawer() {
       const parsed = parseType(row.cells[typeKey] ?? '');
       const base =
         parsed.base.startsWith('select_') || parsed.base === 'rank' ? parsed.base : 'select_one';
-      const listName = suggestListName(data, bound.surveyRowId ?? undefined, questionName);
+      const listName = suggestListName(
+        data,
+        bound.surveyRowId ?? undefined,
+        questionName,
+        listNamePattern,
+        slugMaxLength,
+      );
       useWorkbookStore
         .getState()
         .apply(
@@ -88,29 +96,34 @@ export function ChoicesDrawer() {
   const applyMode = (mode: ListMode) => {
     const listName = bound.listName;
     if (!listName) return;
-    const referenced = listReferencedInFormulas(useWorkbookStore.getState().data, listName);
-    if (referenced.length > 0) {
-      toast.warning('Choice codes are referenced in formulas', {
-        description: `Renaming them may break ${referenced.join(', ')}. Token-aware choice refactoring arrives in Stage 5.`,
-      });
-    }
     useUiStore.getState().setChoiceMode(listName, mode);
-    useWorkbookStore
-      .getState()
-      .apply('Change choice naming mode', (data) => renumberList(data, listName, mode), {
-        sheet: 'choices',
-      });
+    let outcome: CellEditOutcome | undefined;
+    useWorkbookStore.getState().apply(
+      'Change choice naming mode',
+      (data) => {
+        outcome = applyListMode(data, listName, mode, slugMaxLength);
+        return outcome.data;
+      },
+      { sheet: 'choices' },
+    );
+    if (outcome) notifyCellEdits(outcome);
   };
 
   const commitEdits = (edits: readonly CellEdit[]) => {
     if (!bound.listName) return;
-    useWorkbookStore
-      .getState()
-      .apply(
-        `Edit ${edits.length} choice cell${edits.length === 1 ? '' : 's'}`,
-        (data) => applyChoiceEdits(data, edits, { mode: bound.mode }),
-        { sheet: 'choices', rowIds: edits.map((edit) => edit.rowId) },
-      );
+    let outcome: CellEditOutcome | undefined;
+    useWorkbookStore.getState().apply(
+      `Edit ${edits.length} choice cell${edits.length === 1 ? '' : 's'}`,
+      (data) => {
+        outcome = applyCellEdits(data, 'choices', edits, {
+          mode: bound.mode,
+          maxLength: slugMaxLength,
+        });
+        return outcome.data;
+      },
+      { sheet: 'choices', rowIds: edits.map((edit) => edit.rowId) },
+    );
+    if (outcome) notifyCellEdits(outcome);
   };
 
   const appendRow = () => {
@@ -119,7 +132,15 @@ export function ChoicesDrawer() {
     useWorkbookStore.getState().apply(
       'Add choice',
       (data) => {
-        const result = insertChoiceRow(data, bound.listName ?? '', {}, { mode: bound.mode });
+        const result = insertChoiceRow(
+          data,
+          bound.listName ?? '',
+          {},
+          {
+            mode: bound.mode,
+            maxLength: slugMaxLength,
+          },
+        );
         rowId = result.rowId;
         return result.data;
       },

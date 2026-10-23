@@ -11,9 +11,9 @@ import { useState } from 'react';
 import { findColumnKey } from '@/core/indexes/columns';
 import { resolveColumn } from '@/core/model/columns';
 import { diagnosticCellKey } from '@/core/lint/diagnostics';
-import { setCells } from '@/core/ops/cells';
-import { applyChoiceEdits } from '@/core/ops/choices';
 import { isCellEditable } from '@/features/grid/editability';
+import { applyCellEdits, type CellEditOutcome } from '@/features/grid/cellEditPipeline';
+import { notifyCellEdits } from '@/features/shell/toasts';
 import { useIsDark } from '@/lib/theme';
 import { useDerivedStore } from '@/state/derivedStore';
 import { usePrefsStore } from '@/state/prefsStore';
@@ -27,6 +27,8 @@ export function FormulaBar() {
   const activeCell = useUiStore((state) => state.activeCell);
   const data = useWorkbookStore((state) => state.data);
   const theme = usePrefsStore((state) => state.theme);
+  const autocompleteOnDollar = usePrefsStore((state) => state.autocompleteOnDollar);
+  const formulaFontSize = usePrefsStore((state) => state.formulaFontSize);
   const dark = useIsDark(theme);
 
   const sheet = activeCell ? data[activeCell.sheet] : null;
@@ -44,16 +46,20 @@ export function FormulaBar() {
     if (!activeCell || !editable) return;
     useUiStore.getState().setCellPreview(null);
     if (draft === value) return;
+    const { slugMaxLength } = usePrefsStore.getState();
+    let outcome: CellEditOutcome | undefined;
     useWorkbookStore.getState().apply(
       `Edit ${resolveColumn(activeCell.column).canonical}`,
       (current) => {
         const edit = { rowId: activeCell.rowId, column: activeCell.column, value: draft };
-        return activeCell.sheet === 'choices'
-          ? applyChoiceEdits(current, [edit])
-          : setCells(current, activeCell.sheet, [edit]);
+        outcome = applyCellEdits(current, activeCell.sheet, [edit], {
+          maxLength: slugMaxLength,
+        });
+        return outcome.data;
       },
       { sheet: activeCell.sheet, rowIds: [activeCell.rowId] },
     );
+    if (outcome) notifyCellEdits(outcome);
   };
 
   const revert = () => {
@@ -79,6 +85,8 @@ export function FormulaBar() {
           cell={activeCell}
           value={value}
           dark={dark}
+          autocomplete={autocompleteOnDollar}
+          fontSize={formulaFontSize}
           onChange={preview}
           onCommit={commit}
           onCancel={revert}
@@ -89,6 +97,7 @@ export function FormulaBar() {
           value={value}
           enabled={Boolean(activeCell)}
           editable={editable}
+          fontSize={formulaFontSize}
           onCommit={commit}
         />
       )}
@@ -103,6 +112,8 @@ function XPathFormulaInput({
   cell,
   value,
   dark,
+  autocomplete,
+  fontSize,
   onChange,
   onCommit,
   onCancel,
@@ -110,6 +121,8 @@ function XPathFormulaInput({
   cell: CellRef;
   value: string;
   dark: boolean;
+  autocomplete: boolean;
+  fontSize: number;
   onChange: (value: string) => void;
   onCommit: (value: string) => void;
   onCancel: () => void;
@@ -119,6 +132,8 @@ function XPathFormulaInput({
       value={value}
       xpath
       dark={dark}
+      autocomplete={autocomplete}
+      fontSize={fontSize}
       ariaLabel="Formula bar"
       className="border-input bg-background min-h-7 min-w-0 flex-1 overflow-hidden rounded border"
       testId="formula-bar-editor"
@@ -145,11 +160,13 @@ function PlainFormulaInput({
   value,
   enabled,
   editable,
+  fontSize,
   onCommit,
 }: {
   value: string;
   enabled: boolean;
   editable: boolean;
+  fontSize: number;
   onCommit: (value: string) => void;
 }) {
   const [draft, setDraft] = useState(value);
@@ -157,6 +174,7 @@ function PlainFormulaInput({
   return (
     <input
       className="border-input bg-background focus-visible:ring-ring min-w-0 flex-1 rounded border px-2 py-0.5 font-mono text-xs focus-visible:ring-1 focus-visible:outline-none disabled:opacity-50"
+      style={{ fontSize }}
       data-testid="formula-bar-input"
       value={enabled ? draft : ''}
       disabled={!enabled || !editable}

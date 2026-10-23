@@ -2,11 +2,16 @@ import { useEffect } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { Toaster } from 'sonner';
 
-import { fileActions } from '@/features/file/fileActions';
 import { UnsavedDialog } from '@/features/file/UnsavedDialog';
 import { useCloseGuard } from '@/features/file/useCloseGuard';
+import { CommandPalette } from '@/features/command-palette/CommandPalette';
+import { ShortcutsSheet } from '@/features/command-palette/ShortcutsSheet';
+import { foldingCommands } from '@/features/grid/useFolding';
+import { groupCommands } from '@/features/grid/useGroupCommands';
+import { rowCommands } from '@/features/grid/useRowCommands';
 import { AppShell } from '@/features/shell/AppShell';
 import { isTauriRuntime } from '@/features/shell/StatusBar';
+import { appCommands } from '@/lib/appCommands';
 import { registerCommands } from '@/lib/commands';
 import { installShortcuts } from '@/lib/shortcuts';
 import { useIsDirty, useWorkbookStore } from '@/state/workbookStore';
@@ -31,38 +36,10 @@ export default function App() {
 
   useEffect(() => {
     const unregister = registerCommands([
-      {
-        id: 'file.new',
-        title: 'New XLSForm',
-        shortcut: { code: 'KeyN', ctrlOrMeta: true },
-        run: () => {
-          void fileActions.newFile();
-        },
-      },
-      {
-        id: 'file.open',
-        title: 'Open workbook…',
-        shortcut: { code: 'KeyO', ctrlOrMeta: true },
-        run: () => {
-          void fileActions.openFile();
-        },
-      },
-      {
-        id: 'file.save',
-        title: 'Save',
-        shortcut: { code: 'KeyS', ctrlOrMeta: true },
-        run: () => {
-          void fileActions.saveFile();
-        },
-      },
-      {
-        id: 'file.saveAs',
-        title: 'Save As…',
-        shortcut: { code: 'KeyS', ctrlOrMeta: true, shift: true },
-        run: () => {
-          void fileActions.saveFileAs();
-        },
-      },
+      ...appCommands(),
+      ...rowCommands(),
+      ...groupCommands(),
+      ...foldingCommands(),
     ]);
     const uninstallShortcuts = installShortcuts();
     return () => {
@@ -74,6 +51,8 @@ export default function App() {
   return (
     <>
       <AppShell />
+      <CommandPalette />
+      <ShortcutsSheet />
       <UnsavedDialog />
       <Toaster richColors closeButton position="bottom-right" />
     </>

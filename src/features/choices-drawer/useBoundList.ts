@@ -2,6 +2,7 @@
 import { useMemo } from 'react';
 
 import { findColumnKey } from '@/core/indexes/columns';
+import { primaryLabelColumn } from '@/core/languages/discover';
 import { resolveColumn } from '@/core/model/columns';
 import { parseType } from '@/core/model/parseType';
 import type { ColumnKey, Row, RowId } from '@/core/model/types';
@@ -21,11 +22,6 @@ export interface BoundList {
   columns: ColumnKey[];
 }
 
-function labelKeyFor(columns: readonly ColumnKey[]): ColumnKey | undefined {
-  const labels = columns.filter((column) => resolveColumn(column).base === 'label');
-  return labels.find((column) => !resolveColumn(column).language) ?? labels[0];
-}
-
 export function useBoundList(): BoundList {
   const data = useWorkbookStore((state) => state.data);
   const activeCell = useUiStore((state) => state.activeCell);
@@ -43,7 +39,7 @@ export function useBoundList(): BoundList {
     const choices = data.choices;
     const listKey = findColumnKey(choices, 'list_name') ?? 'list_name';
     const nameKey = findColumnKey(choices, 'name') ?? 'name';
-    const labelKey = labelKeyFor(choices.columns);
+    const labelKey = primaryLabelColumn(choices, data);
 
     const rows: Row[] = [];
     const rowIndexes: number[] = [];

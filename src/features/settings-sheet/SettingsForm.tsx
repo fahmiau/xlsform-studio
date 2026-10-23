@@ -14,6 +14,7 @@ import {
 import { resolveColumn, type ColumnBase } from '@/core/model/columns';
 import type { ColumnKey, WorkbookData } from '@/core/model/types';
 import { findColumnKey } from '@/core/indexes/columns';
+import { DEFAULT_LANGUAGE_ID, discoverLanguages } from '@/core/languages/discover';
 import { addColumn } from '@/core/ops/columns';
 import { setCells } from '@/core/ops/cells';
 import { insertRows } from '@/core/ops/rows';
@@ -78,17 +79,11 @@ interface LanguageOption {
   label: string;
 }
 
-function discoverLanguages(data: WorkbookData): LanguageOption[] {
-  const options = new Map<string, string>();
-  for (const column of data.survey.columns) {
-    const resolved = resolveColumn(column);
-    if (resolved.base !== 'label' || !resolved.language) continue;
-    const name = resolved.language.code
-      ? `${resolved.language.name} (${resolved.language.code})`
-      : resolved.language.name;
-    options.set(name, name);
-  }
-  return [...options].map(([value, label]) => ({ value, label }));
+/** `default_language` choices come from the shared language discovery (5.3). */
+function languageOptions(data: WorkbookData): LanguageOption[] {
+  return discoverLanguages(data)
+    .filter((language) => language.id !== DEFAULT_LANGUAGE_ID)
+    .map((language) => ({ value: language.display, label: language.display }));
 }
 
 function ensureSettingsRow(data: WorkbookData): WorkbookData {
@@ -203,7 +198,7 @@ export function SettingsForm() {
 
   const settings = data.settings;
   const row = settings.rows[0];
-  const languages = discoverLanguages(data);
+  const languages = languageOptions(data);
   const customColumns = settings.columns.filter(
     (column) => resolveColumn(column).base === 'custom',
   );

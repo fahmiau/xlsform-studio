@@ -1,5 +1,10 @@
 /** Grid cell construction and edit decoding (Task 2.2). */
-import { GridCellKind, type EditableGridCell, type GridCell } from '@glideapps/glide-data-grid';
+import {
+  GridCellKind,
+  type EditableGridCell,
+  type GridCell,
+  type Theme,
+} from '@glideapps/glide-data-grid';
 
 import type { Row, SheetData } from '@/core/model/types';
 
@@ -7,6 +12,7 @@ export interface TextCellOptions {
   readonly?: boolean;
   faded?: boolean;
   align?: 'left' | 'right' | 'center';
+  themeOverride?: Partial<Theme>;
 }
 
 export function textCell(value: string, options: TextCellOptions = {}): GridCell {
@@ -18,6 +24,7 @@ export function textCell(value: string, options: TextCellOptions = {}): GridCell
     readonly: options.readonly === true,
     ...(options.faded === true ? { style: 'faded' as const } : {}),
     ...(options.align !== undefined ? { contentAlign: options.align } : {}),
+    ...(options.themeOverride !== undefined ? { themeOverride: options.themeOverride } : {}),
   };
 }
 

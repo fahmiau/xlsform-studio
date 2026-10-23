@@ -15,8 +15,8 @@ import type { EditorView } from '@codemirror/view';
 import type { ChoicesIndex, VariableMap } from '@/core/indexes';
 import { findColumnKey } from '@/core/indexes/columns';
 import type { AllIndexes } from '@/core/indexes';
+import { labelColumnFor } from '@/core/languages/discover';
 import { resolveColumn } from '@/core/model/columns';
-import { defaultLabelColumn } from '@/core/model/labelColumn';
 import { readSettings } from '@/core/model/settings';
 import type { ManagedSheetName, RowId, WorkbookData } from '@/core/model/types';
 import { analyzeContext } from '@/core/xpath/context';
@@ -55,7 +55,7 @@ export function completionDataFor(
   const row = sheet.rows.find((candidate) => candidate.id === cell.rowId);
   const rowIndex = indexes.rowIndexes[cell.sheet].get(cell.rowId);
   const nameKey = findColumnKey(sheet, 'name');
-  const labelKey = defaultLabelColumn(data.choices, readSettings(data.settings).defaultLanguage);
+  const labelKey = labelColumnFor(data.choices, readSettings(data.settings).defaultLanguage);
   return {
     variableMap: indexes.variables,
     choicesByList: indexes.choices.byList,

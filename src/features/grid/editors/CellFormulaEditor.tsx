@@ -15,6 +15,8 @@ type EditorProps = Parameters<ProvideEditorComponent<XPathCell>>[0];
 
 export function CellFormulaEditor({ value, onFinishedEditing }: EditorProps) {
   const theme = usePrefsStore((state) => state.theme);
+  const autocomplete = usePrefsStore((state) => state.autocompleteOnDollar);
+  const fontSize = usePrefsStore((state) => state.formulaFontSize);
   const dark = useIsDark(theme);
   const cell = { sheet: 'survey' as const, rowId: value.data.rowId, column: value.data.column };
 
@@ -29,6 +31,8 @@ export function CellFormulaEditor({ value, onFinishedEditing }: EditorProps) {
         value={value.data.value}
         xpath
         dark={dark}
+        autocomplete={autocomplete}
+        fontSize={fontSize}
         autoFocus
         commitOnTab
         ariaLabel="Formula cell editor"

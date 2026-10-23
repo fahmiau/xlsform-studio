@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { toast } from 'sonner';
 
 import { commands } from '@/ipc/bindings';
+import { usePrefsStore } from '@/state/prefsStore';
 import { selectIsDirty, useWorkbookStore } from '@/state/workbookStore';
 
 import { serializeSnapshot } from './snapshot';
@@ -49,8 +50,9 @@ export async function clearRecoverySnapshot(): Promise<void> {
 }
 
 export function useAutosave(): void {
+  const autosave = usePrefsStore((state) => state.autosave);
   useEffect(() => {
-    if (!isTauriRuntime()) return;
+    if (!isTauriRuntime() || !autosave) return;
     const timer = window.setInterval(() => {
       void writeRecoverySnapshot().catch((error: unknown) => {
         if (warned) return;
@@ -61,5 +63,5 @@ export function useAutosave(): void {
       });
     }, AUTOSAVE_INTERVAL_MS);
     return () => window.clearInterval(timer);
-  }, []);
+  }, [autosave]);
 }

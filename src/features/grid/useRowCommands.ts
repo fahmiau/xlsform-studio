@@ -2,13 +2,11 @@
  * Row commands shared by shortcuts and the row context menu (Task 2.4). Every
  * user action is one store `apply`, hence one undo step (AD-2).
  */
-import { useEffect } from 'react';
-
 import { findColumnKey } from '@/core/indexes/columns';
 import type { ManagedSheetName, RowId } from '@/core/model/types';
 import { deleteRows, duplicateRows, insertRows } from '@/core/ops/rows';
 import { clampIndex } from '@/core/ops/rows';
-import { registerCommands } from '@/lib/commands';
+import type { AppCommand } from '@/lib/commands';
 import { useUiStore, type SheetTab } from '@/state/uiStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 
@@ -158,28 +156,26 @@ export function selectionRowIndex(): number {
   return selectionIndex(currentSheet(), selectedRowIds());
 }
 
-/** Register the insert shortcuts once from the app shell (R3). */
-export function useRegisterRowCommands(): void {
-  useEffect(() => {
-    return registerCommands([
-      {
-        id: 'grid.row.insertBelow',
-        title: 'Insert row below',
-        shortcut: { code: 'KeyI', ctrlOrMeta: true },
-        when: () => currentSheet() !== 'settings',
-        run: () => {
-          insertRowsAtSelection('below');
-        },
+/** Insert-row commands, shared by shortcuts and the palette (Task 2.4). */
+export function rowCommands(): AppCommand[] {
+  return [
+    {
+      id: 'grid.row.insertBelow',
+      title: 'Insert row below',
+      shortcut: { code: 'KeyI', ctrlOrMeta: true },
+      when: () => currentSheet() !== 'settings',
+      run: () => {
+        insertRowsAtSelection('below');
       },
-      {
-        id: 'grid.row.insertAbove',
-        title: 'Insert row above',
-        shortcut: { code: 'KeyI', ctrlOrMeta: true, shift: true },
-        when: () => currentSheet() !== 'settings',
-        run: () => {
-          insertRowsAtSelection('above');
-        },
+    },
+    {
+      id: 'grid.row.insertAbove',
+      title: 'Insert row above',
+      shortcut: { code: 'KeyI', ctrlOrMeta: true, shift: true },
+      when: () => currentSheet() !== 'settings',
+      run: () => {
+        insertRowsAtSelection('above');
       },
-    ]);
-  }, []);
+    },
+  ];
 }

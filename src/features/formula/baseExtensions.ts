@@ -47,6 +47,8 @@ export interface BaseExtensionsOptions {
   ariaLabel?: string;
   /** Render tooltips in `document.body` so Glide's overlay cannot clip them. */
   tooltipsInBody?: boolean;
+  /** Formula font size from Preferences (default 12px). */
+  fontSize?: number;
 }
 
 export function baseExtensions(options: BaseExtensionsOptions): Extension {
@@ -59,7 +61,7 @@ export function baseExtensions(options: BaseExtensionsOptions): Extension {
     bracketLanguageData,
     templateBraceInput,
     xlsformHighlighting,
-    xlsformTheme(options.dark),
+    xlsformTheme(options.dark, options.fontSize),
     EditorState.allowMultipleSelections.of(false),
     keymap.of([
       ...(options.keymap ?? []),

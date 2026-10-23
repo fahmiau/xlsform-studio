@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import type { GridSelection } from '@glideapps/glide-data-grid';
 
 import type { ColumnKey, RowId } from '@/core/model/types';
+import type { LanguageViewState } from '@/core/languages/viewModes';
 import type { ListMode } from '@/core/slug/slugify';
 
 export type SheetTab = 'survey' | 'choices' | 'settings';
@@ -25,7 +26,7 @@ export interface Selection {
   focus: CellRef;
 }
 
-export type LanguageViewMode = 'all' | 'single' | 'split';
+export type { LanguageViewMode, LanguageViewState } from '@/core/languages/viewModes';
 
 export interface RevealRequest {
   sheet: SheetTab;
@@ -63,7 +64,12 @@ export interface UiState {
   rightTab: RightTab;
   leftTab: LeftTab;
   panels: { outline: boolean; lint: boolean; ai: boolean };
-  languageView: { mode: LanguageViewMode; language: string | null };
+  languageView: LanguageViewState;
+  /** Command palette, shortcut help, and preferences dialogs (Task 5.6/5.7). */
+  paletteOpen: boolean;
+  shortcutsOpen: boolean;
+  preferencesOpen: boolean;
+  addLanguageOpen: boolean;
   /** Session-only per-sheet column widths (Task 2.2). */
   columnWidths: Partial<Record<SheetTab, Record<ColumnKey, number>>>;
   /** View-only hidden columns (Task 2.6). */
@@ -86,7 +92,12 @@ export interface UiState {
   setRightTab: (tab: RightTab) => void;
   setLeftTab: (tab: LeftTab) => void;
   setPanel: (panel: keyof UiState['panels'], visible: boolean) => void;
-  setLanguageView: (mode: LanguageViewMode, language?: string | null) => void;
+  setLanguageView: (mode: LanguageViewState['mode'], language?: string | null) => void;
+  setLanguageViewState: (view: LanguageViewState) => void;
+  setPaletteOpen: (open: boolean) => void;
+  setShortcutsOpen: (open: boolean) => void;
+  setPreferencesOpen: (open: boolean) => void;
+  setAddLanguageOpen: (open: boolean) => void;
   setColumnWidth: (sheet: SheetTab, column: ColumnKey, width: number) => void;
   toggleColumnHidden: (sheet: SheetTab, column: ColumnKey) => void;
   showAllColumns: (sheet: SheetTab) => void;
@@ -111,7 +122,11 @@ export const useUiStore = create<UiState>()((set) => ({
   rightTab: 'choices',
   leftTab: 'outline',
   panels: { outline: true, lint: false, ai: false },
-  languageView: { mode: 'all', language: null },
+  languageView: { mode: 'all', language: null, source: null, target: null },
+  paletteOpen: false,
+  shortcutsOpen: false,
+  preferencesOpen: false,
+  addLanguageOpen: false,
   columnWidths: {},
   hiddenColumns: {},
   reveal: null,
@@ -173,7 +188,13 @@ export const useUiStore = create<UiState>()((set) => ({
   setRightTab: (rightTab) => set({ rightTab }),
   setLeftTab: (leftTab) => set({ leftTab }),
   setPanel: (panel, visible) => set((state) => ({ panels: { ...state.panels, [panel]: visible } })),
-  setLanguageView: (mode, language = null) => set({ languageView: { mode, language } }),
+  setLanguageView: (mode, language = null) =>
+    set((state) => ({ languageView: { ...state.languageView, mode, language } })),
+  setLanguageViewState: (languageView) => set({ languageView }),
+  setPaletteOpen: (paletteOpen) => set({ paletteOpen }),
+  setShortcutsOpen: (shortcutsOpen) => set({ shortcutsOpen }),
+  setPreferencesOpen: (preferencesOpen) => set({ preferencesOpen }),
+  setAddLanguageOpen: (addLanguageOpen) => set({ addLanguageOpen }),
 
   setColumnWidth: (sheet, column, width) =>
     set((state) => ({

@@ -1,11 +1,12 @@
-/** Drawer header: question, bound list name, and naming mode (Task 3.4). */
-import { useMemo } from 'react';
+/** Drawer header: question, editable list name, and naming mode (Tasks 3.4, 5.2). */
+import { useMemo, useState } from 'react';
+import { ListTree, Pencil } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { findColumnKey } from '@/core/indexes/columns';
-import { resolveColumn } from '@/core/model/columns';
+import { primaryLabelColumn } from '@/core/languages/discover';
 import type { RowId } from '@/core/model/types';
-import { ListTree } from 'lucide-react';
-
+import { listRenameError, renameList } from '@/core/refactor/renameList';
 import type { ListMode } from '@/core/slug/slugify';
 import { useWorkbookStore } from '@/state/workbookStore';
 
@@ -23,16 +24,49 @@ export function DrawerHeader({
   onModeChange: (mode: ListMode) => void;
 }) {
   const data = useWorkbookStore((state) => state.data);
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(listName);
+
   const row = useMemo(
     () =>
       surveyRowId ? data.survey.rows.find((candidate) => candidate.id === surveyRowId) : undefined,
     [data.survey.rows, surveyRowId],
   );
   const nameKey = findColumnKey(data.survey, 'name') ?? 'name';
-  const labels = data.survey.columns.filter((column) => resolveColumn(column).base === 'label');
-  const labelKey = labels.find((column) => !resolveColumn(column).language) ?? labels[0] ?? nameKey;
+  const labelKey = primaryLabelColumn(data.survey, data) ?? nameKey;
   const name = row?.cells[nameKey] ?? '';
   const label = row?.cells[labelKey] ?? '';
+
+  const commitListName = () => {
+    setEditing(false);
+    const next = draft.trim();
+    if (next === listName) return;
+    const error = listRenameError(data, listName, next);
+    if (error) {
+      toast.error('List name not changed', { description: error });
+      setDraft(listName);
+      return;
+    }
+    let changes = 0;
+    useWorkbookStore.getState().apply(
+      'Rename choice list',
+      (current) => {
+        const result = renameList(current, listName, next);
+        changes = result.changes.length;
+        return result.data;
+      },
+      { sheet: 'choices' },
+    );
+    if (changes > 0) {
+      toast.success(`Renamed list ${listName} → ${next}`, {
+        description: `Updated ${changes} cell${changes === 1 ? '' : 's'}.`,
+        action: {
+          label: 'Undo',
+          onClick: () => useWorkbookStore.temporal.getState().undo(),
+        },
+      });
+    }
+  };
 
   return (
     <div className="space-y-1 border-b px-2 py-1.5" data-testid="drawer-header">
@@ -48,10 +82,49 @@ export function DrawerHeader({
       </div>
       <div className="text-muted-foreground flex items-center gap-1 text-[11px]">
         <span>list</span>
-        <code className="bg-muted rounded px-1 font-mono" data-testid="drawer-list-name">
-          {listName}
-        </code>
-        <span className="ml-auto">rename arrives in Stage 5</span>
+        {editing ? (
+          <input
+            autoFocus
+            aria-label="List name"
+            className="border-input bg-background w-40 rounded border px-1 font-mono"
+            value={draft}
+            data-testid="drawer-list-name-input"
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={commitListName}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') commitListName();
+              if (event.key === 'Escape') {
+                setDraft(listName);
+                setEditing(false);
+              }
+            }}
+          />
+        ) : (
+          <>
+            <code
+              className="bg-muted rounded px-1 font-mono"
+              data-testid="drawer-list-name"
+              onDoubleClick={() => {
+                setDraft(listName);
+                setEditing(true);
+              }}
+            >
+              {listName}
+            </code>
+            <button
+              type="button"
+              aria-label="Rename list"
+              className="hover:text-foreground"
+              data-testid="rename-list"
+              onClick={() => {
+                setDraft(listName);
+                setEditing(true);
+              }}
+            >
+              <Pencil aria-hidden className="size-3" />
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

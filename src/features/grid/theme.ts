@@ -73,10 +73,13 @@ export const ROW_TINTS = {
     group: 'rgba(241, 245, 249, 1)',
     repeat: 'rgba(238, 242, 255, 1)',
     end: 'rgba(248, 250, 252, 1)',
+    /** Split view: target cell empty while the source is filled (Task 5.4). */
+    translation: 'rgba(254, 243, 199, 0.55)',
   },
   dark: {
     group: 'rgba(51, 65, 85, 0.6)',
     repeat: 'rgba(49, 46, 129, 0.45)',
     end: 'rgba(30, 41, 59, 0.45)',
+    translation: 'rgba(120, 53, 15, 0.28)',
   },
 } as const;

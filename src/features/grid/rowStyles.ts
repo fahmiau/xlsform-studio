@@ -5,6 +5,12 @@ import { ROW_TINTS } from './theme';
 
 export type RowStyleKind = 'group' | 'repeat' | 'end' | 'orphan' | 'choice-boundary' | null;
 
+/** "Needs translation" tint for one target-language cell (Task 5.4). */
+export function translationCellTheme(dark: boolean): Partial<Theme> {
+  const tints = dark ? ROW_TINTS.dark : ROW_TINTS.light;
+  return { bgCell: tints.translation };
+}
+
 export function rowThemeOverride(
   theme: Theme,
   dark: boolean,

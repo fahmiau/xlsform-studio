@@ -11,6 +11,26 @@ export interface ShortcutSpec {
   alt?: boolean;
 }
 
+/** Event the focused CodeMirror editor listens for (`Ctrl+Space`). */
+export const AUTOCOMPLETE_EVENT = 'xlsform:autocomplete';
+
+/** Human-readable shortcut for the palette and the help sheet. */
+export function shortcutLabel(shortcut: ShortcutSpec | undefined): string {
+  if (!shortcut) return '';
+  const parts: string[] = [];
+  if (shortcut.ctrlOrMeta) parts.push('Ctrl');
+  if (shortcut.shift) parts.push('Shift');
+  if (shortcut.alt) parts.push('Alt');
+  parts.push(
+    shortcut.code.startsWith('Key')
+      ? shortcut.code.slice(3)
+      : shortcut.code.startsWith('Bracket')
+        ? shortcut.code.slice(7).replace('Left', '[').replace('Right', ']')
+        : shortcut.code,
+  );
+  return parts.join('+');
+}
+
 export interface AppCommand {
   id: string;
   title: string;
