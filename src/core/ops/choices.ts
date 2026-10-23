@@ -6,6 +6,7 @@ import { produce } from 'immer';
 
 import { buildGroupTree } from '../indexes/groupTree';
 import { columnKey } from '../indexes/columns';
+import { primaryLabelColumn } from '../languages/discover';
 import { resolveColumn } from '../model/columns';
 import { newRowId } from '../model/factory';
 import { formatType, parseType } from '../model/parseType';
@@ -42,8 +43,7 @@ function nameColumn(data: WorkbookData): ColumnKey {
 }
 
 function primaryLabelKey(data: WorkbookData): ColumnKey | undefined {
-  const labels = data.choices.columns.filter((column) => resolveColumn(column).base === 'label');
-  return labels.find((column) => !resolveColumn(column).language) ?? labels[0];
+  return primaryLabelColumn(data.choices, data);
 }
 
 /** Names a new list must not collide with: both choice rows and survey types. */
@@ -64,11 +64,15 @@ export function existingListNames(data: WorkbookData, excludeRowId?: RowId): Set
 }
 
 /** Apply the configurable `{name}` pattern and slug the result. */
-export function buildListName(name: string, pattern = DEFAULT_LIST_NAME_PATTERN): string {
+export function buildListName(
+  name: string,
+  pattern = DEFAULT_LIST_NAME_PATTERN,
+  maxLength?: number,
+): string {
   const rendered = pattern.includes('{name}')
     ? pattern.replaceAll('{name}', name)
     : `${name}${pattern}`;
-  return slugify(rendered);
+  return slugify(rendered, maxLength === undefined ? {} : { maxLength });
 }
 
 /** A collision-free list name for a question (Task 3.3). */
@@ -77,9 +81,11 @@ export function suggestListName(
   surveyRowId: RowId | undefined,
   questionName: string,
   pattern = DEFAULT_LIST_NAME_PATTERN,
+  maxLength?: number,
 ): string {
-  const base = buildListName(questionName || 'list', pattern);
-  return uniqueName(base, existingListNames(data, surveyRowId));
+  const base = buildListName(questionName || 'list', pattern, maxLength);
+  const used = existingListNames(data, surveyRowId);
+  return maxLength === undefined ? uniqueName(base, used) : uniqueName(base, used, maxLength);
 }
 
 function rowIndexById(rows: readonly Row[], rowId: RowId): number {
@@ -109,7 +115,7 @@ export function applyTypeChange(
   data: WorkbookData,
   surveyRowId: RowId,
   rawType: string,
-  options: { pattern?: string } = {},
+  options: { pattern?: string; maxLength?: number } = {},
 ): WorkbookData {
   const index = rowIndexById(data.survey.rows, surveyRowId);
   if (index < 0) return data;
@@ -125,7 +131,13 @@ export function applyTypeChange(
   let nextName = questionName;
 
   if (SELECT_LIST_BASES.has(parsed.base) && !parsed.listName && questionName) {
-    const listName = suggestListName(data, surveyRowId, questionName, options.pattern);
+    const listName = suggestListName(
+      data,
+      surveyRowId,
+      questionName,
+      options.pattern,
+      options.maxLength,
+    );
     nextType = formatType({ ...parsed, listName });
   }
 
@@ -172,6 +184,8 @@ export function applyTypeChange(
 export interface ChoiceEditOptions {
   /** Drawer mode; defaults to the list's detected convention. */
   mode?: ListMode;
+  /** Slug length cap from Preferences (defaults to 32). */
+  maxLength?: number;
 }
 
 /** Apply label/name/extra edits with auto-naming and manual locks (Task 3.4). */
@@ -217,13 +231,20 @@ export function applyChoiceEdits(
       const siblings = listName ? listRows(rows, listName, listKey) : [];
       const mode = options.mode ?? currentMode(siblings, nameKey);
       const position = siblings.length > 0 ? siblings.indexOf(row) + 1 : 1;
-      const expected = autoChoiceName(row.cells[labelKey] ?? '', mode, position, position);
+      const expected = autoChoiceName(
+        row.cells[labelKey] ?? '',
+        mode,
+        position,
+        position,
+        options.maxLength,
+      );
       const name = uniqueName(
         expected,
         usedNames(
           siblings.filter((r) => r.id !== row.id),
           nameKey,
         ),
+        options.maxLength,
       );
       row.cells[nameKey] = name;
     }
@@ -257,8 +278,18 @@ export function insertChoiceRow(
     const position = existing.length + 1;
     const rowCells: Record<ColumnKey, string> = { ...cells, [listKey]: listNameValue };
     if (labelKey && !(rowCells[nameKeyValue] ?? '').trim()) {
-      const made = autoChoiceName(rowCells[labelKey] ?? '', mode, position, position);
-      rowCells[nameKeyValue] = uniqueName(made, usedNames(existing, nameKeyValue));
+      const made = autoChoiceName(
+        rowCells[labelKey] ?? '',
+        mode,
+        position,
+        position,
+        options.maxLength,
+      );
+      rowCells[nameKeyValue] = uniqueName(
+        made,
+        usedNames(existing, nameKeyValue),
+        options.maxLength,
+      );
     }
     rows.splice(at, 0, { id: rowId, cells: rowCells });
   });
@@ -320,8 +351,8 @@ export function bulkInsertChoices(
         locked = true;
         used.add(pastedName);
       } else if (nameKeyValue) {
-        const expected = autoChoiceName(label, mode, position, position);
-        const name = uniqueName(expected, used);
+        const expected = autoChoiceName(label, mode, position, position, options.maxLength);
+        const name = uniqueName(expected, used, options.maxLength);
         used.add(name);
         cells[nameKeyValue] = name;
       }
@@ -345,6 +376,7 @@ export function renumberList(
   data: WorkbookData,
   listNameValue: string,
   mode: ListMode,
+  maxLength?: number,
 ): WorkbookData {
   const listKey = listNameKey(data);
   const nameKeyValue = nameColumn(data);
@@ -361,14 +393,14 @@ export function renumberList(
     rows.forEach((row, index) => {
       if (row.meta?.nameLocked) return;
       const label = labelKey ? (row.cells[labelKey] ?? '') : '';
-      const expected = autoChoiceName(label, mode, index + 1, index + 1);
+      const expected = autoChoiceName(label, mode, index + 1, index + 1, maxLength);
       // Snake names ignore position, so a repeated slug needs the same `_2`
       // suffix the auto-fill path uses. Numeric/prefix names still skip
       // positions until the next free number.
-      let name = mode.kind === 'snake' ? uniqueName(expected, used) : expected;
+      let name = mode.kind === 'snake' ? uniqueName(expected, used, maxLength) : expected;
       if (mode.kind !== 'snake') {
         for (let attempt = index + 1; used.has(name) && attempt < index + 10_000; attempt += 1) {
-          name = autoChoiceName(label, mode, attempt + 1, attempt + 1);
+          name = autoChoiceName(label, mode, attempt + 1, attempt + 1, maxLength);
         }
       }
       row.cells[nameKeyValue] = name;
@@ -387,7 +419,7 @@ export function forkList(
   data: WorkbookData,
   sourceListName: string,
   surveyRowId: RowId,
-  options: { pattern?: string } = {},
+  options: { pattern?: string; maxLength?: number } = {},
 ): ForkListResult {
   const surveyIndex = rowIndexById(data.survey.rows, surveyRowId);
   if (surveyIndex < 0) return { data, newListName: sourceListName };
@@ -399,7 +431,13 @@ export function forkList(
   const parsed = parseType(row.cells[typeKey] ?? '');
   if (!SELECT_LIST_BASES.has(parsed.base)) return { data, newListName: sourceListName };
   const questionName = (row.cells[nameKeyValue] ?? '').trim() || sourceListName;
-  const newListName = suggestListName(data, surveyRowId, questionName, options.pattern);
+  const newListName = suggestListName(
+    data,
+    surveyRowId,
+    questionName,
+    options.pattern,
+    options.maxLength,
+  );
   if (newListName === sourceListName) return { data, newListName: sourceListName };
 
   const listKey = listNameKey(data);
@@ -508,7 +546,11 @@ export function choiceListNames(data: WorkbookData): string[] {
 }
 
 /** Unlock a choice name and regenerate it from its label (Task 3.4). */
-export function unlockChoiceName(data: WorkbookData, rowId: RowId): WorkbookData {
+export function unlockChoiceName(
+  data: WorkbookData,
+  rowId: RowId,
+  options: ChoiceEditOptions = {},
+): WorkbookData {
   const listKey = listNameKey(data);
   const nameKeyValue = nameColumn(data);
   const labelKey = primaryLabelKey(data);
@@ -519,15 +561,22 @@ export function unlockChoiceName(data: WorkbookData, rowId: RowId): WorkbookData
     if (!labelKey) return;
     const listNameValue = (row.cells[listKey] ?? '').trim();
     const siblings = listRows(draft.choices.rows, listNameValue, listKey);
-    const mode = currentMode(siblings, nameKeyValue);
+    const mode = options.mode ?? currentMode(siblings, nameKeyValue);
     const position = Math.max(1, siblings.indexOf(row) + 1);
-    const expected = autoChoiceName(row.cells[labelKey] ?? '', mode, position, position);
+    const expected = autoChoiceName(
+      row.cells[labelKey] ?? '',
+      mode,
+      position,
+      position,
+      options.maxLength,
+    );
     row.cells[nameKeyValue] = uniqueName(
       expected,
       usedNames(
         siblings.filter((candidate) => candidate.id !== rowId),
         nameKeyValue,
       ),
+      options.maxLength,
     );
   });
 }
@@ -539,9 +588,7 @@ export function listUsageDetails(
 ): Array<{ rowId: RowId; name: string; label: string }> {
   const typeKey = columnKey(data.survey, 'type');
   const nameKeyValue = columnKey(data.survey, 'name');
-  const labels = data.survey.columns.filter((column) => resolveColumn(column).base === 'label');
-  const labelKey =
-    labels.find((column) => !resolveColumn(column).language) ?? labels[0] ?? nameKeyValue;
+  const labelKey = primaryLabelColumn(data.survey, data) ?? nameKeyValue;
   return data.survey.rows
     .filter((row) => parseType(row.cells[typeKey] ?? '').listName === listNameValue)
     .map((row) => ({

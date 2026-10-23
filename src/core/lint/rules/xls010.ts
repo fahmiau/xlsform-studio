@@ -1,5 +1,5 @@
 /** XLS-010 Missing label in the default language (warning, PRD §4.5). */
-import { defaultLabelColumn } from '../../model/labelColumn';
+import { labelColumnFor } from '../../languages/discover';
 import { parseType } from '../../model/parseType';
 import { getQuestionType } from '../../model/questionTypes';
 import type { DiagnosticIssue, LintContext, LintRule } from '../types';
@@ -28,7 +28,7 @@ export const xls010: LintRule = {
     const survey = ctx.data.survey;
     const typeKey = columnFor(survey, 'type');
     const nameKey = columnFor(survey, 'name');
-    const labelKey = defaultLabelColumn(survey, ctx.settings.defaultLanguage);
+    const labelKey = labelColumnFor(survey, ctx.settings.defaultLanguage);
     // A sheet with no label column at all is not a form of visible questions;
     // do not flood it with one warning per row.
     if (!labelKey) return [];

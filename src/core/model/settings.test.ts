@@ -1,43 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { createEmptyWorkbook } from './factory';
-import { defaultLabelColumn } from './labelColumn';
 import { readSettings } from './settings';
-import type { SheetData } from './types';
-
-function sheet(columns: string[], rows: Array<Record<string, string>> = []): SheetData {
-  return {
-    sheetName: 'survey',
-    columns,
-    rows: rows.map((cells, index) => ({ id: `r${index}`, cells })),
-  };
-}
-
-describe('defaultLabelColumn', () => {
-  const columns = ['label::English (en)', 'label::French (fr)', 'label'];
-
-  it('matches a language code', () => {
-    expect(defaultLabelColumn(sheet(columns), 'en')).toBe('label::English (en)');
-  });
-
-  it('matches a language name', () => {
-    expect(defaultLabelColumn(sheet(columns), 'French')).toBe('label::French (fr)');
-  });
-
-  it('matches `Name (code)` settings values', () => {
-    expect(defaultLabelColumn(sheet(columns), 'French (fr)')).toBe('label::French (fr)');
-    expect(defaultLabelColumn(sheet(columns), 'English (en)')).toBe('label::English (en)');
-  });
-
-  it('falls back to the plain label, then the first localized label', () => {
-    expect(defaultLabelColumn(sheet(columns), 'Spanish')).toBe('label');
-    expect(defaultLabelColumn(sheet(['label::French (fr)']), 'Spanish')).toBe('label::French (fr)');
-  });
-
-  it('returns undefined when the sheet has no labels', () => {
-    expect(defaultLabelColumn(sheet(['name']))).toBeUndefined();
-  });
-});
 
 describe('readSettings', () => {
   it('reads canonical settings', () => {

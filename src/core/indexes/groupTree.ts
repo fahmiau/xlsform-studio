@@ -2,7 +2,7 @@
  * Group/repeat tree for folding and the Outline panel (Task 1.7).
  * Never throws: unbalanced and mismatched tags are reported, not fatal.
  */
-import { defaultLabelColumn } from '../model/labelColumn';
+import { labelColumnFor } from '../languages/discover';
 import { parseType } from '../model/parseType';
 import type { RowId, SheetData } from '../model/types';
 import { columnKey } from './columns';
@@ -45,7 +45,7 @@ interface OpenGroup {
 }
 
 function primaryLabelKey(sheet: SheetData, options: VariableOptions): string | undefined {
-  return defaultLabelColumn(sheet, options.defaultLanguage);
+  return labelColumnFor(sheet, options.defaultLanguage);
 }
 
 export function buildGroupTree(sheet: SheetData, options: VariableOptions = {}): GroupTreeIndex {

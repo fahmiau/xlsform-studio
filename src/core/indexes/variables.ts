@@ -2,8 +2,8 @@
  * Variable index for autocomplete and refactoring (PRD §3, Task 1.7).
  * Pure functions over `SheetData`.
  */
+import { labelColumnFor } from '../languages/discover';
 import { parseType } from '../model/parseType';
-import { defaultLabelColumn } from '../model/labelColumn';
 import type { RowId, SheetData } from '../model/types';
 import { columnKey } from './columns';
 
@@ -33,7 +33,7 @@ export interface VariableOptions {
 }
 
 function labelColumn(sheet: SheetData, options: VariableOptions): string | undefined {
-  return defaultLabelColumn(sheet, options.defaultLanguage);
+  return labelColumnFor(sheet, options.defaultLanguage);
 }
 
 export function buildVariableMap(sheet: SheetData, options: VariableOptions = {}): VariableMap {

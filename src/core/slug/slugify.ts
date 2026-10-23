@@ -4,12 +4,21 @@
  * Pure and dependency-free (AD-1). All functions are total: malformed or
  * non-Latin labels fall back to `opt_<n>` instead of throwing.
  */
+import { labelColumnFor } from '../languages/discover';
 import { resolveColumn } from '../model/columns';
 import type { Row, SheetData } from '../model/types';
 
 export const SLUG_MAX_LENGTH = 32;
 
-export type ListMode = { kind: 'snake' } | { kind: 'numeric' } | { kind: 'prefix'; prefix: string };
+/** Naming styles a *new* list can start from (Preferences → Choices). */
+export type SlugStyle = 'snake' | 'camel' | 'passthrough';
+
+export type ListMode =
+  | { kind: 'snake' }
+  | { kind: 'numeric' }
+  | { kind: 'prefix'; prefix: string }
+  | { kind: 'camel' }
+  | { kind: 'passthrough' };
 
 export interface SlugifyOptions {
   /** Maximum length. Defaults to {@link SLUG_MAX_LENGTH}. */
@@ -52,17 +61,49 @@ export function numericName(index: number, prefix?: string): string {
   return stem ? `${stem}_${value}` : String(value);
 }
 
-/** Append `_2`, `_3`… while keeping the base plus suffix within 32 chars. */
-export function uniqueName(base: string, existing: ReadonlySet<string>): string {
-  const stem = slugify(base || 'opt');
+/** Append `_2`, `_3`… while keeping the base plus suffix within `maxLength`. */
+export function uniqueName(
+  base: string,
+  existing: ReadonlySet<string>,
+  maxLength = SLUG_MAX_LENGTH,
+): string {
+  const limit = Math.max(1, maxLength);
+  const stem = slugify(base || 'opt', { maxLength: limit });
   if (!existing.has(stem)) return stem;
   for (let counter = 2; counter < 10_000; counter += 1) {
     const suffix = `_${counter}`;
-    const trimmed = truncateAtBoundary(stem, SLUG_MAX_LENGTH - suffix.length);
+    const trimmed = truncateAtBoundary(stem, limit - suffix.length);
     const candidate = `${trimmed || 'opt'}${suffix}`;
     if (!existing.has(candidate)) return candidate;
   }
-  return `${truncateAtBoundary(stem, 24)}_${Date.now()}`;
+  return `${truncateAtBoundary(stem, Math.max(1, limit - 8))}_${Date.now()}`;
+}
+
+/** `drinking_water` → `drinkingWater`. */
+export function camelize(value: string): string {
+  return value
+    .split('_')
+    .filter(Boolean)
+    .map((part, index) => (index === 0 ? part : `${part.charAt(0).toUpperCase()}${part.slice(1)}`))
+    .join('');
+}
+
+/** Keep the author's spelling; only whitespace and punctuation become `_`. */
+export function passthroughName(label: string, options: SlugifyOptions = {}): string {
+  const maxLength = Math.max(1, options.maxLength ?? SLUG_MAX_LENGTH);
+  const cleaned = (label ?? '')
+    .trim()
+    .replace(/\s+/g, '_')
+    .replace(/[^\p{L}\p{N}_.-]/gu, '');
+  const value = cleaned === '' ? `opt_${Math.max(1, options.index ?? 1)}` : cleaned;
+  return value.length <= maxLength ? value : value.slice(0, maxLength);
+}
+
+/** Style chosen in Preferences for brand-new lists. */
+export function modeFromStyle(style: SlugStyle): ListMode {
+  if (style === 'camel') return { kind: 'camel' };
+  if (style === 'passthrough') return { kind: 'passthrough' };
+  return { kind: 'snake' };
 }
 
 const NUMERIC = /^\d+$/;
@@ -92,10 +133,15 @@ export function autoChoiceName(
   mode: ListMode,
   position = 1,
   fallbackIndex = position,
+  maxLength?: number,
 ): string {
   if (mode.kind === 'numeric') return numericName(position);
   if (mode.kind === 'prefix') return numericName(position, mode.prefix);
-  return slugify(label, { index: fallbackIndex });
+  const options: SlugifyOptions = { index: fallbackIndex };
+  if (maxLength !== undefined) options.maxLength = maxLength;
+  if (mode.kind === 'camel') return camelize(slugify(label, options));
+  if (mode.kind === 'passthrough') return passthroughName(label, options);
+  return slugify(label, options);
 }
 
 /**
@@ -110,11 +156,6 @@ export function inferNameLocked(row: Row, mode: ListMode, position = 1): boolean
   return name !== expected;
 }
 
-function primaryLabelKey(sheet: SheetData): string | undefined {
-  const labels = sheet.columns.filter((column) => resolveColumn(column).base === 'label');
-  return labels.find((column) => !resolveColumn(column).language) ?? labels[0] ?? undefined;
-}
-
 /**
  * AD-14 hook for the reader: infer `meta.nameLocked` per choice row from the
  * naming convention of its list. Mutates the freshly parsed sheet in place.
@@ -122,7 +163,7 @@ function primaryLabelKey(sheet: SheetData): string | undefined {
 export function inferNameLocks(choices: SheetData): void {
   const listKey = choices.columns.find((column) => resolveColumn(column).base === 'list_name');
   const nameKey = choices.columns.find((column) => resolveColumn(column).base === 'name');
-  const labelKey = primaryLabelKey(choices);
+  const labelKey = labelColumnFor(choices);
   if (!listKey || !nameKey) return;
 
   const byList = new Map<string, Row[]>();
