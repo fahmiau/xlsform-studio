@@ -9,6 +9,15 @@ import { runLint } from '../src/core/lint';
 import { buildReferenceWorkbookData } from '../tests/fixtures/reference-workbook';
 import { measure, report } from './bench-utils';
 
+// Validate the override before building/warming the fixture so a typo in the
+// env var fails fast instead of after several seconds of work.
+const rawLimit = process.env.LINT_BENCH_LIMIT_MS ?? '15';
+const limit = Number(rawLimit);
+if (!Number.isFinite(limit) || limit <= 0) {
+  console.error(`Invalid LINT_BENCH_LIMIT_MS: ${rawLimit}`);
+  process.exit(1);
+}
+
 const data = buildReferenceWorkbookData();
 const indexes = buildAllIndexes(data, { defaultLanguage: 'English (en)' });
 const diagnostics = runLint(data, indexes);
@@ -27,13 +36,6 @@ const timings = await measure(
   20,
 );
 report([timings]);
-
-const rawLimit = process.env.LINT_BENCH_LIMIT_MS ?? '15';
-const limit = Number(rawLimit);
-if (!Number.isFinite(limit) || limit <= 0) {
-  console.error(`Invalid LINT_BENCH_LIMIT_MS: ${rawLimit}`);
-  process.exit(1);
-}
 
 if (timings.median > limit) {
   console.error(`Regression: lint ${timings.median.toFixed(1)} ms (limit ${limit} ms).`);

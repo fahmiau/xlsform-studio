@@ -218,6 +218,7 @@ describe('XLS-002 duplicate name', () => {
         const warnings = issues.filter((issue) => issue.severity === 'warning');
         expect(warnings).toHaveLength(1);
         expect(warnings[0]?.rowId).toBe('s3');
+        expect(warnings[0]?.message).toContain('"age" (row 1), "age" (row 2)');
         expect(warnings[0]?.message).not.toContain('"AGE" (row 3)');
       },
     );
