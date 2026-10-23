@@ -13,6 +13,7 @@ import { QUESTION_TYPES, type QuestionCategory } from '@/core/model/questionType
 import { suggestListName } from '@/core/ops/choices';
 import { slugify } from '@/core/slug/slugify';
 import { useDerivedStore } from '@/state/derivedStore';
+import { usePrefsStore } from '@/state/prefsStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 
 import { makeEnumCell, type EnumCell } from '../cells/EnumCell';
@@ -162,17 +163,25 @@ export function TypeEditor({ value, onChange, onFinishedEditing, forceEditMode }
     return slugify(row.cells[labelKey] ?? '') || 'list';
   }
 
+  /** Honor the Preferences `{name}` pattern and length cap (Task 5.7). */
+  function suggestedListName(): string {
+    const { listNamePattern, slugMaxLength } = usePrefsStore.getState();
+    return suggestListName(
+      useWorkbookStore.getState().data,
+      value.data.rowId,
+      questionBasis(),
+      listNamePattern,
+      slugMaxLength,
+    );
+  }
+
   function commitList(listName: string, movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) {
-    const name =
-      listName ||
-      suggestListName(useWorkbookStore.getState().data, value.data.rowId, questionBasis());
+    const name = listName || suggestedListName();
     finish(`${pendingBase} ${name}${orOther ? ' or_other' : ''}`, movement);
   }
 
   function createList(movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) {
-    const data = useWorkbookStore.getState().data;
-    const name = suggestListName(data, value.data.rowId, questionBasis());
-    commitList(name, movement);
+    commitList(suggestedListName(), movement);
   }
 
   function commitActive(movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) {
@@ -307,10 +316,7 @@ export function TypeEditor({ value, onChange, onFinishedEditing, forceEditMode }
             }`}
             data-testid="create-list-option"
           >
-            + Create new list{' '}
-            <span className="font-mono">
-              {suggestListName(useWorkbookStore.getState().data, value.data.rowId, questionBasis())}
-            </span>
+            + Create new list <span className="font-mono">{suggestedListName()}</span>
           </Command.Item>
         ) : null}
       </Command.List>

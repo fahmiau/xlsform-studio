@@ -119,6 +119,14 @@ describe('uniqueName', () => {
     expect(uniqueName('Drinking Water', new Set())).toBe('drinking_water');
     expect(uniqueName('', new Set())).toMatch(/^opt/);
   });
+
+  it('can preserve camelCase or passthrough spellings', () => {
+    expect(uniqueName('drinkingWater', new Set(), 32, { slug: false })).toBe('drinkingWater');
+    expect(uniqueName('Drinking Water', new Set(), 32, { slug: false })).toBe('Drinking Water');
+    expect(uniqueName('drinkingWater', new Set(['drinkingWater']), 32, { slug: false })).toBe(
+      'drinkingWater_2',
+    );
+  });
 });
 
 describe('detectListMode (AD-14)', () => {
@@ -137,6 +145,19 @@ describe('detectListMode (AD-14)', () => {
     expect(detectListMode(['opt_1', 'other_2'])).toEqual({ kind: 'snake' });
     expect(detectListMode([])).toEqual({ kind: 'snake' });
     expect(detectListMode([''])).toEqual({ kind: 'snake' });
+  });
+
+  it('detects camelCase when a name has an uppercase letter', () => {
+    expect(detectListMode(['drinkingWater', 'bottledWater'])).toEqual({ kind: 'camel' });
+    expect(detectListMode(['north', 'south'])).toEqual({ kind: 'snake' });
+    expect(detectListMode(['drinking_water'])).toEqual({ kind: 'snake' });
+  });
+
+  it('uses the fallback only for a list without names', () => {
+    expect(detectListMode([], { kind: 'camel' })).toEqual({ kind: 'camel' });
+    expect(detectListMode([''], { kind: 'passthrough' })).toEqual({ kind: 'passthrough' });
+    expect(detectListMode(['yes', 'no'], { kind: 'camel' })).toEqual({ kind: 'snake' });
+    expect(detectListMode(['1', '2'], { kind: 'camel' })).toEqual({ kind: 'numeric' });
   });
 });
 

@@ -231,6 +231,20 @@ describe('renameVariable (Task 5.1)', () => {
     expect(surveyRow(result.data, 0).cells.relevant).toBe('${renamed} + ${old_var_2}');
   });
 
+  it('leaves ${…} inside an XPath string literal alone (R10)', () => {
+    const data = workbook();
+    data.survey.rows.push(
+      createRow({
+        name: 'old_var',
+        calculation: "concat('literal ${old_var}', ${old_var})",
+      }),
+    );
+    const result = renameVariable(data, 'old_var', 'new_var');
+    expect(surveyRow(result.data, 0).cells.calculation).toBe(
+      "concat('literal ${old_var}', ${new_var})",
+    );
+  });
+
   it('rewrites several rows and reports each change', () => {
     const data = workbook();
     data.survey.rows.push(

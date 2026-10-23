@@ -102,10 +102,6 @@ function usedNames(rows: readonly Row[], nameKeyValue: ColumnKey): Set<string> {
   );
 }
 
-function currentMode(rows: readonly Row[], nameKeyValue: ColumnKey): ListMode {
-  return detectListMode(rows.map((row) => row.cells[nameKeyValue] ?? ''));
-}
-
 /**
  * Set a survey `type` cell (Task 3.3). Selects without a list get one from the
  * question name, an empty question name adopts the list name, and begin/end
@@ -184,8 +180,44 @@ export function applyTypeChange(
 export interface ChoiceEditOptions {
   /** Drawer mode; defaults to the list's detected convention. */
   mode?: ListMode;
+  /** Per-list session overrides (`uiStore.choiceModes`). */
+  listModes?: Readonly<Record<string, ListMode>>;
+  /** Preferences default, used only when a list has no names yet. */
+  fallbackMode?: ListMode;
   /** Slug length cap from Preferences (defaults to 32). */
   maxLength?: number;
+}
+
+/**
+ * Resolve the naming mode for one list: explicit drawer mode, then the user's
+ * session override, then the names already in the list (with the Preferences
+ * default standing in for an empty list).
+ */
+function modeFor(
+  rows: readonly Row[],
+  listName: string,
+  nameKeyValue: ColumnKey,
+  options: ChoiceEditOptions,
+): ListMode {
+  return (
+    options.mode ??
+    options.listModes?.[listName] ??
+    detectListMode(
+      rows.map((row) => row.cells[nameKeyValue] ?? ''),
+      options.fallbackMode,
+    )
+  );
+}
+
+/** De-duplicate an auto name without re-slugifying camel/passthrough spellings. */
+function uniqueChoiceName(
+  name: string,
+  used: ReadonlySet<string>,
+  mode: ListMode,
+  maxLength?: number,
+): string {
+  const preserve = mode.kind === 'camel' || mode.kind === 'passthrough';
+  return uniqueName(name, used, maxLength, preserve ? { slug: false } : {});
 }
 
 /** Apply label/name/extra edits with auto-naming and manual locks (Task 3.4). */
@@ -229,7 +261,7 @@ export function applyChoiceEdits(
 
       const listName = (row.cells[listKey] ?? '').trim();
       const siblings = listName ? listRows(rows, listName, listKey) : [];
-      const mode = options.mode ?? currentMode(siblings, nameKey);
+      const mode = modeFor(siblings, listName, nameKey, options);
       const position = siblings.length > 0 ? siblings.indexOf(row) + 1 : 1;
       const expected = autoChoiceName(
         row.cells[labelKey] ?? '',
@@ -238,12 +270,13 @@ export function applyChoiceEdits(
         position,
         options.maxLength,
       );
-      const name = uniqueName(
+      const name = uniqueChoiceName(
         expected,
         usedNames(
           siblings.filter((r) => r.id !== row.id),
           nameKey,
         ),
+        mode,
         options.maxLength,
       );
       row.cells[nameKey] = name;
@@ -274,7 +307,7 @@ export function insertChoiceRow(
       }
     }
     const existing = listRows(rows, listNameValue, listKey);
-    const mode = options.mode ?? currentMode(existing, nameKeyValue);
+    const mode = modeFor(existing, listNameValue, nameKeyValue, options);
     const position = existing.length + 1;
     const rowCells: Record<ColumnKey, string> = { ...cells, [listKey]: listNameValue };
     if (labelKey && !(rowCells[nameKeyValue] ?? '').trim()) {
@@ -285,9 +318,10 @@ export function insertChoiceRow(
         position,
         options.maxLength,
       );
-      rowCells[nameKeyValue] = uniqueName(
+      rowCells[nameKeyValue] = uniqueChoiceName(
         made,
         usedNames(existing, nameKeyValue),
+        mode,
         options.maxLength,
       );
     }
@@ -331,7 +365,7 @@ export function bulkInsertChoices(
       }
     }
     const existing = listRows(rows, listNameValue, listKey);
-    const mode = options.mode ?? currentMode(existing, nameKeyValue);
+    const mode = modeFor(existing, listNameValue, nameKeyValue, options);
     const used = usedNames(existing, nameKeyValue);
     let position = existing.length;
 
@@ -352,7 +386,7 @@ export function bulkInsertChoices(
         used.add(pastedName);
       } else if (nameKeyValue) {
         const expected = autoChoiceName(label, mode, position, position, options.maxLength);
-        const name = uniqueName(expected, used, options.maxLength);
+        const name = uniqueChoiceName(expected, used, mode, options.maxLength);
         used.add(name);
         cells[nameKeyValue] = name;
       }
@@ -394,15 +428,18 @@ export function renumberList(
       if (row.meta?.nameLocked) return;
       const label = labelKey ? (row.cells[labelKey] ?? '') : '';
       const expected = autoChoiceName(label, mode, index + 1, index + 1, maxLength);
-      // Snake names ignore position, so a repeated slug needs the same `_2`
-      // suffix the auto-fill path uses. Numeric/prefix names still skip
-      // positions until the next free number.
-      let name = mode.kind === 'snake' ? uniqueName(expected, used, maxLength) : expected;
-      if (mode.kind !== 'snake') {
+      // Numeric/prefix names skip positions until the next free number; every
+      // other mode de-duplicates the generated name without re-slugifying it.
+      if (mode.kind === 'numeric' || mode.kind === 'prefix') {
+        let name = expected;
         for (let attempt = index + 1; used.has(name) && attempt < index + 10_000; attempt += 1) {
           name = autoChoiceName(label, mode, attempt + 1, attempt + 1, maxLength);
         }
+        row.cells[nameKeyValue] = name;
+        used.add(name);
+        return;
       }
+      const name = uniqueChoiceName(expected, used, mode, maxLength);
       row.cells[nameKeyValue] = name;
       used.add(name);
     });
@@ -561,7 +598,7 @@ export function unlockChoiceName(
     if (!labelKey) return;
     const listNameValue = (row.cells[listKey] ?? '').trim();
     const siblings = listRows(draft.choices.rows, listNameValue, listKey);
-    const mode = options.mode ?? currentMode(siblings, nameKeyValue);
+    const mode = modeFor(siblings, listNameValue, nameKeyValue, options);
     const position = Math.max(1, siblings.indexOf(row) + 1);
     const expected = autoChoiceName(
       row.cells[labelKey] ?? '',
@@ -570,12 +607,13 @@ export function unlockChoiceName(
       position,
       options.maxLength,
     );
-    row.cells[nameKeyValue] = uniqueName(
+    row.cells[nameKeyValue] = uniqueChoiceName(
       expected,
       usedNames(
         siblings.filter((candidate) => candidate.id !== rowId),
         nameKeyValue,
       ),
+      mode,
       options.maxLength,
     );
   });

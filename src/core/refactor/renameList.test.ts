@@ -125,12 +125,16 @@ describe('renameList (Task 5.2)', () => {
 
   it('refuses an invalid name', () => {
     const data = workbook();
-    expect(renameList(data, 'gender_list', 'bad name').data).toBe(data);
+    const result = renameList(data, 'gender_list', 'bad name');
+    expect(result.data).toBe(data);
+    expect(result.changes).toEqual([]);
   });
 
   it('refuses a duplicate list name', () => {
     const data = workbook();
-    expect(renameList(data, 'gender_list', 'other_list').data).toBe(data);
+    const result = renameList(data, 'gender_list', 'other_list');
+    expect(result.data).toBe(data);
+    expect(result.changes).toEqual([]);
   });
 
   it('renames a list that only appears in a survey binding', () => {

@@ -10,6 +10,7 @@ import { useState } from 'react';
 
 import { findColumnKey } from '@/core/indexes/columns';
 import { resolveColumn } from '@/core/model/columns';
+import { modeFromStyle } from '@/core/slug/slugify';
 import { diagnosticCellKey } from '@/core/lint/diagnostics';
 import { isCellEditable } from '@/features/grid/editability';
 import { applyCellEdits, type CellEditOutcome } from '@/features/grid/cellEditPipeline';
@@ -46,7 +47,8 @@ export function FormulaBar() {
     if (!activeCell || !editable) return;
     useUiStore.getState().setCellPreview(null);
     if (draft === value) return;
-    const { slugMaxLength } = usePrefsStore.getState();
+    const { slugMaxLength, defaultSlugMode, listNamePattern } = usePrefsStore.getState();
+    const { choiceModes } = useUiStore.getState();
     let outcome: CellEditOutcome | undefined;
     useWorkbookStore.getState().apply(
       `Edit ${resolveColumn(activeCell.column).canonical}`,
@@ -54,6 +56,9 @@ export function FormulaBar() {
         const edit = { rowId: activeCell.rowId, column: activeCell.column, value: draft };
         outcome = applyCellEdits(current, activeCell.sheet, [edit], {
           maxLength: slugMaxLength,
+          choiceModes,
+          defaultMode: modeFromStyle(defaultSlugMode),
+          listNamePattern,
         });
         return outcome.data;
       },

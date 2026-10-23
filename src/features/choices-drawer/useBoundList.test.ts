@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { renderHook } from '@testing-library/react';
 
 import { createEmptyWorkbook, createRow } from '@/core/model/factory';
+import { usePrefsStore } from '@/state/prefsStore';
 import { useUiStore } from '@/state/uiStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 
@@ -26,6 +27,7 @@ function setup() {
 
 beforeEach(() => {
   useWorkbookStore.getState().newWorkbook();
+  usePrefsStore.getState().update({ defaultSlugMode: 'snake' });
   useUiStore.setState({
     activeCell: null,
     choiceDrawer: { open: false, rowId: null },
@@ -67,5 +69,17 @@ describe('useBoundList (Task 3.4)', () => {
     useUiStore.getState().setDrawerRow(data.survey.rows[0]!.id);
     rerender();
     expect(result.current.mode).toEqual({ kind: 'numeric' });
+  });
+
+  it('uses the Preferences default for a list that has no names yet', () => {
+    const data = setup();
+    usePrefsStore.getState().update({ defaultSlugMode: 'camel' });
+    data.survey.rows.push(createRow({ type: 'select_one drinks', name: 'drink' }));
+    useWorkbookStore.getState().load(data);
+    useUiStore.getState().openChoicesDrawer(data.survey.rows[2]!.id);
+
+    const { result } = renderHook(() => useBoundList());
+    expect(result.current.listName).toBe('drinks');
+    expect(result.current.mode).toEqual({ kind: 'camel' });
   });
 });

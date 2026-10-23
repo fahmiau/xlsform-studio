@@ -61,14 +61,24 @@ export function numericName(index: number, prefix?: string): string {
   return stem ? `${stem}_${value}` : String(value);
 }
 
+export interface UniqueNameOptions {
+  /**
+   * Slugify `base` before de-duplicating. Set to `false` for camelCase or
+   * passthrough names, whose spelling is already meaningful.
+   */
+  slug?: boolean;
+}
+
 /** Append `_2`, `_3`… while keeping the base plus suffix within `maxLength`. */
 export function uniqueName(
   base: string,
   existing: ReadonlySet<string>,
   maxLength = SLUG_MAX_LENGTH,
+  options: UniqueNameOptions = {},
 ): string {
   const limit = Math.max(1, maxLength);
-  const stem = slugify(base || 'opt', { maxLength: limit });
+  const stem =
+    options.slug === false ? base || 'opt' : slugify(base || 'opt', { maxLength: limit });
   if (!existing.has(stem)) return stem;
   for (let counter = 2; counter < 10_000; counter += 1) {
     const suffix = `_${counter}`;
@@ -108,11 +118,21 @@ export function modeFromStyle(style: SlugStyle): ListMode {
 
 const NUMERIC = /^\d+$/;
 const PREFIXED = /^([a-z][a-z0-9]*)_(\d+)$/;
+const CAMEL = /^[a-z][a-zA-Z0-9]*$/;
 
-/** Infer the naming convention already used by a list (AD-14). */
-export function detectListMode(names: readonly string[]): ListMode {
+/**
+ * Infer the naming convention already used by a list (AD-14).
+ *
+ * `fallback` is returned only when the list has no names yet, so Preferences
+ * can pick the convention for brand-new lists without overriding a detectable
+ * one.
+ */
+export function detectListMode(
+  names: readonly string[],
+  fallback: ListMode = { kind: 'snake' },
+): ListMode {
   const values = names.map((name) => name.trim()).filter(Boolean);
-  if (values.length === 0) return { kind: 'snake' };
+  if (values.length === 0) return fallback;
   if (values.every((name) => NUMERIC.test(name))) return { kind: 'numeric' };
 
   let prefix: string | undefined;
@@ -124,6 +144,11 @@ export function detectListMode(names: readonly string[]): ListMode {
     return prefix === candidate;
   });
   if (allPrefixed && prefix) return { kind: 'prefix', prefix };
+  // camelCase is only unambiguous when at least one name has an uppercase
+  // letter; single lowercase words stay snake_case.
+  if (values.every((name) => CAMEL.test(name)) && values.some((name) => /[A-Z]/.test(name))) {
+    return { kind: 'camel' };
+  }
   return { kind: 'snake' };
 }
 

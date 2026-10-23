@@ -26,12 +26,16 @@ export function ModeToggle({
           const kind = event.target.value;
           if (kind === 'snake') onChange({ kind: 'snake' });
           else if (kind === 'numeric') onChange({ kind: 'numeric' });
+          else if (kind === 'camel') onChange({ kind: 'camel' });
+          else if (kind === 'passthrough') onChange({ kind: 'passthrough' });
           else onChange({ kind: 'prefix', prefix: prefixDraft || 'opt' });
         }}
       >
         <option value="snake">Text codes</option>
         <option value="numeric">Numbers</option>
         <option value="prefix">Prefix</option>
+        <option value="camel">camelCase</option>
+        <option value="passthrough">Passthrough</option>
       </select>
       {mode.kind === 'prefix' ? (
         <input

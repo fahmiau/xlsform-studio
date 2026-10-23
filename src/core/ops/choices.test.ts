@@ -159,6 +159,32 @@ describe('choice edits (Task 3.4)', () => {
     });
     expect(prefixed.choices.rows[1]?.cells.name).toBe('opt_2');
   });
+
+  it('keeps camelCase names instead of re-slugifying them', () => {
+    const data = workbook();
+    const rowId = data.choices.rows[1]!.id;
+    const next = applyChoiceEdits(data, [{ rowId, column: 'label', value: 'Negative answer' }], {
+      mode: { kind: 'camel' },
+    });
+    expect(next.choices.rows[1]?.cells.name).toBe('negativeAnswer');
+  });
+
+  it('uses the fallback mode when the list has no names yet', () => {
+    const data = workbook();
+    data.choices.rows.push(choice('empty_list', '', 'Drinking Water'));
+    const rowId = data.choices.rows[3]!.id;
+    const next = applyChoiceEdits(data, [{ rowId, column: 'label', value: 'Drinking Water' }], {
+      fallbackMode: { kind: 'camel' },
+    });
+    expect(next.choices.rows[3]?.cells.name).toBe('drinkingWater');
+    // An explicit session override still wins over the fallback.
+    const overridden = applyChoiceEdits(
+      data,
+      [{ rowId, column: 'label', value: 'Drinking Water' }],
+      { listModes: { empty_list: { kind: 'snake' } }, fallbackMode: { kind: 'camel' } },
+    );
+    expect(overridden.choices.rows[3]?.cells.name).toBe('drinking_water');
+  });
 });
 
 describe('drawer insertion and bulk paste (Tasks 3.4/3.5)', () => {
@@ -173,6 +199,19 @@ describe('drawer insertion and bulk paste (Tasks 3.4/3.5)', () => {
     ]);
     expect(result.data.choices.rows[2]?.cells.name).toBe('maybe');
     expect(result.data.choices.rows).toHaveLength(4);
+  });
+
+  it('names the first choice of a new list with the fallback mode', () => {
+    const data = workbook();
+    const result = insertChoiceRow(
+      data,
+      'drinks',
+      { label: 'Drinking Water' },
+      {
+        fallbackMode: { kind: 'camel' },
+      },
+    );
+    expect(result.data.choices.rows.at(-1)?.cells.name).toBe('drinkingWater');
   });
 
   it('pastes 20 lines with 20 unique names in one transaction', () => {

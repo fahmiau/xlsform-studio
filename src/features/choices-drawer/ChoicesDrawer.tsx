@@ -12,7 +12,7 @@ import { parseType } from '@/core/model/parseType';
 import { Button } from '@/components/ui/button';
 import type { CellEdit } from '@/core/ops/cells';
 import { applyTypeChange, insertChoiceRow, suggestListName } from '@/core/ops/choices';
-import type { ListMode } from '@/core/slug/slugify';
+import { modeFromStyle, type ListMode } from '@/core/slug/slugify';
 import { deleteRows, moveBlock } from '@/core/ops/rows';
 import {
   applyCellEdits,
@@ -37,6 +37,7 @@ export function ChoicesDrawer() {
   const [filterOpen, setFilterOpen] = useState(false);
   const listNamePattern = usePrefsStore((state) => state.listNamePattern);
   const slugMaxLength = usePrefsStore((state) => state.slugMaxLength);
+  const defaultSlugMode = usePrefsStore((state) => state.defaultSlugMode);
   const paste = useDrawerPaste(bound.listName, bound.columns, bound.mode);
 
   if (!bound.surveyRowId) {
@@ -117,7 +118,10 @@ export function ChoicesDrawer() {
       (data) => {
         outcome = applyCellEdits(data, 'choices', edits, {
           mode: bound.mode,
+          choiceModes: useUiStore.getState().choiceModes,
+          defaultMode: modeFromStyle(defaultSlugMode),
           maxLength: slugMaxLength,
+          listNamePattern,
         });
         return outcome.data;
       },
@@ -127,14 +131,21 @@ export function ChoicesDrawer() {
   };
 
   const appendRow = () => {
-    if (!bound.listName) return null;
+    const listName = bound.listName;
+    if (!listName) return null;
+    // Stage 3 keeps the initial mode per list for the session; remember the
+    // Preferences default so later rows keep using it (camel/passthrough
+    // cannot be re-inferred from names alone).
+    if (!useUiStore.getState().choiceModes[listName]) {
+      useUiStore.getState().setChoiceMode(listName, bound.mode);
+    }
     let rowId: string | null = null;
     useWorkbookStore.getState().apply(
       'Add choice',
       (data) => {
         const result = insertChoiceRow(
           data,
-          bound.listName ?? '',
+          listName,
           {},
           {
             mode: bound.mode,

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { createEmptyWorkbook } from '@/core/model/factory';
 import { useDerivedStore } from '@/state/derivedStore';
+import { usePrefsStore } from '@/state/prefsStore';
 import { useUiStore } from '@/state/uiStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 
@@ -28,6 +29,7 @@ function cellValue(): string {
 
 beforeEach(() => {
   useUiStore.getState().setCellPreview(null);
+  usePrefsStore.getState().update({ listNamePattern: '{name}' });
   loadForm();
 });
 
@@ -79,5 +81,17 @@ describe('FormulaBar XPath editor (Task 4.6)', () => {
     render(<FormulaBar />);
     expect(screen.getByTestId('formula-bar-input')).toHaveValue('Q1');
     expect(screen.queryByTestId('formula-bar-editor')).not.toBeInTheDocument();
+  });
+
+  it('auto-binds a list with the current name pattern (Task 5.7/3.3)', () => {
+    usePrefsStore.getState().update({ listNamePattern: '{name}_list' });
+    useUiStore.getState().setActiveCell({ sheet: 'survey', rowId: 's2', column: 'type' });
+    render(<FormulaBar />);
+
+    const input = screen.getByTestId('formula-bar-input');
+    fireEvent.change(input, { target: { value: 'select_one' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(useWorkbookStore.getState().data.survey.rows[1]?.cells.type).toBe('select_one q2_list');
   });
 });

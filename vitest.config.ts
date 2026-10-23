@@ -29,6 +29,12 @@ export default defineConfig({
         functions: 90,
         statements: 90,
         branches: 80,
+        // Checkpoint I: the refactor engine stays above 95%.
+        'src/core/refactor/**/*.ts': {
+          lines: 95,
+          functions: 95,
+          statements: 95,
+        },
       },
     },
   },

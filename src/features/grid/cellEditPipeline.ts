@@ -24,8 +24,14 @@ import type { ManagedSheetName, WorkbookData } from '@/core/model/types';
 export interface CellEditContext {
   /** Naming mode for the bound list (drawer only). */
   mode?: ListMode;
+  /** Per-list session overrides from `uiStore.choiceModes`. */
+  choiceModes?: Readonly<Record<string, ListMode>>;
+  /** Preferences default for lists without names yet. */
+  defaultMode?: ListMode;
   /** Slug length cap from Preferences. */
   maxLength?: number;
+  /** `{name}` pattern for auto-bound list names (Task 3.3). */
+  listNamePattern?: string;
 }
 
 export interface CellEditOutcome {
@@ -49,7 +55,11 @@ function nameEdits(data: WorkbookData, edits: readonly CellEdit[]): CellEdit[] {
   return edits.filter((edit) => edit.column === nameKey && (edit.value ?? '').trim().length > 0);
 }
 
-function applySurveyEdits(data: WorkbookData, edits: readonly CellEdit[]): CellEditOutcome {
+function applySurveyEdits(
+  data: WorkbookData,
+  edits: readonly CellEdit[],
+  context: CellEditContext,
+): CellEditOutcome {
   const outcome = emptyOutcome(data);
   let next = data;
 
@@ -71,7 +81,12 @@ function applySurveyEdits(data: WorkbookData, edits: readonly CellEdit[]): CellE
   next = setCells(next, 'survey', edits);
   for (const edit of edits) {
     if (columnKey(next.survey, 'type') === edit.column) {
-      next = applyTypeChange(next, edit.rowId, edit.value);
+      next = applyTypeChange(
+        next,
+        edit.rowId,
+        edit.value,
+        context.listNamePattern === undefined ? {} : { pattern: context.listNamePattern },
+      );
     }
   }
   outcome.data = next;
@@ -85,6 +100,8 @@ function applyChoicesEdits(
 ): CellEditOutcome {
   const next = applyChoiceEdits(data, edits, {
     ...(context.mode ? { mode: context.mode } : {}),
+    ...(context.choiceModes ? { listModes: context.choiceModes } : {}),
+    ...(context.defaultMode ? { fallbackMode: context.defaultMode } : {}),
     ...(context.maxLength !== undefined ? { maxLength: context.maxLength } : {}),
   });
   const propagated = propagateChoiceRenames(data, next);
@@ -104,7 +121,7 @@ export function applyCellEdits(
   context: CellEditContext = {},
 ): CellEditOutcome {
   if (edits.length === 0) return emptyOutcome(data);
-  if (sheet === 'survey') return applySurveyEdits(data, edits);
+  if (sheet === 'survey') return applySurveyEdits(data, edits, context);
   if (sheet === 'choices') return applyChoicesEdits(data, edits, context);
   return { ...emptyOutcome(setCells(data, sheet, edits)) };
 }

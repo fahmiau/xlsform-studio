@@ -6,7 +6,8 @@ import { primaryLabelColumn } from '@/core/languages/discover';
 import { resolveColumn } from '@/core/model/columns';
 import { parseType } from '@/core/model/parseType';
 import type { ColumnKey, Row, RowId } from '@/core/model/types';
-import { detectListMode, type ListMode } from '@/core/slug/slugify';
+import { detectListMode, modeFromStyle, type ListMode } from '@/core/slug/slugify';
+import { usePrefsStore } from '@/state/prefsStore';
 import { useUiStore } from '@/state/uiStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 
@@ -27,6 +28,7 @@ export function useBoundList(): BoundList {
   const activeCell = useUiStore((state) => state.activeCell);
   const drawer = useUiStore((state) => state.choiceDrawer);
   const modes = useUiStore((state) => state.choiceModes);
+  const defaultSlugMode = usePrefsStore((state) => state.defaultSlugMode);
 
   return useMemo(() => {
     const surveyRowId = drawer.rowId ?? (activeCell?.sheet === 'survey' ? activeCell.rowId : null);
@@ -51,7 +53,10 @@ export function useBoundList(): BoundList {
       });
     }
 
-    const inferred = detectListMode(rows.map((row) => row.cells[nameKey] ?? ''));
+    const inferred = detectListMode(
+      rows.map((row) => row.cells[nameKey] ?? ''),
+      modeFromStyle(defaultSlugMode),
+    );
     const mode = listName ? (modes[listName] ?? inferred) : inferred;
 
     const hidden = new Set<ColumnKey>([listKey, nameKey]);
@@ -76,5 +81,5 @@ export function useBoundList(): BoundList {
       nameKey,
       columns,
     };
-  }, [activeCell, data, drawer.rowId, modes]);
+  }, [activeCell, data, defaultSlugMode, drawer.rowId, modes]);
 }

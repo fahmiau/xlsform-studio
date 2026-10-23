@@ -88,6 +88,27 @@ describe('applyCellEdits — survey (Task 5.1)', () => {
     expect(outcome.data.survey.rows[2]!.cells.type).toBe('select_one new_question');
   });
 
+  it('binds the list with the Preferences pattern (Task 5.7/3.3)', () => {
+    const data = workbook();
+    data.survey.rows.push(createRow({ type: 'text', name: 'marital' }));
+    const row = data.survey.rows[2]!;
+    const outcome = applyCellEdits(
+      data,
+      'survey',
+      [{ rowId: row.id, column: 'type', value: 'select_one' }],
+      { listNamePattern: '{name}_list' },
+    );
+    expect(outcome.data.survey.rows[2]!.cells.type).toBe('select_one marital_list');
+
+    const custom = applyCellEdits(
+      data,
+      'survey',
+      [{ rowId: row.id, column: 'type', value: 'select_one' }],
+      { listNamePattern: '{name}_choices' },
+    );
+    expect(custom.data.survey.rows[2]!.cells.type).toBe('select_one marital_choices');
+  });
+
   it('applies settings edits directly', () => {
     const data = workbook();
     const row = data.settings.rows[0]!;
@@ -145,6 +166,35 @@ describe('applyCellEdits — choices (Task 5.2)', () => {
     ]);
     expect(outcome.choiceRenames).toEqual([]);
     expect(outcome.data.survey.rows[0]!.cells.relevant).toBe("selected(${marital}, 'married')");
+  });
+});
+
+describe('applyCellEdits — naming defaults (Task 5.7)', () => {
+  it('uses defaultMode for a list without names', () => {
+    const data = workbook();
+    data.survey.rows.push(createRow({ type: 'select_one drinks', name: 'drink' }));
+    data.choices.rows.push(createRow({ list_name: 'drinks', label: 'Drinking Water' }));
+    const row = data.choices.rows[2]!;
+    const outcome = applyCellEdits(
+      data,
+      'choices',
+      [{ rowId: row.id, column: 'label', value: 'Drinking Water' }],
+      { defaultMode: { kind: 'camel' } },
+    );
+    expect(outcome.data.choices.rows[2]!.cells.name).toBe('drinkingWater');
+  });
+
+  it('prefers an explicit per-list override over the default', () => {
+    const data = workbook();
+    data.choices.rows.push(createRow({ list_name: 'drinks', label: 'Drinking Water' }));
+    const row = data.choices.rows[2]!;
+    const outcome = applyCellEdits(
+      data,
+      'choices',
+      [{ rowId: row.id, column: 'label', value: 'Drinking Water' }],
+      { defaultMode: { kind: 'camel' }, choiceModes: { drinks: { kind: 'snake' } } },
+    );
+    expect(outcome.data.choices.rows[2]!.cells.name).toBe('drinking_water');
   });
 });
 

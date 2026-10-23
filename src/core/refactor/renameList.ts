@@ -51,6 +51,15 @@ export function replaceListToken(raw: string, oldListName: string, newListName: 
     .join('');
 }
 
+/**
+ * Rename a list everywhere it is referenced.
+ *
+ * Safe no-op on invalid input: an empty, malformed, colliding, or unchanged
+ * name returns `{ data, changes: [] }` without touching the workbook. Callers
+ * that show validation messages should call {@link listRenameError} first;
+ * `renameList` stays silent so a UI that forgets the pre-check cannot corrupt
+ * the document.
+ */
 export function renameList(
   data: WorkbookData,
   oldListName: string,

@@ -32,6 +32,7 @@ import type { ColumnKey, ManagedSheetName, RowId } from '@/core/model/types';
 import type { CellEdit } from '@/core/ops/cells';
 import { groupHiddenQuestionCount } from '@/core/ops/groups';
 import { insertRows } from '@/core/ops/rows';
+import { modeFromStyle } from '@/core/slug/slugify';
 import { applyCellEdits, type CellEditOutcome } from '@/features/grid/cellEditPipeline';
 import { notifyCellEdits } from '@/features/shell/toasts';
 import { useDerivedStore } from '@/state/derivedStore';
@@ -537,19 +538,25 @@ export function SheetGrid({
         onCommitEdits(edits);
         return;
       }
-      const maxLength = usePrefsStore.getState().slugMaxLength;
+      const { slugMaxLength, defaultSlugMode, listNamePattern } = usePrefsStore.getState();
+      const choiceModes = useUiStore.getState().choiceModes;
       let outcome: CellEditOutcome | undefined;
       useWorkbookStore.getState().apply(
         `Edit ${edits.length} cell${edits.length === 1 ? '' : 's'}`,
         (current) => {
-          outcome = applyCellEdits(current, sheetName, edits, { maxLength });
+          outcome = applyCellEdits(current, sheetName, edits, {
+            maxLength: slugMaxLength,
+            choiceModes,
+            defaultMode: modeFromStyle(defaultSlugMode),
+            listNamePattern,
+          });
           return outcome.data;
         },
         { sheet: sheetName, rowIds: [...rowIds] },
       );
       if (outcome) notifyCellEdits(outcome);
     },
-    [display, onCommitEdits, projection, sheet, sheetName],
+    [display, onCommitEdits, projection, sheet, sheetName, typeKey],
   );
 
   const onCellsEdited = useCallback<NonNullable<DataEditorProps['onCellsEdited']>>(

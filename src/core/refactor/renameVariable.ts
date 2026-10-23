@@ -5,6 +5,12 @@
  * `${old}` in XPath columns and `${old}` interpolations in plain-text columns.
  * Names with regex metacharacters are safe because XPath replacement works on
  * tokenizer offsets (AD-9) and the plain-text path escapes its pattern.
+ *
+ * XPath string literals are deliberately left alone: in
+ * `concat('prefix ${old} suffix', ${old})` the first `${old}` is a `string`
+ * token, not a variable reference, so only the second one is rewritten. This
+ * keeps the refactor from editing data the author typed as text (R10); the
+ * tokenizer, not a blanket `${…}` search, decides what is a reference.
  */
 import { produce } from 'immer';
 
