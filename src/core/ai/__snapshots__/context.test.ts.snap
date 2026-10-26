@@ -1,0 +1,479 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildContext > snapshots a form with a selection 1`] = `
+"XLSForm context
+form_title: Household survey
+form_id: household
+version: (none)
+languages: Default, Indonesian (id)
+default_language: Default
+active_sheet: survey
+
+selected_rows: 1
+survey#1
+  type: integer
+  name: age
+  label: Age of the respondent
+  label::Indonesian (id): Usia responden
+  relevant: \${age} > 0
+
+outline: rowIndex | type | name | label | groupPath
+0 | begin_group | household | Household | 
+1 | integer | age | Age of the respondent | household
+3 | text | city | City | 
+
+choices:
+yes_no: [yes, no]
+
+lint_errors: none"
+`;
+
+exports[`buildContext > snapshots a small form 1`] = `
+"XLSForm context
+form_title: Household survey
+form_id: household
+version: (none)
+languages: Default, Indonesian (id)
+default_language: Default
+active_sheet: survey
+
+selected_rows: none
+
+outline: rowIndex | type | name | label | groupPath
+0 | begin_group | household | Household | 
+1 | integer | age | Age of the respondent | household
+3 | text | city | City | 
+
+choices:
+yes_no: [yes, no]
+
+lint_errors: none"
+`;
+
+exports[`buildContext > snapshots the reference form summary 1`] = `
+"XLSForm context
+form_title: Reference form
+form_id: reference_form
+version: 2024010101
+languages: English (en), Indonesian (id), French (fr), Spanish (es), Default
+default_language: English (en)
+active_sheet: survey
+
+selected_rows: none
+
+outline: rowIndex | type | name | label | groupPath (elided)
+0 | begin_group | grp_0_0 | Group grp_0_0 | 
+1 | integer | q_2 | Question 1 (English) | grp_0_0
+2 | decimal | q_3 | Question 2 (English) | grp_0_0
+3 | date | q_4 | Question 3 (English) | grp_0_0
+4 | select_one list_5 | q_5 | Question 4 (English) | grp_0_0
+5 | select_multiple list_6 | q_6 | Question 5 (English) | grp_0_0
+6 | geopoint | q_7 | Question 6 (English) | grp_0_0
+7 | note | q_8 | Question 7 (English) | grp_0_0
+8 | calculate | q_9 | Question 8 (English) | grp_0_0
+9 | time | q_10 | Question 9 (English) | grp_0_0
+… 29 rows in grp_0_0
+… 1 rows in form
+… 38 rows in grp_1_0
+… 1 rows in form
+… 38 rows in grp_2_0
+… 1 rows in form
+… 38 rows in grp_3_0
+… 1 rows in form
+… 38 rows in grp_4_0
+… 1 rows in form
+… 38 rows in grp_5_0
+… 1 rows in form
+… 38 rows in grp_6_0
+… 1 rows in form
+… 38 rows in grp_7_0
+… 1 rows in form
+… 38 rows in grp_8_0
+… 1 rows in form
+… 38 rows in grp_9_0
+… 1 rows in form
+… 38 rows in grp_10_0
+… 1 rows in form
+… 38 rows in grp_11_0
+… 1 rows in form
+… 38 rows in grp_12_0
+… 1 rows in form
+… 38 rows in grp_13_0
+… 1 rows in form
+… 38 rows in grp_14_0
+… 1 rows in form
+… 38 rows in grp_15_0
+… 1 rows in form
+… 38 rows in grp_16_0
+… 1 rows in form
+… 38 rows in grp_17_0
+… 1 rows in form
+… 38 rows in grp_18_0
+… 1 rows in form
+… 38 rows in grp_19_0
+… 1 rows in form
+… 38 rows in grp_20_0
+… 1 rows in form
+… 38 rows in grp_21_0
+… 1 rows in form
+… 38 rows in grp_22_0
+… 1 rows in form
+… 38 rows in grp_23_0
+… 1 rows in form
+… 38 rows in grp_24_0
+… 1 rows in form
+… 38 rows in grp_25_0
+… 1 rows in form
+… 38 rows in grp_26_0
+… 1 rows in form
+… 38 rows in grp_27_0
+… 1 rows in form
+… 38 rows in grp_28_0
+… 1 rows in form
+… 38 rows in grp_29_0
+… 1 rows in form
+… 38 rows in grp_30_0
+… 1 rows in form
+… 38 rows in grp_31_0
+… 1 rows in form
+… 38 rows in grp_32_0
+… 1 rows in form
+… 38 rows in grp_33_0
+… 1 rows in form
+… 38 rows in grp_34_0
+… 1 rows in form
+… 38 rows in grp_35_0
+… 1 rows in form
+… 38 rows in grp_36_0
+… 1 rows in form
+… 38 rows in grp_37_0
+… 1 rows in form
+… 38 rows in grp_38_0
+… 1 rows in form
+… 38 rows in grp_39_0
+… 1 rows in form
+… 38 rows in grp_40_0
+… 1 rows in form
+… 38 rows in grp_41_0
+… 1 rows in form
+… 38 rows in grp_42_0
+… 1 rows in form
+… 38 rows in grp_43_0
+… 1 rows in form
+… 38 rows in grp_44_0
+… 1 rows in form
+… 38 rows in grp_45_0
+… 1 rows in form
+… 38 rows in grp_46_0
+… 1 rows in form
+… 38 rows in grp_47_0
+… 1 rows in form
+… 38 rows in grp_48_0
+… 1 rows in form
+… 38 rows in grp_49_0
+
+choices:
+list_1: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_2: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_3: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_4: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_5: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_6: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_7: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_8: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_9: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_10: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_11: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_12: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_13: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_14: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_15: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_16: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_17: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_18: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_19: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_20: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_21: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_22: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_23: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_24: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_25: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_26: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_27: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_28: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_29: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_30: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_31: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_32: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_33: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_34: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_35: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_36: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_37: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_38: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_39: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_40: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_41: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_42: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_43: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_44: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_45: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_46: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_47: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_48: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_49: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_50: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_51: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_52: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_53: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_54: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_55: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_56: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_57: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_58: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_59: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_60: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_61: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_62: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_63: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_64: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_65: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_66: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_67: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_68: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_69: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_70: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_71: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_72: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_73: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_74: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_75: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_76: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_77: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_78: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_79: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_80: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_81: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_82: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_83: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_84: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_85: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_86: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_87: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_88: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_89: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_90: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_91: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_92: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_93: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_94: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_95: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_96: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_97: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_98: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_99: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_100: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_101: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_102: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_103: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_104: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_105: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_106: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_107: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_108: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_109: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_110: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_111: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_112: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_113: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_114: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_115: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_116: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_117: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_118: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_119: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_120: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_121: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_122: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_123: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_124: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_125: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_126: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_127: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_128: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_129: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_130: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_131: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_132: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_133: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_134: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_135: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_136: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_137: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_138: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_139: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_140: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_141: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_142: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_143: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_144: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_145: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_146: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_147: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_148: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_149: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_150: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_151: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_152: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_153: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_154: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_155: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_156: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_157: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_158: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_159: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_160: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_161: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_162: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_163: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_164: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_165: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_166: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_167: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_168: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_169: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_170: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_171: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_172: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_173: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_174: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_175: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_176: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_177: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_178: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_179: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_180: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_181: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_182: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_183: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_184: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_185: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_186: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_187: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_188: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_189: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_190: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_191: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_192: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_193: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_194: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_195: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_196: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_197: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_198: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_199: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_200: [choice_1, choice_2, choice_3, choice_4] (+13 more)
+list_201: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_202: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_203: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_204: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_205: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_206: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_207: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_208: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_209: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_210: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_211: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_212: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_213: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_214: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_215: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_216: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_217: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_218: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_219: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_220: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_221: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_222: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_223: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_224: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_225: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_226: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_227: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_228: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_229: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_230: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_231: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_232: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_233: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_234: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_235: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_236: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_237: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_238: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_239: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_240: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_241: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_242: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_243: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_244: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_245: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_246: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_247: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_248: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_249: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_250: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_251: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_252: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_253: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_254: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_255: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_256: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_257: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_258: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_259: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_260: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_261: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_262: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_263: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_264: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_265: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_266: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_267: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_268: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_269: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_270: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_271: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_272: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_273: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_274: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_275: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_276: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_277: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_278: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_279: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_280: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_281: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_282: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_283: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_284: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_285: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_286: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_287: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_288: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_289: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_290: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_291: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_292: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_293: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_294: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_295: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_296: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_297: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_298: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_299: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+list_300: [choice_1, choice_2, choice_3, choice_4] (+12 more)
+
+lint_errors: 1 (first 50)
+settings#0 instance_name [XLS-004] error: Undefined variable \${q_1}"
+`;
