@@ -667,4 +667,32 @@ mod tests {
         let text = fs::read_to_string(binding_path(dir.path())).unwrap();
         assert!(!text.contains("apiKey"));
     }
+
+    /// Manual native check for Task 6.1: stores a real binding in the Windows
+    /// Credential Manager, proves it is listed there, then removes it. Ignored
+    /// by default so CI and normal test runs never touch a developer's vault.
+    #[cfg(windows)]
+    #[test]
+    #[ignore = "writes a real Windows Credential Manager entry; run manually"]
+    fn native_keychain_round_trip_is_visible_in_credential_manager() {
+        let provider_id = "native-check-stage6";
+        let secret = r#"{"baseUrl":"https://api.example.com/v1","auth":"bearer","apiKey":"native-check-key"}"#;
+        let target = format!("{provider_id}.{KEYCHAIN_SERVICE}");
+
+        keyring_set(provider_id, secret).expect("store the binding in the credential manager");
+        assert_eq!(keyring_get(provider_id).unwrap().as_deref(), Some(secret));
+
+        let listing_output = std::process::Command::new("cmdkey")
+            .arg("/list")
+            .output()
+            .expect("run cmdkey /list");
+        let listing = String::from_utf8_lossy(&listing_output.stdout);
+        assert!(
+            listing.contains(&target),
+            "expected {target} in the Windows Credential Manager"
+        );
+
+        keyring_delete(provider_id).expect("delete the test credential");
+        assert_eq!(keyring_get(provider_id).unwrap(), None);
+    }
 }
