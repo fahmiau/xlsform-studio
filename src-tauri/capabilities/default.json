@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Grants the main window only: dialog pickers, non-secret preference store, window state, and core defaults. No filesystem plugin: workbook I/O goes through scoped app commands (AD-7).",
+  "description": "Grants the main window only: dialog pickers, non-secret preference store, window state, core defaults, and opening the exact AI provider key/billing pages in the system browser (Q-AI1). No filesystem plugin: workbook I/O goes through scoped app commands (AD-7). No path opening, no wildcard hosts.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -15,6 +15,26 @@
     "store:allow-set",
     "store:allow-save",
     "store:allow-delete",
-    "window-state:default"
+    "window-state:default",
+    {
+      "identifier": "opener:allow-open-url",
+      "allow": [
+        { "url": "https://aistudio.google.com/app/apikey" },
+        { "url": "https://console.anthropic.com/settings/keys" },
+        { "url": "https://console.anthropic.com/settings/billing" },
+        { "url": "https://openrouter.ai/settings/keys" },
+        { "url": "https://openrouter.ai/settings/credits" },
+        { "url": "https://platform.openai.com/api-keys" },
+        { "url": "https://platform.openai.com/settings/organization/billing/overview" },
+        { "url": "https://console.groq.com/keys" },
+        { "url": "https://console.groq.com/settings/billing" },
+        { "url": "https://console.x.ai" },
+        { "url": "https://console.x.ai/billing" },
+        { "url": "https://platform.deepseek.com/api_keys" },
+        { "url": "https://platform.deepseek.com/top_up" },
+        { "url": "https://console.mistral.ai/api-keys" },
+        { "url": "https://console.mistral.ai/billing" }
+      ]
+    }
   ]
 }

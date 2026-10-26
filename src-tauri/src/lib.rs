@@ -18,6 +18,11 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::recovery::recovery_write,
             commands::recovery::recovery_read,
             commands::recovery::recovery_clear,
+            commands::secrets::secret_set,
+            commands::secrets::secret_status,
+            commands::secrets::secret_delete,
+            commands::ai_proxy::ai_proxy,
+            commands::ai_proxy::ai_proxy_cancel,
         ])
         .events(tauri_specta::collect_events![])
         .error_handling(tauri_specta::ErrorHandlingMode::Throw)
@@ -53,7 +58,14 @@ pub fn run() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_plugin_window_state::Builder::default().build());
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        // Q-AI1: "Get a key" / billing links open in the system browser. The
+        // capability allows exact URLs only; no file/path opening.
+        .plugin(tauri_plugin_opener::init())
+        .manage(
+            commands::ai_proxy::AiProxyState::new()
+                .expect("failed to initialize the AI proxy HTTP client"),
+        );
 
     #[cfg(all(debug_assertions, feature = "agent-kit"))]
     let builder = builder.plugin(tauri_plugin_agent_kit::init(

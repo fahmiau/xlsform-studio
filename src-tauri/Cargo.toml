@@ -24,12 +24,26 @@ tauri-plugin-dialog = "=2.6.0"
 tauri-plugin-fs = "=2.4.5"
 tauri-plugin-store = "2"
 tauri-plugin-window-state = "2"
+# Q-AI1 (plans/stage-6): "Get a key" opens the system browser. Pinned to the
+# frontend package version; see docs/adr/0002-tauri-dependency-pins.md.
+tauri-plugin-opener = "=2.7.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "2"
 base64 = "0.22"
 rand = "0.9"
 chrono = { version = "0.4", features = ["serde"] }
+# BYOK keys live in the OS credential store (AD-7). Platform backends are
+# enabled per target below; no default features on purpose.
+keyring = "=3.6.3"
+# AI proxy client: rustls avoids OpenSSL, `stream` gives `bytes_stream()`.
+reqwest = { version = "=0.12.28", default-features = false, features = [
+  "rustls-tls",
+  "stream",
+  "http2",
+] }
+tokio = { version = "1", features = ["sync", "time", "macros"] }
+log = "0.4"
 tauri-specta = { version = "=2.0.0-rc.25", features = ["derive", "typescript"] }
 specta = { version = "=2.0.0-rc.25", features = ["derive"] }
 tauri-plugin-agent-kit = { version = "0.1.0-alpha.1", optional = true }
@@ -40,10 +54,25 @@ tauri-plugin-agent-kit = { version = "0.1.0-alpha.1", optional = true }
 # Both crates are already in the graph through wry.
 webview2-com = "0.39"
 windows-core = "0.62"
+keyring = { version = "=3.6.3", features = ["windows-native"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "=3.6.3", features = ["apple-native"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Secret Service over D-Bus; rust crypto so a distro without OpenSSL headers
+# can still build. A minimal distro without a Secret Service reports a clear
+# keychain error (R6); keyless local providers keep working without one.
+keyring = { version = "=3.6.3", features = [
+  "sync-secret-service",
+  "crypto-rust",
+] }
 
 [dev-dependencies]
 tempfile = "3"
 specta-typescript = "0.0.12"
+wiremock = "0.6"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 
 [features]
 # Optional agent-driven native UI inspection (Q5). Debug builds only; the
