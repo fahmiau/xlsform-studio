@@ -10,6 +10,9 @@ import { useUiStore, type SheetTab } from '@/state/uiStore';
 import { RecoveryDialog } from '@/features/file/RecoveryDialog';
 import { useAutosave } from '@/features/file/useAutosave';
 import { ChoicesDrawer } from '@/features/choices-drawer/ChoicesDrawer';
+import { AiDrawer } from '@/features/ai/AiDrawer';
+import { StagingBar } from '@/features/ai/StagingBar';
+import { useStagingAutoReveal } from '@/features/ai/useStagingAutoReveal';
 import { useLanguageViewBootstrap } from '@/features/languages/useLanguageView';
 import { LintPanel } from '@/features/lint-panel/LintPanel';
 import { SheetGrid } from '@/features/grid/SheetGrid';
@@ -74,13 +77,7 @@ function RightPanel() {
         ))}
       </div>
       <div className="min-h-0 flex-1 overflow-hidden">
-        {tab === 'choices' ? (
-          <ChoicesDrawer />
-        ) : (
-          <p className="text-muted-foreground p-2 text-xs" data-testid="ai-placeholder">
-            AI assistant arrives in Stage 6.
-          </p>
-        )}
+        {tab === 'choices' ? <ChoicesDrawer /> : <AiDrawer />}
       </div>
     </section>
   );
@@ -90,7 +87,7 @@ function CenterPane({ sheet }: { sheet: SheetTab }) {
   const warnings = useWorkbookStore((state) => state.warnings);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="relative flex h-full min-h-0 flex-col">
       {warnings.length > 0 ? (
         <div
           className="flex items-start gap-2 border-b border-amber-300 bg-amber-50 px-3 py-1 text-xs text-amber-900"
@@ -110,6 +107,7 @@ function CenterPane({ sheet }: { sheet: SheetTab }) {
           <SettingsForm />
         )}
       </div>
+      <StagingBar />
     </div>
   );
 }
@@ -125,6 +123,7 @@ export function AppShell() {
 
   useAutosave();
   useLanguageViewBootstrap();
+  useStagingAutoReveal();
 
   useEffect(() => {
     void usePrefsStore.getState().hydrate();

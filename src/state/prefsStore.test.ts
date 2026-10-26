@@ -18,6 +18,7 @@ const DEFAULTS = {
   formulaFontSize: 12,
   autocompleteOnDollar: true,
   languageViews: {},
+  ai: { providers: [], activeInstanceId: null },
 };
 
 describe('prefsStore (Task 2.1, Task 5.7)', () => {
@@ -145,5 +146,72 @@ describe('corrupt pref storage (Task 5.7)', () => {
     const state = usePrefsStore.getState();
     expect(state.hydrated).toBe(true);
     expect(state.theme).toBe('system');
+  });
+});
+
+describe('AI preferences (Task 6.2c)', () => {
+  it('defaults to no providers', () => {
+    const prefs = parsePrefs({});
+    expect(prefs.ai).toEqual({ providers: [], activeInstanceId: null });
+  });
+
+  it('strips any apiKey smuggled into persisted state', () => {
+    const prefs = parsePrefs({
+      ai: {
+        providers: [
+          {
+            instanceId: 'p_1',
+            presetId: 'anthropic',
+            label: 'Anthropic',
+            modelId: 'claude-sonnet-4-5',
+            apiKey: 'sk-ant-secret',
+          },
+        ],
+        activeInstanceId: 'p_1',
+      },
+    });
+    expect(prefs.ai.providers).toHaveLength(1);
+    expect(JSON.stringify(prefs.ai)).not.toContain('sk-ant-secret');
+    expect(prefs.ai.providers[0]).not.toHaveProperty('apiKey');
+  });
+
+  it('adds, activates, updates, and removes providers', () => {
+    const store = usePrefsStore.getState();
+    store.upsertAiProvider({
+      instanceId: 'p_one',
+      presetId: 'openai',
+      label: 'OpenAI',
+      modelId: 'gpt-5',
+    });
+    store.upsertAiProvider({
+      instanceId: 'p_two',
+      presetId: 'ollama',
+      label: 'Ollama',
+      modelId: 'qwen2.5:7b',
+    });
+    expect(usePrefsStore.getState().ai.activeInstanceId).toBe('p_two');
+
+    usePrefsStore.getState().setActiveAiProvider('p_one');
+    expect(usePrefsStore.getState().ai.activeInstanceId).toBe('p_one');
+
+    usePrefsStore.getState().updateAiProvider('p_one', { modelId: 'gpt-5-mini' });
+    expect(usePrefsStore.getState().ai.providers[0]?.modelId).toBe('gpt-5-mini');
+
+    usePrefsStore.getState().removeAiProvider('p_one');
+    expect(usePrefsStore.getState().ai.providers.map((p) => p.instanceId)).toEqual(['p_two']);
+    expect(usePrefsStore.getState().ai.activeInstanceId).toBe('p_two');
+  });
+
+  it('persists providers without keys', () => {
+    usePrefsStore.getState().upsertAiProvider({
+      instanceId: 'p_persist',
+      presetId: 'groq',
+      label: 'Groq',
+      modelId: 'llama-3.3-70b-versatile',
+    });
+    const stored = localStorage.getItem('xlsform-studio.prefs') ?? '';
+    expect(stored).toContain('p_persist');
+    expect(stored).not.toContain('apiKey');
+    expect(stored).not.toContain('sk-');
   });
 });

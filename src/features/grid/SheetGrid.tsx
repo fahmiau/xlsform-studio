@@ -21,10 +21,12 @@ import {
 import { toast } from 'sonner';
 
 import { findColumnKey } from '@/core/indexes/columns';
+import { buildGroupTree } from '@/core/indexes/groupTree';
 import { primaryLabelColumn } from '@/core/languages/discover';
 import { splitPair, untranslatedCellKeys, visibleColumns } from '@/core/languages/viewModes';
 import { diagnosticCellKey } from '@/core/lint/diagnostics';
 import type { DiagnosticIssue } from '@/core/lint';
+import { isCellModified, rowChange } from '@/core/ai/diff';
 import type { ColumnBase } from '@/core/model/columns';
 import { resolveColumn } from '@/core/model/columns';
 import { parseType } from '@/core/model/parseType';
@@ -37,6 +39,7 @@ import { applyCellEdits, type CellEditOutcome } from '@/features/grid/cellEditPi
 import { notifyCellEdits } from '@/features/shell/toasts';
 import { useDerivedStore } from '@/state/derivedStore';
 import { usePrefsStore } from '@/state/prefsStore';
+import { useStagingStore } from '@/state/stagingStore';
 import { useUiStore } from '@/state/uiStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 import { useIsDark } from '@/lib/theme';
@@ -73,7 +76,8 @@ import {
   selectionToRowIds,
   findRowIndex,
 } from './selection';
-import { buildGridTheme } from './theme';
+import { mergedSheet } from './stagingView';
+import { buildGridTheme, stagingCellTheme, stagingRowTheme } from './theme';
 import { useClipboard } from './useClipboard';
 import {
   deleteSelectedRows,
@@ -126,8 +130,21 @@ export function SheetGrid({
   onActiveRowChange,
   compact = false,
 }: SheetGridProps) {
-  const data = useWorkbookStore((state) => state.data);
-  const sheet = data[sheetName];
+  const liveData = useWorkbookStore((state) => state.data);
+  const stagedBase = useStagingStore((state) => state.base);
+  const stagedDraft = useStagingStore((state) => state.draft);
+  const stagedDiff = useStagingStore((state) => state.diff);
+  const data = stagedDraft ?? liveData;
+  // Deleted rows stay visible at their original positions while staged.
+  const sourceSheet = data[sheetName];
+  const sheet = useMemo(
+    () =>
+      stagedBase && stagedDraft && stagedDiff
+        ? mergedSheet(stagedBase[sheetName], stagedDraft[sheetName], stagedDiff[sheetName])
+        : sourceSheet,
+    [sheetName, sourceSheet, stagedBase, stagedDiff, stagedDraft],
+  );
+  const locked = stagedDraft !== null;
   const indexes = useDerivedStore((state) => state.indexes);
   const diagnosticIndex = useDerivedStore((state) => state.diagnosticIndex);
   const cellPreview = useUiStore((state) => state.cellPreview);
@@ -186,6 +203,7 @@ export function SheetGrid({
     return untranslatedCellKeys(sheet, languages, source?.id, target?.id);
   }, [languageView, languages, sheet, view]);
   const projection = useMemo(() => {
+    const groups = stagedDraft && sheetName === 'survey' ? buildGroupTree(sheet) : indexes.groups;
     if (rowIndexes) {
       const realIndexes = Int32Array.from(rowIndexes);
       const visibleIndexes = new Int32Array(sheet.rows.length).fill(-1);
@@ -195,11 +213,15 @@ export function SheetGrid({
       return { realIndexes, visibleIndexes } as RowProjection;
     }
     if (sheetName === 'survey') {
-      return buildProjection(sheet, { groups: indexes.groups, collapsed: collapsedGroupIds });
+      return buildProjection(sheet, { groups, collapsed: collapsedGroupIds });
     }
     return identityProjection(sheet);
-  }, [collapsedGroupIds, indexes.groups, rowIndexes, sheet, sheetName]);
+  }, [collapsedGroupIds, indexes.groups, rowIndexes, sheet, sheetName, stagedDraft]);
   const rowCount = rowIndexes?.length ?? visibleRowCount(projection);
+  const groupsForDepth = useMemo(
+    () => (stagedDraft && sheetName === 'survey' ? buildGroupTree(sheet) : indexes.groups),
+    [indexes.groups, sheet, sheetName, stagedDraft],
+  );
   const gridSelection = useMemo(() => {
     if (!storedGridSelection || rowCount === 0) return fallbackGridSelection;
     const range = storedGridSelection.current?.range;
@@ -218,8 +240,8 @@ export function SheetGrid({
     sheetName === 'choices' ? (findColumnKey(sheet, 'list_name') ?? 'list_name') : undefined;
 
   const orphanRows = useMemo(
-    () => (sheetName === 'survey' ? new Set(indexes.groups.orphans) : new Set<string>()),
-    [indexes.groups.orphans, sheetName],
+    () => (sheetName === 'survey' ? new Set(groupsForDepth.orphans) : new Set<string>()),
+    [groupsForDepth.orphans, sheetName],
   );
 
   const clipboard = useClipboard(sheetName, display.keys, gridSelection, projection);
@@ -272,7 +294,7 @@ export function SheetGrid({
     const realIndex = findRowIndex(sheet, reveal.rowId);
     if (realIndex < 0) return;
 
-    const ancestors = indexes.groups.groups
+    const ancestors = groupsForDepth.groups
       .filter((group) => {
         const end = group.endRowIndex < 0 ? Number.POSITIVE_INFINITY : group.endRowIndex;
         return realIndex >= group.startRowIndex && realIndex <= end;
@@ -282,7 +304,7 @@ export function SheetGrid({
     for (const id of ancestors) expanded.delete(id);
     const expandedProjection =
       sheetName === 'survey'
-        ? buildProjection(sheet, { groups: indexes.groups, collapsed: expanded })
+        ? buildProjection(sheet, { groups: groupsForDepth, collapsed: expanded })
         : projection;
     const visibleIndex = visibleRowIndex(expandedProjection, realIndex);
     if (visibleIndex < 0) return;
@@ -312,14 +334,14 @@ export function SheetGrid({
     display.keys,
     activeCell?.column,
     collapsedGroupIds,
-    indexes.groups,
+    groupsForDepth,
     projection,
     setGridSelection,
   ]);
 
   const groupByRowId = useMemo(
-    () => new Map(indexes.groups.groups.map((group) => [group.id, group])),
-    [indexes.groups.groups],
+    () => new Map(groupsForDepth.groups.map((group) => [group.id, group])),
+    [groupsForDepth.groups],
   );
 
   // Diagnostics draw through `drawCell`; damage the affected rows so markers
@@ -370,7 +392,7 @@ export function SheetGrid({
           copyData: '',
           data: {
             kind: 'xlsform-gutter',
-            depth: sheetName === 'survey' ? (indexes.groups.depthByRowIndex[real] ?? 0) : 0,
+            depth: sheetName === 'survey' ? (groupsForDepth.depthByRowIndex[real] ?? 0) : 0,
             rowKind,
             orphan: orphanRows.has(row.id),
             collapsed: collapsedGroupIds.has(row.id),
@@ -438,7 +460,7 @@ export function SheetGrid({
           value: row.cells[key] ?? '',
           rowId: row.id,
           column: key,
-          readonly: !isCellEditable(typeValue, key),
+          readonly: locked || !isCellEditable(typeValue, key),
           faded: structural === 'end_group' || structural === 'end_repeat',
         });
       }
@@ -452,23 +474,28 @@ export function SheetGrid({
       }
 
       const needsTranslation = untranslated.has(`${row.id}\u0000${key}`);
+      const modifiedCell = stagedDiff ? isCellModified(stagedDiff, sheetName, row.id, key) : false;
       let cache = cellCache.current.get(row);
       if (!cache) {
         cache = new Map();
         cellCache.current.set(row, cache);
       }
-      if (!needsTranslation) {
+      if (!needsTranslation && !modifiedCell) {
         const cached = cache.get(key);
         if (cached) return cached;
       }
 
       const kind = structuralRowKind(typeValue);
       const built = textCell(cellValue(sheet, real, key), {
-        readonly: !isCellEditable(typeValue, key),
+        readonly: locked || !isCellEditable(typeValue, key),
         faded: kind === 'end_group' || kind === 'end_repeat',
-        ...(needsTranslation ? { themeOverride: translationCellTheme(dark) } : {}),
+        ...(modifiedCell
+          ? { themeOverride: stagingCellTheme(dark) }
+          : needsTranslation
+            ? { themeOverride: translationCellTheme(dark) }
+            : {}),
       });
-      if (!needsTranslation) cache.set(key, built);
+      if (!needsTranslation && !modifiedCell) cache.set(key, built);
       return built;
     },
     [
@@ -479,13 +506,15 @@ export function SheetGrid({
       display.keys,
       groupByRowId,
       indexes.choices.byList,
-      indexes.groups.depthByRowIndex,
+      locked,
+      groupsForDepth.depthByRowIndex,
       onCommitEdits,
       orphanRows,
       primaryLabelKey,
       projection,
       sheet,
       sheetName,
+      stagedDiff,
       typeKey,
       untranslated,
     ],
@@ -502,6 +531,10 @@ export function SheetGrid({
       if (row.id === flashRowId) {
         return { bgCell: dark ? '#334155' : '#dbeafe' };
       }
+      const change = stagedDiff ? rowChange(stagedDiff, sheetName, row.id) : undefined;
+      if (change === 'inserted' || change === 'deleted') {
+        return stagingRowTheme(gridTheme, dark, change);
+      }
       if (orphanRows.has(row.id)) style = 'orphan';
       else if (kind === 'begin_group') style = 'group';
       else if (kind === 'begin_repeat') style = 'repeat';
@@ -513,11 +546,23 @@ export function SheetGrid({
       }
       return rowThemeOverride(gridTheme, dark, style);
     },
-    [dark, flashRowId, gridTheme, listNameKey, orphanRows, projection, sheet, typeKey],
+    [
+      dark,
+      flashRowId,
+      gridTheme,
+      listNameKey,
+      orphanRows,
+      projection,
+      sheet,
+      sheetName,
+      stagedDiff,
+      typeKey,
+    ],
   );
 
   const commitEdits = useCallback(
     (items: readonly { location: Item; value: EditableGridCell }[]) => {
+      if (locked) return;
       const edits: CellEdit[] = [];
       const rowIds = new Set<string>();
       for (const { location, value } of items) {
@@ -556,7 +601,7 @@ export function SheetGrid({
       );
       if (outcome) notifyCellEdits(outcome);
     },
-    [display, onCommitEdits, projection, sheet, sheetName, typeKey],
+    [display, locked, onCommitEdits, projection, sheet, sheetName, typeKey],
   );
 
   const onCellsEdited = useCallback<NonNullable<DataEditorProps['onCellsEdited']>>(
@@ -569,6 +614,7 @@ export function SheetGrid({
 
   const onPaste = useCallback(
     (target: Item, values: readonly (readonly string[])[]): boolean => {
+      if (locked) return true;
       const matrix = values.map((row) => [...row]);
       if (matrix.length === 0) return false;
       if (onPasteMatrix) {
@@ -602,12 +648,13 @@ export function SheetGrid({
       // We already applied the paste in one store action.
       return false;
     },
-    [display.keys, onPasteMatrix, projection.realIndexes, sheetName],
+    [display.keys, locked, onPasteMatrix, projection.realIndexes, sheetName],
   );
 
   const onFillPattern = useCallback<NonNullable<DataEditorProps['onFillPattern']>>(
     (event) => {
       event.preventDefault();
+      if (locked) return;
       const source = event.patternSource;
       const destination = event.fillDestination;
       const sourceKeys = selectionColumnKeysForRange(display.keys, source);
@@ -641,10 +688,11 @@ export function SheetGrid({
         toast.warning(`Skipped ${result.skippedReadOnly} read-only cell(s).`);
       }
     },
-    [display.keys, projection, sheet.rows, sheetName],
+    [display.keys, locked, projection, sheet.rows, sheetName],
   );
 
   const onRowAppended = useCallback<NonNullable<DataEditorProps['onRowAppended']>>(async () => {
+    if (locked) return 'bottom' as const;
     if (onAppendRow) {
       const rowId = onAppendRow();
       if (rowId) useUiStore.getState().setSelectedRowIds([rowId]);
@@ -664,7 +712,7 @@ export function SheetGrid({
     );
     if (rowId) useUiStore.getState().setSelectedRowIds([rowId]);
     return 'bottom' as const;
-  }, [onAppendRow, sheetName]);
+  }, [locked, onAppendRow, sheetName]);
 
   const onColumnResize = useCallback<NonNullable<DataEditorProps['onColumnResizeEnd']>>(
     (_column, newSize, columnIndex) => {
@@ -741,12 +789,20 @@ export function SheetGrid({
       const row = real >= 0 ? sheet.rows[real] : undefined;
       const key = display.keys[args.col - 1];
       if (!row || !key) return;
+      if (stagedDiff) {
+        const change = rowChange(stagedDiff, sheetName, row.id);
+        if (change === 'deleted') {
+          ctxStrike(args.ctx, args.rect);
+        } else if (isCellModified(stagedDiff, sheetName, row.id, key)) {
+          ctxUnderline(args.ctx, args.rect);
+        }
+      }
       const issues = diagnosticIndex.byCell.get(diagnosticCellKey(row.id, key));
       if (!issues || issues.length === 0) return;
       const error = issues.some((issue) => issue.severity === 'error');
       ctxMarker(args.ctx, args.rect, error ? '#dc2626' : '#d97706');
     },
-    [diagnosticIndex.byCell, display.keys, projection, sheet.rows],
+    [diagnosticIndex.byCell, display.keys, projection, sheetName, sheet.rows, stagedDiff],
   );
 
   const hoverKey = useRef<string | null>(null);
@@ -799,8 +855,9 @@ export function SheetGrid({
             ) : null}
             <button
               type="button"
-              className="hover:bg-accent rounded px-2 py-0.5"
+              className="hover:bg-accent rounded px-2 py-0.5 disabled:opacity-40"
               data-testid="add-column-button"
+              disabled={locked}
               onClick={() => setAddColumnOpen(true)}
             >
               + Column
@@ -822,6 +879,7 @@ export function SheetGrid({
           onItemHovered={handleDiagnosticHover}
           drawCell={drawDiagnosticMarker}
           onDelete={() => {
+            if (locked) return true;
             const rowIds = useUiStore.getState().selectedRowIds;
             if (rowIds.length === 0) return true;
             if (onDeleteRows) {
@@ -857,12 +915,16 @@ export function SheetGrid({
             const point = hostPoint(event.localEventX, event.localEventY);
             openRowMenu(item[0] <= 0 ? [1, item[1]] : item, point.x, point.y);
           }}
-          trailingRowOptions={{
-            tint: true,
-            hint: 'New row',
-            sticky: false,
-            targetColumn: Math.min(1, display.keys.length),
-          }}
+          trailingRowOptions={
+            locked
+              ? undefined
+              : {
+                  tint: true,
+                  hint: 'New row',
+                  sticky: false,
+                  targetColumn: Math.min(1, display.keys.length),
+                }
+          }
           freezeColumns={display.frozenCount}
           rowMarkers="number"
           rowHeight={GRID_ROW_HEIGHT}
@@ -899,6 +961,16 @@ export function SheetGrid({
                 {issue.message}
               </div>
             ))}
+          </div>
+        ) : null}
+        {locked ? (
+          <div
+            className="bg-background/60 absolute inset-0 z-30 flex items-start justify-center pt-4 backdrop-blur-[1px]"
+            data-testid="ai-staging-lock"
+          >
+            <p className="border-border bg-background rounded border px-3 py-1.5 text-xs shadow">
+              AI changes are staged — Accept or Revert below to continue editing.
+            </p>
           </div>
         ) : null}
       </div>
@@ -973,5 +1045,29 @@ function ctxMarker(ctx: CanvasRenderingContext2D, rect: Rectangle, color: string
   ctx.lineTo(rect.x + rect.width - 2, rect.y + 9);
   ctx.closePath();
   ctx.fill();
+  ctx.restore();
+}
+
+/** Rose strikethrough for a row staged for deletion. */
+function ctxStrike(ctx: CanvasRenderingContext2D, rect: Rectangle): void {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(225, 29, 72, 0.75)';
+  ctx.lineWidth = 1.25;
+  ctx.beginPath();
+  ctx.moveTo(rect.x + 6, rect.y + rect.height / 2);
+  ctx.lineTo(rect.x + rect.width - 6, rect.y + rect.height / 2);
+  ctx.stroke();
+  ctx.restore();
+}
+
+/** Amber underline for a modified cell in a staged draft. */
+function ctxUnderline(ctx: CanvasRenderingContext2D, rect: Rectangle): void {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(217, 119, 6, 0.9)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(rect.x + 2, rect.y + rect.height - 2);
+  ctx.lineTo(rect.x + rect.width - 2, rect.y + rect.height - 2);
+  ctx.stroke();
   ctx.restore();
 }

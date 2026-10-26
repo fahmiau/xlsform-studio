@@ -75,11 +75,39 @@ export const ROW_TINTS = {
     end: 'rgba(248, 250, 252, 1)',
     /** Split view: target cell empty while the source is filled (Task 5.4). */
     translation: 'rgba(254, 243, 199, 0.55)',
+    /** Build Mode staged changes (Task 6.7). */
+    inserted: 'rgba(16, 185, 129, 0.16)',
+    modifiedCell: 'rgba(245, 158, 11, 0.24)',
+    deleted: 'rgba(244, 63, 94, 0.16)',
   },
   dark: {
     group: 'rgba(51, 65, 85, 0.6)',
     repeat: 'rgba(49, 46, 129, 0.45)',
     end: 'rgba(30, 41, 59, 0.45)',
     translation: 'rgba(120, 53, 15, 0.28)',
+    inserted: 'rgba(16, 185, 129, 0.22)',
+    modifiedCell: 'rgba(245, 158, 11, 0.26)',
+    deleted: 'rgba(244, 63, 94, 0.22)',
   },
 } as const;
+
+/** Amber cell wash for a modified cell in a staged draft. */
+export function stagingCellTheme(dark: boolean): Partial<Theme> {
+  const tints = dark ? ROW_TINTS.dark : ROW_TINTS.light;
+  return { bgCell: tints.modifiedCell };
+}
+
+/** Emerald/rose row wash for inserted/deleted staged rows. */
+export function stagingRowTheme(
+  theme: Theme,
+  dark: boolean,
+  kind: 'inserted' | 'deleted',
+): Partial<Theme> {
+  const tints = dark ? ROW_TINTS.dark : ROW_TINTS.light;
+  if (kind === 'inserted') return { bgCell: tints.inserted };
+  return {
+    bgCell: tints.deleted,
+    textDark: dark ? '#fecdd3' : '#9f1239',
+    baseFontStyle: `13px ${theme.fontFamily}`,
+  };
+}

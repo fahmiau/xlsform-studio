@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { buildListName } from '@/core/ops/choices';
 import type { SlugStyle } from '@/core/slug/slugify';
+import { AiSection } from '@/features/preferences/sections/AiSection';
 import { usePrefsStore } from '@/state/prefsStore';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -147,10 +148,7 @@ export function PreferencesDialog({
             </Row>
           </section>
 
-          <section className="space-y-1.5">
-            <h3 className="text-muted-foreground font-medium">AI</h3>
-            <p className="text-muted-foreground">AI settings arrive in Stage 6.</p>
-          </section>
+          <AiSection />
         </div>
       </DialogContent>
     </Dialog>

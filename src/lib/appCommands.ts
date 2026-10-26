@@ -99,6 +99,7 @@ export function appCommands(): AppCommand[] {
         }
         prefs.setPanelVisible('right', true);
         ui.setRightTab('ai');
+        ui.focusAiInput();
       },
     },
     {

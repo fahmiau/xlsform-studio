@@ -13,6 +13,7 @@ import type { ListMode } from '@/core/slug/slugify';
 export type SheetTab = 'survey' | 'choices' | 'settings';
 export type RightTab = 'choices' | 'ai';
 export type LeftTab = 'outline' | 'lint';
+export type AiMode = 'chat' | 'build';
 
 export interface CellRef {
   sheet: SheetTab;
@@ -63,6 +64,9 @@ export interface UiState {
   dismissedSharedLists: Set<string>;
   rightTab: RightTab;
   leftTab: LeftTab;
+  aiMode: AiMode;
+  /** Bumped by Ctrl+J so the drawer focuses its input. */
+  aiFocusNonce: number;
   panels: { outline: boolean; lint: boolean; ai: boolean };
   languageView: LanguageViewState;
   /** Command palette, shortcut help, and preferences dialogs (Task 5.6/5.7). */
@@ -91,6 +95,8 @@ export interface UiState {
   dismissSharedList: (listName: string) => void;
   setRightTab: (tab: RightTab) => void;
   setLeftTab: (tab: LeftTab) => void;
+  setAiMode: (mode: AiMode) => void;
+  focusAiInput: () => void;
   setPanel: (panel: keyof UiState['panels'], visible: boolean) => void;
   setLanguageView: (mode: LanguageViewState['mode'], language?: string | null) => void;
   setLanguageViewState: (view: LanguageViewState) => void;
@@ -121,6 +127,8 @@ export const useUiStore = create<UiState>()((set) => ({
   dismissedSharedLists: new Set(),
   rightTab: 'choices',
   leftTab: 'outline',
+  aiMode: 'chat',
+  aiFocusNonce: 0,
   panels: { outline: true, lint: false, ai: false },
   languageView: { mode: 'all', language: null, source: null, target: null },
   paletteOpen: false,
@@ -187,6 +195,8 @@ export const useUiStore = create<UiState>()((set) => ({
     set((state) => ({ dismissedSharedLists: new Set(state.dismissedSharedLists).add(listName) })),
   setRightTab: (rightTab) => set({ rightTab }),
   setLeftTab: (leftTab) => set({ leftTab }),
+  setAiMode: (aiMode) => set({ aiMode }),
+  focusAiInput: () => set((state) => ({ aiFocusNonce: state.aiFocusNonce + 1 })),
   setPanel: (panel, visible) => set((state) => ({ panels: { ...state.panels, [panel]: visible } })),
   setLanguageView: (mode, language = null) =>
     set((state) => ({ languageView: { ...state.languageView, mode, language } })),

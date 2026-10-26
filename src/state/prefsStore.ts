@@ -36,6 +36,23 @@ export interface PrefsValues {
   autocompleteOnDollar: boolean;
   /** Language view per file path (empty string for untitled workbooks). */
   languageViews: Record<string, LanguageViewState>;
+  /** Configured AI providers (Task 6.2c). Never contains a key. */
+  ai: AiPrefs;
+}
+
+/** One saved provider instance. `instanceId` is also the keyring provider id. */
+export interface AiProviderPrefs {
+  instanceId: string;
+  presetId: string;
+  label: string;
+  modelId: string;
+  temperature?: number;
+  baseUrlOverride?: string;
+}
+
+export interface AiPrefs {
+  providers: AiProviderPrefs[];
+  activeInstanceId: string | null;
 }
 
 export interface PrefsState extends PrefsValues {
@@ -45,12 +62,24 @@ export interface PrefsState extends PrefsValues {
   setPanelVisible: (panel: 'left' | 'right', visible: boolean) => void;
   update: (patch: Partial<PrefsValues>) => void;
   setLanguageViewFor: (fileKey: string, view: LanguageViewState) => void;
+  upsertAiProvider: (provider: AiProviderPrefs, makeActive?: boolean) => void;
+  updateAiProvider: (instanceId: string, patch: Partial<AiProviderPrefs>) => void;
+  removeAiProvider: (instanceId: string) => void;
+  setActiveAiProvider: (instanceId: string) => void;
   hydrate: () => Promise<void>;
 }
 
 const STORE_FILE = 'prefs.json';
 const STORE_KEY = 'prefs';
 const LOCAL_KEY = 'xlsform-studio.prefs';
+
+/** Stable, keyring-safe provider instance id (`p_` + 16 hex chars). */
+export function newProviderInstanceId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return `p_${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`;
+  }
+  return `p_${Math.random().toString(16).slice(2, 18)}`;
+}
 
 const DEFAULT_VALUES: PrefsValues = {
   theme: 'system',
@@ -64,6 +93,7 @@ const DEFAULT_VALUES: PrefsValues = {
   formulaFontSize: 12,
   autocompleteOnDollar: true,
   languageViews: {},
+  ai: { providers: [], activeInstanceId: null },
 };
 
 const THEMES = ['light', 'dark', 'system'] as const;
@@ -77,6 +107,28 @@ const languageViewSchema = z.object({
   target: z.string().nullable().catch(null),
 });
 
+/**
+ * No `apiKey` field on purpose: zod strips unknown keys, so even a hand-edited
+ * preferences file cannot smuggle a key into persisted state.
+ */
+const aiProviderSchema = z.object({
+  instanceId: z.string().min(1).max(128),
+  presetId: z.string().min(1).max(64),
+  label: z.string().min(1).max(80),
+  modelId: z.string().min(1).max(160),
+  temperature: z.number().min(0).max(2).optional(),
+  baseUrlOverride: z.string().max(2048).optional(),
+});
+
+const emptyAiPrefs: AiPrefs = { providers: [], activeInstanceId: null };
+
+const aiSchema = z
+  .object({
+    providers: z.array(aiProviderSchema).catch([]),
+    activeInstanceId: z.string().nullable().catch(null),
+  })
+  .catch(emptyAiPrefs);
+
 const prefsSchema = z.object({
   theme: z.enum(THEMES).catch(DEFAULT_VALUES.theme),
   layout: z.record(z.string(), z.number()).catch(DEFAULT_VALUES.layout),
@@ -89,6 +141,7 @@ const prefsSchema = z.object({
   formulaFontSize: z.number().int().min(9).max(24).catch(DEFAULT_VALUES.formulaFontSize),
   autocompleteOnDollar: z.boolean().catch(DEFAULT_VALUES.autocompleteOnDollar),
   languageViews: z.record(z.string(), languageViewSchema).catch({}),
+  ai: aiSchema,
 });
 
 /** Validate one persisted blob; never throws. */
@@ -152,6 +205,7 @@ function valuesOf(state: PrefsState): PrefsValues {
     formulaFontSize,
     autocompleteOnDollar,
     languageViews,
+    ai,
   } = state;
   return {
     theme,
@@ -165,6 +219,7 @@ function valuesOf(state: PrefsState): PrefsValues {
     formulaFontSize,
     autocompleteOnDollar,
     languageViews,
+    ai,
   };
 }
 
@@ -194,6 +249,48 @@ export const usePrefsStore = create<PrefsState>()((set, get) => ({
   },
   setLanguageViewFor: (fileKey, view) => {
     set((state) => ({ languageViews: { ...state.languageViews, [fileKey]: view } }));
+    persist(get());
+  },
+  upsertAiProvider: (provider, makeActive = true) => {
+    set((state) => {
+      const providers = [
+        ...state.ai.providers.filter((entry) => entry.instanceId !== provider.instanceId),
+        provider,
+      ];
+      return {
+        ai: {
+          providers,
+          activeInstanceId: makeActive ? provider.instanceId : state.ai.activeInstanceId,
+        },
+      };
+    });
+    persist(get());
+  },
+  updateAiProvider: (instanceId, patch) => {
+    set((state) => ({
+      ai: {
+        ...state.ai,
+        providers: state.ai.providers.map((entry) =>
+          entry.instanceId === instanceId ? { ...entry, ...patch, instanceId } : entry,
+        ),
+      },
+    }));
+    persist(get());
+  },
+  removeAiProvider: (instanceId) => {
+    set((state) => {
+      const providers = state.ai.providers.filter((entry) => entry.instanceId !== instanceId);
+      const activeInstanceId =
+        state.ai.activeInstanceId === instanceId
+          ? (providers[0]?.instanceId ?? null)
+          : state.ai.activeInstanceId;
+      return { ai: { providers, activeInstanceId } };
+    });
+    persist(get());
+  },
+  setActiveAiProvider: (instanceId) => {
+    if (!get().ai.providers.some((entry) => entry.instanceId === instanceId)) return;
+    set((state) => ({ ai: { ...state.ai, activeInstanceId: instanceId } }));
     persist(get());
   },
   hydrate: async () => {

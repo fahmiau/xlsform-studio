@@ -22,6 +22,7 @@ import {
 import { SheetGrid } from '@/features/grid/SheetGrid';
 import { notifyCellEdits } from '@/features/shell/toasts';
 import { usePrefsStore } from '@/state/prefsStore';
+import { useStagingStore } from '@/state/stagingStore';
 import { useUiStore } from '@/state/uiStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 
@@ -39,6 +40,13 @@ export function ChoicesDrawer() {
   const slugMaxLength = usePrefsStore((state) => state.slugMaxLength);
   const defaultSlugMode = usePrefsStore((state) => state.defaultSlugMode);
   const paste = useDrawerPaste(bound.listName, bound.columns, bound.mode);
+  const staged = useStagingStore((state) => state.draft !== null);
+
+  if (staged) {
+    return (
+      <EmptyState message="AI changes are staged. Accept or Revert them before editing choices." />
+    );
+  }
 
   if (!bound.surveyRowId) {
     return (
