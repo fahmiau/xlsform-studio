@@ -1,0 +1,164 @@
+name: release
+
+# Push a tag like v1.0.0 to build the five installer types and create a draft
+# GitHub release. The draft is published by a human after the QA checklist in
+# docs/qa/v1-checklist.md is signed off.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  quality:
+    name: quality gates
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux WebKit dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
+            patchelf libgtk-3-dev
+
+      - run: pnpm install --frozen-lockfile
+
+      # Same gates as ci.yml (unit level). Playwright E2E already runs on every
+      # push to main; tag commits are expected to be main commits.
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm coverage
+      - run: pnpm format:check
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+      - run: cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
+      - run: pnpm bindings:check
+      - name: Lint performance gate (shared-runner budget)
+        env:
+          LINT_BENCH_LIMIT_MS: '25'
+        run: pnpm bench:lint
+      - name: Version files are in sync
+        run: node scripts/bump-version.mjs --check
+
+  build:
+    name: ${{ matrix.name }}
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: windows-x64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bundles: nsis,msi
+            binary: xlsform-studio.exe
+            checksums: SHA256SUMS-windows-x64.txt
+          - name: linux-x64
+            os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: deb,appimage
+            binary: xlsform-studio
+            checksums: SHA256SUMS-linux-x64.txt
+          # Q4: separate DMGs, no universal binary.
+          - name: macos-arm64
+            os: macos-latest
+            target: aarch64-apple-darwin
+            bundles: dmg
+            binary: xlsform-studio
+            checksums: SHA256SUMS-macos-arm64.txt
+          - name: macos-x64
+            os: macos-latest
+            target: x86_64-apple-darwin
+            bundles: dmg
+            binary: xlsform-studio
+            checksums: SHA256SUMS-macos-x64.txt
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.target }}
+
+      - name: Install Linux WebKit dependencies
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
+            patchelf libgtk-3-dev libfuse2
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Build installers and create the draft release
+        id: tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: xlsform-studio ${{ github.ref_name }}
+          releaseBody: |
+            Unsigned v1 installers (Q3). See the README for Windows SmartScreen
+            and macOS Gatekeeper instructions. SHA-256 checksums are attached as
+            `${{ matrix.checksums }}`.
+          releaseDraft: true
+          prerelease: false
+          args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+
+      - name: Binary size budget (< 15 MB)
+        run: node scripts/check-binary-size.mjs "src-tauri/target/${{ matrix.target }}/release/${{ matrix.binary }}" 15
+
+      - name: SHA-256 checksums
+        run: >-
+          node scripts/checksums.mjs "${{ matrix.checksums }}"
+          "src-tauri/target/${{ matrix.target }}/release/bundle"
+
+      - name: Attach checksums to the draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release upload "${GITHUB_REF_NAME}" "${{ matrix.checksums }}" --clobber
+
+      - name: Upload checksums as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.checksums }}
+          path: ${{ matrix.checksums }}
+          retention-days: 30

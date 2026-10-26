@@ -1,0 +1,76 @@
+name: Bug report
+description: Report a reproducible problem with xlsform-studio
+title: 'bug: '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Do **not** attach API keys, private form data, or
+        full file paths. For security issues use the private advisory flow in
+        SECURITY.md instead.
+  - type: input
+    id: version
+    attributes:
+      label: App version
+      description: From the title bar / release tag (for example v1.0.0).
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 11
+        - Windows 10
+        - Ubuntu 22.04 / 24.04
+        - Other Linux
+        - macOS (Apple silicon)
+        - macOS (Intel)
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include the fixture shape (sheet, row type, column) rather than real workbook contents.
+      placeholder: |
+        1. Open a form with ...
+        2. Select ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Screenshots are welcome; remove personal data first.
+    validations:
+      required: true
+  - type: dropdown
+    id: ai
+    attributes:
+      label: Does it involve AI features?
+      options:
+        - 'No'
+        - 'Yes — Chat Mode'
+        - 'Yes — Build Mode'
+        - 'Yes — provider setup / key storage'
+        - 'Yes — local Ollama / LM Studio'
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Checklist
+      options:
+        - label: I did not include an API key or personal form data.
+          required: true
+        - label: I searched existing issues.
+          required: true

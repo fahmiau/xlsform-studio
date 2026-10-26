@@ -183,7 +183,7 @@ export function SetupCards({ onConfigured }: { onConfigured?: (config: AiConfig)
         {detected && !overrideId ? (
           <div className="flex items-center gap-2 text-[11px]" data-testid="ai-detected-chip">
             <CheckCircle2 className="size-3.5 text-emerald-600" />
-            <span className="font-medium">{detected.preset.label} key</span>
+            <span className="font-medium">Looks like an {detected.preset.label} key</span>
             <select
               className="border-input bg-background ml-auto rounded border px-1 py-0.5 text-[11px]"
               value={detected.preset.id}
