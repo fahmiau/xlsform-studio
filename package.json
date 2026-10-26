@@ -27,6 +27,7 @@
     "format:check": "prettier --check .",
     "bindings": "cargo test --manifest-path src-tauri/Cargo.toml export_bindings",
     "bindings:check": "pnpm bindings && git diff --exit-code -- src/ipc/bindings.ts",
+    "bump-version": "node scripts/bump-version.mjs",
     "fixtures": "tsx tests/fixtures/generate-reference.ts",
     "test:e2e": "playwright test"
   },

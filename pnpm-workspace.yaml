@@ -3,6 +3,12 @@ allowBuilds:
   # installs its platform binary; everything else in this tree is script-free.
   esbuild: true
 
+# The AI SDK's Node-only path pulls undici 5.x, which has open advisories.
+# The desktop app never executes that path (requests use proxyFetch in the
+# WebView), but the patched 6.28.1 keeps `pnpm audit` clean.
+overrides:
+  undici@^5.29.0: 6.29.1
+
 minimumReleaseAgeExclude:
   - immer@11.2.6
   - lucide-react@1.61.0
