@@ -14,10 +14,11 @@ import { GRID_HEADER_HEIGHT, GRID_ROW_HEIGHT } from '../../src/features/grid/geo
 
 const BASIC = join(process.cwd(), 'tests/fixtures/xlsx/synthetic/01-basic.xlsx');
 
-// Glide draws a 32 px row-marker column before the app's columns for <=100 rows.
-const ROW_MARKER_WIDTH = 32;
-// Gutter width from src/features/grid/columns.ts.
-const GUTTER_WIDTH = 48;
+// Category C5 removed Glide's 32 px sequential row markers; the custom gutter
+// now owns the number, so no marker column precedes the app columns.
+const ROW_MARKER_WIDTH = 0;
+// Gutter width from src/features/grid/columns.ts (number slot + depth 0-3).
+const GUTTER_WIDTH = 88;
 // SURVEY_GRID_CONFIG defaults; `relevant` has no default and falls back to 160.
 // Duplicated here because the Playwright runner does not resolve the app's `@/`
 // import alias.
@@ -194,7 +195,7 @@ test('settings columns reorder with only the gutter frozen', async ({ page }) =>
   const box = await canvas.boundingBox();
   if (!box) throw new Error('settings grid canvas has no layout box');
 
-  // Marker + gutter, then form_title (260), form_id (180), version (120).
+  // Gutter, then form_title (260), form_id (180), version (120).
   const left = (offset: number) => box.x + ROW_MARKER_WIDTH + GUTTER_WIDTH + offset;
   const headerY = box.y + GRID_HEADER_HEIGHT / 2;
   await page.mouse.move(left(260 + 180 + 60), headerY);

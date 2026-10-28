@@ -46,7 +46,8 @@ export const SETTINGS_GRID_CONFIG: SheetGridConfig = {
 };
 
 const FALLBACK_WIDTH = 160;
-const GUTTER_WIDTH = 48;
+/** Row number slot plus indent depth 0-3, badges, and the collapse chevron. */
+const GUTTER_WIDTH = 88;
 
 export interface DisplayColumns {
   /** Data columns in display order, excluding the gutter. */
@@ -74,6 +75,8 @@ export interface BuildDisplayColumnsOptions {
   keys?: readonly ColumnKey[];
   /** Frozen subset of `keys`, leftmost in this order. */
   frozen?: readonly ColumnKey[];
+  /** Gutter width in px; the drawer keeps 48 next to Glide's row markers. */
+  gutterWidth?: number;
 }
 
 function columnWidth(
@@ -142,7 +145,7 @@ export function buildDisplayColumns(
     {
       id: GUTTER_COLUMN_ID,
       title: '',
-      width: GUTTER_WIDTH,
+      width: options.gutterWidth ?? GUTTER_WIDTH,
     },
     ...keys.map((key): GridColumn => {
       const resolved = resolveColumn(key);

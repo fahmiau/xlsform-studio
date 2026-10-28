@@ -111,4 +111,20 @@ describe('buildProjection folding (Task 3.7)', () => {
     const projection = buildProjection(sheet, { groups, collapsed: new Set(['r0']) });
     expect(realIndexesFor(projection, [4, 1, 0, 99])).toEqual([0, 5, 8]);
   });
+
+  it('keeps 1-based sheet row numbers stable when a group collapses', () => {
+    // Group begins at sheet row 10 (index 9) and ends at sheet row 20 (index 19).
+    const rows: SheetData['rows'] = Array.from({ length: 21 }, (_, index) => ({
+      id: `r${index}`,
+      cells: {
+        type: index === 9 ? 'begin_group' : index === 19 ? 'end_group' : 'text',
+      },
+    }));
+    const sheet: SheetData = { sheetName: 'survey', columns: ['type'], rows };
+    const groups = buildGroupTree(sheet);
+    const projection = buildProjection(sheet, { groups, collapsed: new Set(['r9']) });
+
+    const visibleNumbers = Array.from(projection.realIndexes, (real) => real + 1);
+    expect(visibleNumbers.slice(-3)).toEqual([10, 20, 21]);
+  });
 });

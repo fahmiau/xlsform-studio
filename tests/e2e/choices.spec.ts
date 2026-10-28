@@ -7,8 +7,14 @@ import { join } from 'node:path';
 
 import { expect, test, type Page } from '@playwright/test';
 
+import { GRID_HEADER_HEIGHT, GRID_ROW_HEIGHT } from '../../src/features/grid/geometry';
+
 const BASIC = join(process.cwd(), 'tests/fixtures/xlsx/synthetic/01-basic.xlsx');
 const GROUPS = join(process.cwd(), 'tests/fixtures/xlsx/synthetic/15-unbalanced-groups.xlsx');
+
+// Glide's row-marker column (Stage 3 drawer drag) and the compact gutter width.
+const ROW_MARKER_WIDTH = 32;
+const DRAWER_GUTTER_WIDTH = 48;
 
 async function mockTauri(page: Page, fixturePath = BASIC, fileName = '01-basic.xlsx') {
   const base64 = (await readFile(fixturePath)).toString('base64');
@@ -238,6 +244,53 @@ test('Shift+Delete deletes the selected choice row in the drawer', async ({ page
   await expect(page.getByTestId('choice-count')).toHaveText('2 choices');
 });
 
+test('dragging a drawer row marker reorders the list in one undo step', async ({ page }) => {
+  await openFixture(page);
+  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await canvas.waitFor();
+  await canvas.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByTestId('formula-bar-input')).toHaveValue('select_one yes_no');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByTestId('choices-drawer')).toBeVisible();
+
+  const drawerCanvas = page.getByTestId('drawer-grid').locator('canvas').first();
+  await drawerCanvas.waitFor();
+  await drawerCanvas.focus();
+  const box = await drawerCanvas.boundingBox();
+  if (!box) throw new Error('drawer grid canvas has no layout box');
+
+  // Glide only starts a row drag on its own marker column.
+  const markerX = box.x + ROW_MARKER_WIDTH / 2;
+  const firstRowY = box.y + GRID_HEADER_HEIGHT + GRID_ROW_HEIGHT / 2;
+  const secondRowY = firstRowY + GRID_ROW_HEIGHT;
+  await page.mouse.move(markerX, firstRowY);
+  await page.mouse.down();
+  await page.mouse.move(markerX, secondRowY, { steps: 8 });
+  await page.mouse.up();
+
+  // A workbook write is the barrier: the drag landed before the row is read.
+  await expect(page.getByTestId('save-state')).toHaveText('Unsaved');
+
+  // Label is the first drawer column, after the marker column and the gutter.
+  // Click row 2 to anchor selection: Glide's hidden input swallows the first
+  // click on row 1, so row 1 is read with the keyboard from row 2.
+  const labelX = box.x + ROW_MARKER_WIDTH + DRAWER_GUTTER_WIDTH + 60;
+  await page.mouse.click(labelX, secondRowY);
+  const formula = page.getByTestId('formula-bar-input');
+  await expect(page.getByTestId('formula-bar-column')).toHaveText('[Column: label]');
+  await expect(formula).toHaveValue('Yes');
+  await page.keyboard.press('ArrowUp');
+  await expect(formula).toHaveValue('No');
+
+  // One drag = one apply: a single undo restores the original Yes/No order.
+  await page.keyboard.press('Control+z');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowUp');
+  await expect(formula).toHaveValue('Yes');
+});
+
 test('a name typed on the choices tab survives a later label edit', async ({ page }) => {
   await openFixture(page);
   await page.getByTestId('sheet-tab-choices').click();
@@ -245,8 +298,8 @@ test('a name typed on the choices tab survives a later label edit', async ({ pag
   await canvas.waitFor();
   const box = await canvas.boundingBox();
   if (!box) throw new Error('choices grid canvas has no layout box');
-  // list_name (140 px) follows the 48 px gutter; name is the next column.
-  await page.mouse.click(box.x + 48 + 140 + 40, box.y + 34 + 17);
+  // list_name (140 px) follows the 88 px gutter; name is the next column.
+  await page.mouse.click(box.x + 88 + 140 + 40, box.y + 34 + 17);
   const formula = page.getByTestId('formula-bar-input');
   await expect(page.getByTestId('formula-bar-column')).toHaveText('[Column: name]');
   await expect(formula).toHaveValue('yes');
@@ -278,8 +331,8 @@ test('a name typed on the choices tab survives a later label edit', async ({ pag
   await page.getByTestId('sheet-tab-choices').click();
   const choicesCanvas = page.getByTestId('sheet-grid-choices').locator('canvas').first();
   await choicesCanvas.waitFor();
-  // list_name (140 px) follows the 48 px gutter; name is the next column.
-  await page.mouse.click(box.x + 48 + 140 + 40, box.y + 34 + 17);
+  // list_name (140 px) follows the 88 px gutter; name is the next column.
+  await page.mouse.click(box.x + 88 + 140 + 40, box.y + 34 + 17);
   await expect(page.getByTestId('formula-bar-column')).toHaveText('[Column: name]');
   await expect(page.getByTestId('formula-bar-input')).toHaveValue('manual_code');
 });

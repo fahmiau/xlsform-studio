@@ -1,6 +1,7 @@
 /**
- * Custom gutter cell (Task 2.2, R2 proof): indent guides, `[G]`/`[R]` badge,
- * collapse chevron slot, and an orphan marker. Folding is wired in Stage 3.
+ * Custom gutter cell (Task 2.2, Category C5): real sheet row number, indent
+ * guides, `[G]`/`[R]` badge, collapse chevron, and an orphan marker. The number
+ * is the projected real row, so folding never renumbers (C5).
  */
 import {
   GridCellKind,
@@ -13,12 +14,35 @@ import { toast } from 'sonner';
 import type { RowId } from '@/core/model/types';
 import { useUiStore } from '@/state/uiStore';
 
+import type { StructuralRowKind } from '../editability';
+
 export const GUTTER_CELL_KIND = 'xlsform-gutter';
+
+/** Fixed left slot for the row number; decorations live to its right. */
+// shortcut: 26 px fits 4 digits, widen if a sheet exceeds 9999 data rows.
+const NUMBER_WIDTH = 26;
+const NUMBER_RIGHT = NUMBER_WIDTH - 4;
+const ORPHAN_X = NUMBER_WIDTH + 3;
+const INDENT_X = NUMBER_WIDTH + 8;
+const INDENT_STEP = 8;
+const NUMBER_FONT = '500 9px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
 export type GutterRowKind = 'group' | 'repeat' | 'end_group' | 'end_repeat' | null;
 
+/** Begin/end structural rows share one gutter badge: `[G]` or `[R]`. */
+export function structuralToGutterKind(kind: StructuralRowKind): GutterRowKind {
+  if (kind === 'begin_group') return 'group';
+  if (kind === 'begin_repeat') return 'repeat';
+  return kind;
+}
+
 export interface GutterCellData {
   kind: typeof GUTTER_CELL_KIND;
+  /**
+   * Real 1-based sheet row; stays put when rows above it are hidden (C5).
+   * Omitted in the drawer, where Glide's own marker column shows the number.
+   */
+  rowNumber?: number;
   depth: number;
   rowKind: GutterRowKind;
   orphan: boolean;
@@ -68,28 +92,40 @@ function drawChevron(
   ctx.fill();
 }
 
-function drawGutter(args: DrawArgs<GutterCell>): void {
+export function drawGutter(args: DrawArgs<GutterCell>): void {
   const { ctx, rect, theme, cell } = args;
-  const { depth, rowKind, orphan, collapsed, canCollapse, diagnosticSeverity } = cell.data;
-  if (depth <= 0 && rowKind === null && !orphan && !diagnosticSeverity) return;
+  const { depth, rowKind, orphan, collapsed, canCollapse, diagnosticSeverity, rowNumber } =
+    cell.data;
 
   ctx.save();
   ctx.lineWidth = 1;
+  const centerY = rect.y + rect.height / 2;
+
+  // Real sheet row number, in its own left slot. Drawn for every row so a
+  // collapsed group shows 10 then 20 instead of renumbering to 11 (C5).
+  if (rowNumber !== undefined) {
+    ctx.font = NUMBER_FONT;
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    // buildGridTheme keeps textMedium light (#cbd5e1) in dark, so one color works.
+    ctx.fillStyle = theme.textMedium;
+    ctx.fillText(String(rowNumber), rect.x + NUMBER_RIGHT, centerY);
+  }
 
   // Indent guides: one vertical line per open nesting level.
+  ctx.textAlign = 'left';
   ctx.strokeStyle = theme.borderColor;
   for (let level = 0; level < depth; level += 1) {
-    const x = rect.x + 7 + level * 10;
+    const x = rect.x + INDENT_X + level * INDENT_STEP;
     ctx.beginPath();
     ctx.moveTo(x + 0.5, rect.y + 2);
     ctx.lineTo(x + 0.5, rect.y + rect.height - 2);
     ctx.stroke();
   }
 
-  const badgeX = rect.x + 7 + depth * 10;
+  const badgeX = rect.x + INDENT_X + depth * INDENT_STEP;
   ctx.font = `600 9px ${theme.fontFamily}`;
   ctx.textBaseline = 'middle';
-  const centerY = rect.y + rect.height / 2;
   if (rowKind === 'group' || rowKind === 'end_group') {
     ctx.fillStyle = theme.textLight;
     ctx.fillText('[G]', badgeX, centerY);
@@ -112,7 +148,7 @@ function drawGutter(args: DrawArgs<GutterCell>): void {
   if (orphan) {
     ctx.fillStyle = '#dc2626';
     ctx.beginPath();
-    ctx.arc(rect.x + 4, centerY, 2.5, 0, Math.PI * 2);
+    ctx.arc(rect.x + ORPHAN_X, centerY, 2.5, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -132,7 +168,7 @@ export const gutterRenderer: CustomRenderer<GutterCell> = {
   onClick: ({ cell, posX, bounds, preventDefault }) => {
     const rowKind = cell.data.rowKind;
     if (rowKind !== 'group' && rowKind !== 'repeat') return undefined;
-    if (posX < bounds.width - 20) return undefined;
+    if (posX < bounds.width - 14) return undefined;
     preventDefault();
     if (!cell.data.canCollapse || !cell.data.rowId) {
       toast.info('This group is never closed', {

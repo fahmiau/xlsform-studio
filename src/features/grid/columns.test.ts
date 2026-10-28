@@ -26,6 +26,21 @@ describe('buildDisplayColumns (Task 2.2)', () => {
     expect(display.columns[0]?.id).toBe('__gutter__');
   });
 
+  it('defaults the gutter to 88 px and accepts a compact width', () => {
+    const wide = buildDisplayColumns(sheet(['type']), SURVEY_GRID_CONFIG);
+    const wideGutter = wide.columns[0];
+    expect(wideGutter && 'width' in wideGutter ? wideGutter.width : undefined).toBe(88);
+
+    // The drawer keeps Glide's 32 px row markers, so its own gutter stays 48 px.
+    const compact = buildDisplayColumns(
+      { sheetName: 'choices', columns: ['label', 'name'], rows: [] },
+      CHOICES_GRID_CONFIG,
+      { gutterWidth: 48 },
+    );
+    const compactGutter = compact.columns[0];
+    expect(compactGutter && 'width' in compactGutter ? compactGutter.width : undefined).toBe(48);
+  });
+
   it('uses the localized label when no plain label exists', () => {
     const display = buildDisplayColumns(
       sheet(['type', 'name', 'label::English (en)', 'hint']),

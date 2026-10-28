@@ -48,7 +48,7 @@ import { cellValue, editValueText, textCell } from './cells/cellContent';
 import { makeChoiceNameCell, choiceNameRenderer } from './cells/ChoiceNameCell';
 import { makeCollapsedPillCell, collapsedPillRenderer } from './cells/CollapsedPillCell';
 import { makeEnumCell, enumRenderer } from './cells/EnumCell';
-import { gutterRenderer } from './cells/GutterCell';
+import { gutterRenderer, makeGutterCell, structuralToGutterKind } from './cells/GutterCell';
 import { makeXPathCell, xpathRenderer } from './cells/XPathCell';
 import {
   buildDisplayColumns,
@@ -197,8 +197,9 @@ export function SheetGrid({
         // The drawer's explicit columnKeys are ordered by the caller.
         order: columnKeys ? undefined : storedOrder,
         ...(view ? { keys: view.columns, frozen: view.frozen } : {}),
+        ...(compact ? { gutterWidth: 48 } : {}),
       }),
-    [columnKeys, config, hidden, storedOrder, view, viewSheet, widths],
+    [columnKeys, compact, config, hidden, storedOrder, view, viewSheet, widths],
   );
   const untranslated = useMemo(() => {
     if (!view || languageView.mode !== 'split') return new Set<string>();
@@ -386,29 +387,26 @@ export function SheetGrid({
 
       const typeValue = row.cells[typeKey] ?? '';
       if (columnIndex === 0) {
-        const rowKind = structuralRowKind(typeValue);
+        const rowKind = structuralToGutterKind(structuralRowKind(typeValue));
         const group = groupByRowId.get(row.id);
         const counts = diagnosticIndex.byRow.get(row.id);
-        return {
-          kind: GridCellKind.Custom,
-          allowOverlay: false,
-          copyData: '',
-          data: {
-            kind: 'xlsform-gutter',
-            depth: sheetName === 'survey' ? (groupsForDepth.depthByRowIndex[real] ?? 0) : 0,
-            rowKind,
-            orphan: orphanRows.has(row.id),
-            collapsed: collapsedGroupIds.has(row.id),
-            canCollapse: Boolean(group && group.endRowIndex >= 0),
-            rowId: row.id,
-            ...(counts
-              ? {
-                  diagnosticSeverity:
-                    counts.errors > 0 ? 'error' : counts.warnings > 0 ? 'warning' : undefined,
-                }
-              : {}),
-          },
-        };
+        return makeGutterCell({
+          // The drawer's own 48 px gutter has no number slot: Glide's marker
+          // column already shows the row number there.
+          ...(compact ? {} : { rowNumber: real + 1 }),
+          depth: sheetName === 'survey' ? (groupsForDepth.depthByRowIndex[real] ?? 0) : 0,
+          rowKind,
+          orphan: orphanRows.has(row.id),
+          collapsed: collapsedGroupIds.has(row.id),
+          canCollapse: Boolean(group && group.endRowIndex >= 0),
+          rowId: row.id,
+          ...(counts
+            ? {
+                diagnosticSeverity:
+                  counts.errors > 0 ? 'error' : counts.warnings > 0 ? 'warning' : undefined,
+              }
+            : {}),
+        });
       }
 
       const key = display.keys[columnIndex - 1];
@@ -504,6 +502,7 @@ export function SheetGrid({
     [
       cellPreview,
       collapsedGroupIds,
+      compact,
       dark,
       diagnosticIndex,
       display.keys,
@@ -920,7 +919,7 @@ export function SheetGrid({
           onPaste={onPaste}
           onFillPattern={onFillPattern}
           onRowAppended={onRowAppended}
-          onRowMoved={onMoveRow}
+          onRowMoved={compact ? onMoveRow : undefined}
           onGridSelectionChange={handleSelectionChange}
           gridSelection={gridSelection}
           provideEditor={provideEditor}
@@ -957,7 +956,7 @@ export function SheetGrid({
                 }
           }
           freezeColumns={display.frozenCount}
-          rowMarkers="number"
+          rowMarkers={compact ? 'number' : 'none'}
           rowHeight={GRID_ROW_HEIGHT}
           headerHeight={GRID_HEADER_HEIGHT}
           theme={gridTheme}
