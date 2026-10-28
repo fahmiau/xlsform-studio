@@ -6,6 +6,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle2, KeyRound, Laptop, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { newProviderInstanceId, usePrefsStore } from '@/state/prefsStore';
 
 import { AiErrorBanner } from './AiErrorBanner';
@@ -184,33 +191,43 @@ export function SetupCards({ onConfigured }: { onConfigured?: (config: AiConfig)
           <div className="flex items-center gap-2 text-[11px]" data-testid="ai-detected-chip">
             <CheckCircle2 className="size-3.5 text-emerald-600" />
             <span className="font-medium">Looks like an {detected.preset.label} key</span>
-            <select
-              className="border-input bg-background ml-auto rounded border px-1 py-0.5 text-[11px]"
-              value={detected.preset.id}
-              data-testid="ai-detected-change"
-              onChange={(event) => setOverrideId(event.target.value)}
-            >
-              {PASTE_PRESETS.map((option) => (
-                <option key={option.id} value={option.id}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+            <Select value={detected.preset.id} onValueChange={setOverrideId}>
+              <SelectTrigger
+                size="sm"
+                className="ml-auto h-6 px-1.5 text-[11px]"
+                aria-label="Detected provider"
+                data-testid="ai-detected-change"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PASTE_PRESETS.map((option) => (
+                  <SelectItem key={option.id} value={option.id} className="text-xs">
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         ) : null}
         {overrideId ? (
-          <select
-            className="border-input bg-background w-full rounded border px-1 py-1 text-xs"
-            value={overrideId}
-            data-testid="ai-manual-provider"
-            onChange={(event) => setOverrideId(event.target.value)}
-          >
-            {PASTE_PRESETS.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.label}
-              </option>
-            ))}
-          </select>
+          <Select value={overrideId} onValueChange={setOverrideId}>
+            <SelectTrigger
+              size="sm"
+              className="h-7 w-full px-2 text-xs"
+              aria-label="Provider"
+              data-testid="ai-manual-provider"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PASTE_PRESETS.map((option) => (
+                <SelectItem key={option.id} value={option.id} className="text-xs">
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         ) : null}
         <div className="flex items-center gap-2">
           <button

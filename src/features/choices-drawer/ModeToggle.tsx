@@ -1,6 +1,13 @@
 /** Naming mode toggle: snake_case, numeric, or a custom prefix (Task 3.5). */
 import { useState } from 'react';
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { ListMode } from '@/core/slug/slugify';
 
 export function ModeToggle({
@@ -17,13 +24,9 @@ export function ModeToggle({
 
   return (
     <div className="flex items-center gap-1 text-xs" data-testid="mode-toggle">
-      <select
-        aria-label={`Choice naming mode for ${listName}`}
-        className="border-input bg-background rounded border px-1 py-0.5"
+      <Select
         value={mode.kind}
-        data-testid="mode-select"
-        onChange={(event) => {
-          const kind = event.target.value;
+        onValueChange={(kind) => {
           if (kind === 'snake') onChange({ kind: 'snake' });
           else if (kind === 'numeric') onChange({ kind: 'numeric' });
           else if (kind === 'camel') onChange({ kind: 'camel' });
@@ -31,12 +34,32 @@ export function ModeToggle({
           else onChange({ kind: 'prefix', prefix: prefixDraft || 'opt' });
         }}
       >
-        <option value="snake">Text codes</option>
-        <option value="numeric">Numbers</option>
-        <option value="prefix">Prefix</option>
-        <option value="camel">camelCase</option>
-        <option value="passthrough">Passthrough</option>
-      </select>
+        <SelectTrigger
+          size="sm"
+          className="h-7 px-2 text-xs"
+          aria-label={`Choice naming mode for ${listName}`}
+          data-testid="mode-select"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="snake" className="text-xs">
+            Text codes
+          </SelectItem>
+          <SelectItem value="numeric" className="text-xs">
+            Numbers
+          </SelectItem>
+          <SelectItem value="prefix" className="text-xs">
+            Prefix
+          </SelectItem>
+          <SelectItem value="camel" className="text-xs">
+            camelCase
+          </SelectItem>
+          <SelectItem value="passthrough" className="text-xs">
+            Passthrough
+          </SelectItem>
+        </SelectContent>
+      </Select>
       {mode.kind === 'prefix' ? (
         <input
           key={prefix}

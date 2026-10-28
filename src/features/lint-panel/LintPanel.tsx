@@ -2,6 +2,13 @@
 import { useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { DiagnosticIssue } from '@/core/lint';
 import { resolveColumn } from '@/core/model/columns';
 import type { ManagedSheetName } from '@/core/model/types';
@@ -80,31 +87,47 @@ export function LintPanel() {
   return (
     <section className="flex h-full min-h-0 flex-col" data-testid="lint-panel">
       <div className="flex flex-wrap items-center gap-1 border-b px-2 py-1 text-xs">
-        <select
-          value={severity}
-          onChange={(event) => setSeverity(event.target.value as typeof severity)}
-          className="bg-background rounded border px-1 py-0.5 text-[11px]"
-          aria-label="Filter by severity"
-          data-testid="lint-severity-filter"
-        >
-          <option value="all">All ({diagnostics.length})</option>
-          <option value="error">Errors ({index.counts.errors})</option>
-          <option value="warning">Warnings ({index.counts.warnings})</option>
-        </select>
-        <select
-          value={rule}
-          onChange={(event) => setRule(event.target.value)}
-          className="bg-background min-w-0 flex-1 rounded border px-1 py-0.5 text-[11px]"
-          aria-label="Filter by rule"
-          data-testid="lint-rule-filter"
-        >
-          <option value="all">All rules</option>
-          {rules.map((id) => (
-            <option key={id} value={id}>
-              {id}
-            </option>
-          ))}
-        </select>
+        <Select value={severity} onValueChange={(next) => setSeverity(next as typeof severity)}>
+          <SelectTrigger
+            size="sm"
+            className="h-7 px-2 text-[11px]"
+            aria-label="Filter by severity"
+            data-testid="lint-severity-filter"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" className="text-xs">
+              All ({diagnostics.length})
+            </SelectItem>
+            <SelectItem value="error" className="text-xs">
+              Errors ({index.counts.errors})
+            </SelectItem>
+            <SelectItem value="warning" className="text-xs">
+              Warnings ({index.counts.warnings})
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={rule} onValueChange={setRule}>
+          <SelectTrigger
+            size="sm"
+            className="h-7 min-w-0 flex-1 px-2 text-[11px]"
+            aria-label="Filter by rule"
+            data-testid="lint-rule-filter"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all" className="text-xs">
+              All rules
+            </SelectItem>
+            {rules.map((id) => (
+              <SelectItem key={id} value={id} className="text-xs">
+                {id}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto" data-testid="lint-list">

@@ -1,4 +1,11 @@
 /** AI Assistant drawer (Tasks 6.5/6.7): Chat | Build, provider quick-switch. */
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { usePrefsStore } from '@/state/prefsStore';
 import { useUiStore } from '@/state/uiStore';
 
@@ -38,19 +45,30 @@ export function AiDrawer() {
         </div>
 
         {providers.length > 0 ? (
-          <select
-            className="border-input bg-background ml-auto max-w-[45%] rounded border px-1 py-0.5 text-[10px]"
+          <Select
             value={activeInstanceId ?? ''}
-            aria-label="Active AI provider"
-            data-testid="ai-provider-switch"
-            onChange={(event) => setActiveAiProvider(event.target.value)}
+            onValueChange={(instanceId) => setActiveAiProvider(instanceId)}
           >
-            {providers.map((provider) => (
-              <option key={provider.instanceId} value={provider.instanceId}>
-                {provider.label}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger
+              size="sm"
+              className="ml-auto h-6 max-w-[45%] px-1.5 text-[10px]"
+              aria-label="Active AI provider"
+              data-testid="ai-provider-switch"
+            >
+              <SelectValue placeholder="Provider" />
+            </SelectTrigger>
+            <SelectContent>
+              {providers.map((provider) => (
+                <SelectItem
+                  key={provider.instanceId}
+                  value={provider.instanceId}
+                  className="text-xs"
+                >
+                  {provider.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         ) : null}
         <button
           type="button"

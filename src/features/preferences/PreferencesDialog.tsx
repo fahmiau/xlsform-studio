@@ -11,6 +11,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { buildListName } from '@/core/ops/choices';
 import type { SlugStyle } from '@/core/slug/slugify';
 import { AiSection } from '@/features/preferences/sections/AiSection';
@@ -26,7 +33,6 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 }
 
 const inputClass = 'border-input bg-background rounded border px-2 py-1 text-xs';
-const selectClass = 'border-input bg-background rounded border px-1 py-1 text-xs';
 
 export function PreferencesDialog({
   open,
@@ -58,16 +64,30 @@ export function PreferencesDialog({
           <section className="space-y-1.5">
             <h3 className="text-muted-foreground font-medium">General</h3>
             <Row label="Theme">
-              <select
-                className={selectClass}
+              <Select
                 value={prefs.theme}
-                data-testid="pref-theme"
-                onChange={(event) => update({ theme: event.target.value as typeof prefs.theme })}
+                onValueChange={(value) => update({ theme: value as typeof prefs.theme })}
               >
-                <option value="system">System</option>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-              </select>
+                <SelectTrigger
+                  size="sm"
+                  className="w-32 text-xs"
+                  aria-label="Theme"
+                  data-testid="pref-theme"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="system" className="text-xs">
+                    System
+                  </SelectItem>
+                  <SelectItem value="light" className="text-xs">
+                    Light
+                  </SelectItem>
+                  <SelectItem value="dark" className="text-xs">
+                    Dark
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </Row>
             <Row label="Autosave (every 30 s)">
               <input
@@ -93,16 +113,30 @@ export function PreferencesDialog({
               Preview: <code className="font-mono">{patternPreview}</code>
             </p>
             <Row label="New list naming">
-              <select
-                className={selectClass}
+              <Select
                 value={prefs.defaultSlugMode}
-                data-testid="pref-slug-mode"
-                onChange={(event) => update({ defaultSlugMode: event.target.value as SlugStyle })}
+                onValueChange={(value) => update({ defaultSlugMode: value as SlugStyle })}
               >
-                <option value="snake">snake_case</option>
-                <option value="camel">camelCase</option>
-                <option value="passthrough">Passthrough</option>
-              </select>
+                <SelectTrigger
+                  size="sm"
+                  className="w-32 text-xs"
+                  aria-label="New list naming"
+                  data-testid="pref-slug-mode"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="snake" className="text-xs">
+                    snake_case
+                  </SelectItem>
+                  <SelectItem value="camel" className="text-xs">
+                    camelCase
+                  </SelectItem>
+                  <SelectItem value="passthrough" className="text-xs">
+                    Passthrough
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </Row>
             <Row label="Max name length">
               <input

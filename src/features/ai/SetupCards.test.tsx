@@ -53,6 +53,7 @@ describe('SetupCards (Task 6.2b)', () => {
     const input = screen.getByTestId('ai-key-input') as HTMLInputElement;
     fireEvent.change(input, { target: { value: KEY } });
     expect(screen.getByTestId('ai-detected-chip')).toHaveTextContent('Anthropic');
+    expect(screen.getByTestId('ai-detected-change')).toHaveAttribute('role', 'combobox');
 
     await userEvent.click(screen.getByTestId('ai-key-save'));
 

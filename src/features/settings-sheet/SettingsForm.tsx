@@ -11,6 +11,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { resolveColumn, type ColumnBase } from '@/core/model/columns';
 import type { ColumnKey, WorkbookData } from '@/core/model/types';
 import { findColumnKey } from '@/core/indexes/columns';
@@ -79,6 +86,8 @@ interface LanguageOption {
   label: string;
 }
 
+const NONE_VALUE = '__none__';
+
 /** `default_language` choices come from the shared language discovery (5.3). */
 function languageOptions(data: WorkbookData): LanguageOption[] {
   return discoverLanguages(data)
@@ -131,18 +140,8 @@ function SettingField({
   };
 
   const fieldId = `setting-${definition.base === 'custom' ? definition.canonical : definition.base}`;
-
-  const common = {
-    id: fieldId,
-    'data-testid': fieldId,
-    className:
-      'border-input bg-background focus-visible:ring-ring w-full rounded-md border px-3 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none',
-    value: draft,
-    onBlur: () => commit(draft),
-    onKeyDown: (event: ReactKeyboardEvent<HTMLInputElement | HTMLSelectElement>) => {
-      if (event.key === 'Enter') commit(draft);
-    },
-  } as const;
+  const inputClass =
+    'border-input bg-background focus-visible:ring-ring w-full rounded-md border px-3 py-1.5 text-sm focus-visible:ring-2 focus-visible:outline-none';
 
   return (
     <div className="flex flex-col gap-1">
@@ -150,25 +149,42 @@ function SettingField({
         {definition.label}
       </label>
       {options ? (
-        <select
-          {...common}
-          onChange={(event) => {
-            setDraft(event.target.value);
-            commit(event.target.value);
+        <Select
+          value={draft || NONE_VALUE}
+          onValueChange={(next) => {
+            const nextValue = next === NONE_VALUE ? '' : next;
+            setDraft(nextValue);
+            commit(nextValue);
           }}
         >
-          <option value="">(none)</option>
-          {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-          {value && !options.some((option) => option.value === value) ? (
-            <option value={value}>{value}</option>
-          ) : null}
-        </select>
+          <SelectTrigger id={fieldId} data-testid={fieldId} className="w-full">
+            <SelectValue placeholder="(none)" />
+          </SelectTrigger>
+          <SelectContent className="max-h-72">
+            <SelectItem value={NONE_VALUE}>(none)</SelectItem>
+            {options.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+            {value && !options.some((option) => option.value === value) ? (
+              <SelectItem value={value}>{value}</SelectItem>
+            ) : null}
+          </SelectContent>
+        </Select>
       ) : (
-        <input {...common} type="text" onChange={(event) => setDraft(event.target.value)} />
+        <input
+          id={fieldId}
+          data-testid={fieldId}
+          className={inputClass}
+          type="text"
+          value={draft}
+          onBlur={() => commit(draft)}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event: ReactKeyboardEvent<HTMLInputElement>) => {
+            if (event.key === 'Enter') commit(draft);
+          }}
+        />
       )}
       <p className="text-muted-foreground text-xs">{definition.help}</p>
     </div>

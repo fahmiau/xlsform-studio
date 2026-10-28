@@ -13,8 +13,22 @@ if (!('ResizeObserver' in globalThis)) {
   });
 }
 
-if (typeof Element !== 'undefined' && !Element.prototype.scrollIntoView) {
-  Element.prototype.scrollIntoView = function scrollIntoView(): void {};
+if (typeof Element !== 'undefined') {
+  if (!Element.prototype.scrollIntoView) {
+    Element.prototype.scrollIntoView = function scrollIntoView(): void {};
+  }
+  // Radix Select uses pointer capture; jsdom has no layout/pointer implementation.
+  if (!Element.prototype.hasPointerCapture) {
+    Element.prototype.hasPointerCapture = function hasPointerCapture(): boolean {
+      return false;
+    };
+  }
+  if (!Element.prototype.setPointerCapture) {
+    Element.prototype.setPointerCapture = function setPointerCapture(): void {};
+  }
+  if (!Element.prototype.releasePointerCapture) {
+    Element.prototype.releasePointerCapture = function releasePointerCapture(): void {};
+  }
 }
 
 // CodeMirror measures text ranges; jsdom's Range has no layout methods.

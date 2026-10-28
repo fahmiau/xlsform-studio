@@ -100,8 +100,8 @@ describe('LintPanel (Task 4.10)', () => {
   it('renders diagnostics from the derived store', () => {
     loadDirtyForm();
     render(<LintPanel />);
-    expect(screen.getByTestId('lint-severity-filter')).toBeInTheDocument();
-    expect(screen.getByTestId('lint-rule-filter')).toBeInTheDocument();
+    expect(screen.getByTestId('lint-severity-filter')).toHaveAttribute('role', 'combobox');
+    expect(screen.getByTestId('lint-rule-filter')).toHaveAttribute('role', 'combobox');
     expect(useDerivedStore.getState().diagnostics.length).toBeGreaterThan(0);
   });
 });

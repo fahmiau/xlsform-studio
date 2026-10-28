@@ -6,6 +6,13 @@
 import { useMemo, useState } from 'react';
 import { Languages, Plus } from 'lucide-react';
 
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { findLanguage, type Language } from '@/core/languages/discover';
 import {
   splitPair,
@@ -121,35 +128,49 @@ export function LanguageSelector() {
             <div className="grid grid-cols-2 gap-1">
               <label className="space-y-0.5">
                 <span className="text-muted-foreground">Source</span>
-                <select
-                  className="border-input bg-background w-full rounded border px-1 py-0.5"
-                  aria-label="Source language"
-                  data-testid="language-source"
+                <Select
                   value={source?.id ?? ''}
-                  onChange={(event) => apply({ ...view, source: event.target.value || null })}
+                  onValueChange={(id) => apply({ ...view, source: id || null })}
                 >
-                  {languages.map((language) => (
-                    <option key={language.id} value={language.id}>
-                      {language.display}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger
+                    size="sm"
+                    className="w-full text-xs"
+                    aria-label="Source language"
+                    data-testid="language-source"
+                  >
+                    <SelectValue placeholder="Source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {languages.map((language) => (
+                      <SelectItem key={language.id} value={language.id} className="text-xs">
+                        {language.display}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </label>
               <label className="space-y-0.5">
                 <span className="text-muted-foreground">Target</span>
-                <select
-                  className="border-input bg-background w-full rounded border px-1 py-0.5"
-                  aria-label="Target language"
-                  data-testid="language-target"
+                <Select
                   value={target?.id ?? ''}
-                  onChange={(event) => apply({ ...view, target: event.target.value || null })}
+                  onValueChange={(id) => apply({ ...view, target: id || null })}
                 >
-                  {languages.map((language) => (
-                    <option key={language.id} value={language.id}>
-                      {language.display}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger
+                    size="sm"
+                    className="w-full text-xs"
+                    aria-label="Target language"
+                    data-testid="language-target"
+                  >
+                    <SelectValue placeholder="Target" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {languages.map((language) => (
+                      <SelectItem key={language.id} value={language.id} className="text-xs">
+                        {language.display}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </label>
             </div>
           ) : null}
