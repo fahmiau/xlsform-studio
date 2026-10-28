@@ -186,6 +186,58 @@ test('undo of an edit inside a collapsed group expands and reveals the row', asy
   await expect(formula).toHaveValue('respondent_name');
 });
 
+test('plain Delete clears a choice label in the drawer and keeps the row', async ({ page }) => {
+  await openFixture(page);
+  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await canvas.waitFor();
+  await canvas.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByTestId('choices-drawer')).toBeVisible();
+
+  const drawerCanvas = page.getByTestId('drawer-grid').locator('canvas').first();
+  await drawerCanvas.waitFor();
+  await drawerCanvas.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowUp');
+  const formula = page.getByTestId('formula-bar-input');
+  await expect(page.getByTestId('formula-bar-column')).toHaveText('[Column: label]');
+  await expect(formula).toHaveValue('Yes');
+
+  await page.keyboard.press('Delete');
+  await expect(formula).toHaveValue('');
+  await expect(page.getByTestId('choice-count')).toHaveText('2 choices');
+
+  await page.keyboard.press('Control+z');
+  await expect(formula).toHaveValue('Yes');
+});
+
+test('Shift+Delete deletes the selected choice row in the drawer', async ({ page }) => {
+  await openFixture(page);
+  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await canvas.waitFor();
+  await canvas.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Control+Enter');
+  await expect(page.getByTestId('choices-drawer')).toBeVisible();
+
+  const drawerCanvas = page.getByTestId('drawer-grid').locator('canvas').first();
+  await drawerCanvas.waitFor();
+  await drawerCanvas.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowUp');
+  await expect(page.getByTestId('formula-bar-column')).toHaveText('[Column: label]');
+
+  await page.keyboard.press('Shift+Delete');
+  await expect(page.getByTestId('choice-count')).toHaveText('1 choices');
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');
+
+  await page.keyboard.press('Control+z');
+  await expect(page.getByTestId('choice-count')).toHaveText('2 choices');
+});
+
 test('a name typed on the choices tab survives a later label edit', async ({ page }) => {
   await openFixture(page);
   await page.getByTestId('sheet-tab-choices').click();

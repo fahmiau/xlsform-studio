@@ -83,6 +83,25 @@ describe('FormulaBar XPath editor (Task 4.6)', () => {
     expect(screen.queryByTestId('formula-bar-editor')).not.toBeInTheDocument();
   });
 
+  it('uses the same fixed height for XPath and plain columns', () => {
+    render(<FormulaBar />);
+    const host = screen.getByTestId('formula-bar-editor');
+    expect(host).toHaveClass('h-8');
+    expect(host.querySelector('.cm-content')?.classList.contains('cm-lineWrapping')).toBe(false);
+
+    act(() => {
+      useUiStore.getState().setActiveCell({ sheet: 'survey', rowId: 's1', column: 'label' });
+    });
+    expect(screen.getByTestId('formula-bar-input')).toHaveClass('h-8');
+  });
+
+  it('uses the same fixed height in the disabled state', () => {
+    useUiStore.getState().setActiveCell(null);
+    render(<FormulaBar />);
+    expect(screen.getByTestId('formula-bar-input')).toHaveClass('h-8');
+    expect(screen.getByTestId('formula-bar-input')).toBeDisabled();
+  });
+
   it('auto-binds a list with the current name pattern (Task 5.7/3.3)', () => {
     usePrefsStore.getState().update({ listNamePattern: '{name}_list' });
     useUiStore.getState().setActiveCell({ sheet: 'survey', rowId: 's2', column: 'type' });

@@ -86,12 +86,7 @@ import {
   insertRowsAtSelection,
   selectionRowIndex,
 } from './useRowCommands';
-import {
-  deleteGroupRow,
-  deleteRowsWithGroupPrompt,
-  isBeginRow,
-  unwrapGroupRow,
-} from './useGroupCommands';
+import { deleteGroupRow, isBeginRow, unwrapGroupRow } from './useGroupCommands';
 
 const scrollMemory = new Map<string, { tx: number; ty: number }>();
 
@@ -714,10 +709,34 @@ export function SheetGrid({
     return 'bottom' as const;
   }, [locked, onAppendRow, sheetName]);
 
-  const onColumnResize = useCallback<NonNullable<DataEditorProps['onColumnResizeEnd']>>(
+  // Widths are session UI prefs: live during the drag (rAF-throttled) and
+  // persisted on release, never an undo entry.
+  const pendingWidth = useRef<{ key: ColumnKey; width: number } | null>(null);
+  const widthFrame = useRef<number | null>(null);
+  const flushWidth = useCallback(() => {
+    widthFrame.current = null;
+    const pending = pendingWidth.current;
+    pendingWidth.current = null;
+    if (pending) useUiStore.getState().setColumnWidth(sheetName, pending.key, pending.width);
+  }, [sheetName]);
+
+  const onColumnResize = useCallback<NonNullable<DataEditorProps['onColumnResize']>>(
     (_column, newSize, columnIndex) => {
       const key = display.keys[columnIndex - 1];
       if (!key) return;
+      pendingWidth.current = { key, width: newSize };
+      if (widthFrame.current === null) widthFrame.current = requestAnimationFrame(flushWidth);
+    },
+    [display.keys, flushWidth],
+  );
+
+  const onColumnResizeEnd = useCallback<NonNullable<DataEditorProps['onColumnResizeEnd']>>(
+    (_column, newSize, columnIndex) => {
+      const key = display.keys[columnIndex - 1];
+      if (!key) return;
+      if (widthFrame.current !== null) cancelAnimationFrame(widthFrame.current);
+      widthFrame.current = null;
+      pendingWidth.current = null;
       useUiStore.getState().setColumnWidth(sheetName, key, newSize);
     },
     [display.keys, sheetName],
@@ -878,18 +897,7 @@ export function SheetGrid({
           onCellsEdited={onCellsEdited}
           onItemHovered={handleDiagnosticHover}
           drawCell={drawDiagnosticMarker}
-          onDelete={() => {
-            if (locked) return true;
-            const rowIds = useUiStore.getState().selectedRowIds;
-            if (rowIds.length === 0) return true;
-            if (onDeleteRows) {
-              onDeleteRows();
-              return false;
-            }
-            deleteRowsWithGroupPrompt(rowIds);
-            // The row delete already happened; suppress Glide's cell clear.
-            return false;
-          }}
+          onDelete={() => !locked}
           onPaste={onPaste}
           onFillPattern={onFillPattern}
           onRowAppended={onRowAppended}
@@ -900,7 +908,8 @@ export function SheetGrid({
           onVisibleRegionChanged={(_range, tx, ty) => {
             scrollMemory.set(compact ? `${sheetName}:drawer` : sheetName, { tx, ty });
           }}
-          onColumnResizeEnd={onColumnResize}
+          onColumnResize={onColumnResize}
+          onColumnResizeEnd={onColumnResizeEnd}
           onHeaderContextMenu={(columnIndex, event) => {
             if (compact) return;
             const key = display.keys[columnIndex - 1];
@@ -920,7 +929,9 @@ export function SheetGrid({
               ? undefined
               : {
                   tint: true,
-                  hint: 'New row',
+                  // Zero-width space, not '': Glide only always-draws the plus
+                  // glyph when the hint is non-empty (new-row-cell.js).
+                  hint: '\u200B',
                   sticky: false,
                   targetColumn: Math.min(1, display.keys.length),
                 }

@@ -14,8 +14,7 @@ function currentSheet(): SheetTab {
   return useUiStore.getState().activeSheet;
 }
 
-export function selectedRowIds(): RowId[] {
-  const sheet = currentSheet();
+export function selectedRowIds(sheet: SheetTab = currentSheet()): RowId[] {
   const data = useWorkbookStore.getState().data;
   const ui = useUiStore.getState();
   const ids = ui.selectedRowIds.filter((id) => data[sheet].rows.some((row) => row.id === id));
@@ -97,10 +96,9 @@ export function duplicateSelectedRows(): RowId[] {
   return created;
 }
 
-export function deleteSelectedRows(): RowId[] {
-  const sheet = currentSheet();
+export function deleteSelectedRows(sheet: SheetTab = currentSheet()): RowId[] {
   if (sheet === 'settings') return [];
-  const selected = selectedRowIds();
+  const selected = selectedRowIds(sheet);
   if (selected.length === 0) return [];
   const index = selectionIndex(sheet, selected);
   const meta: { sheet: ManagedSheetName; rowIds: RowId[] } = { sheet, rowIds: [] };
@@ -117,12 +115,11 @@ export function deleteSelectedRows(): RowId[] {
   );
 
   const nextRows = useWorkbookStore.getState().data[sheet].rows;
-  if (nextRows.length > 0) {
-    const target = nextRows[Math.min(index, nextRows.length - 1)];
-    if (target) focusRows(sheet, [target.id]);
-  } else {
-    useUiStore.getState().setSelectedRowIds([]);
-  }
+  const target = nextRows[Math.min(index, nextRows.length - 1)];
+  // A drawer delete on `choices` must not pull the survey tab along, so only
+  // re-focus the survivors when that sheet is the one on screen.
+  if (target && sheet === currentSheet()) focusRows(sheet, [target.id]);
+  else useUiStore.getState().setSelectedRowIds([]);
   return selected;
 }
 

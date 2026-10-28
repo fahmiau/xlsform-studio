@@ -67,4 +67,6 @@ export const xpathRenderer: CustomRenderer<XPathCell> = {
   // Editing is handled by the CodeMirror overlay; paste goes through the grid's
   // batch pipeline and never calls this.
   onPaste: () => undefined,
+  // Plain Delete must clear the cell, so hand Glide an empty copy of the cell.
+  onDelete: (cell) => ({ ...cell, copyData: '', data: { ...cell.data, value: '' } }),
 };

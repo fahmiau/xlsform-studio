@@ -55,7 +55,6 @@ export function baseExtensions(options: BaseExtensionsOptions): Extension {
   const extensions: Extension[] = [
     history(),
     drawSelection(),
-    EditorView.lineWrapping,
     bracketMatching(),
     closeBrackets(),
     bracketLanguageData,

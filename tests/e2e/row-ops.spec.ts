@@ -83,6 +83,61 @@ test('edit a grid cell with the keyboard and undo it', async ({ page }) => {
   await expect(formula).toHaveValue('integer');
 });
 
+test('in-cell XPath editor keeps "$" visible and commits it (StrictMode)', async ({ page }) => {
+  // Wide viewport so the `relevant` column is on screen without horizontal
+  // scrolling; the grid is canvas, so find the column through the formula bar.
+  await page.setViewportSize({ width: 1920, height: 900 });
+  await mockTauri(page);
+  await openFixture(page);
+
+  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await canvas.waitFor();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('grid canvas has no layout box');
+
+  const column = page.getByTestId('formula-bar-column');
+  const rowY = box.y + GRID_HEADER_HEIGHT + GRID_ROW_HEIGHT / 2;
+  let found = false;
+  for (let x = 60; x <= box.width - 20; x += 40) {
+    // A second click on a cell opens its editor; the in-cell formula editor is
+    // wide enough to cover `relevant`, so close it before probing the next x.
+    await page.keyboard.press('Escape');
+    await page.mouse.click(box.x + x, rowY);
+    if ((await column.textContent()) === '[Column: relevant]') {
+      found = true;
+      break;
+    }
+  }
+  expect(found).toBe(true);
+
+  // Typing "$" opens Glide's overlay with initialValue "$". StrictMode used to
+  // tear the CodeMirror mount down once, blur, commit, and close the editor.
+  await page.keyboard.press('$');
+  const editor = page.getByTestId('cell-formula-editor');
+  await expect(editor).toBeVisible();
+  await expect(editor.locator('.cm-content')).toHaveText('$');
+
+  await page.keyboard.press('Enter');
+  await expect(editor).toHaveCount(0);
+  await expect(page.getByTestId('formula-bar-editor').locator('.cm-content')).toHaveText('$');
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');
+
+  await page.keyboard.press('Control+z');
+  await expect(page.getByTestId('formula-bar-editor').locator('.cm-content')).toHaveText('');
+
+  // Clicking outside must commit the document Glide's overlay is tracking,
+  // which is why the editor seeds `tempValue` on mount.
+  await page.keyboard.press('$');
+  await expect(editor.locator('.cm-content')).toHaveText('$');
+  await column.click();
+  await expect(editor).toHaveCount(0);
+  await expect(page.getByTestId('formula-bar-editor').locator('.cm-content')).toHaveText('$');
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');
+
+  await page.keyboard.press('Control+z');
+  await expect(page.getByTestId('formula-bar-editor').locator('.cm-content')).toHaveText('');
+});
+
 test('insert rows with the keyboard and undo/redo them', async ({ page }) => {
   await mockTauri(page);
   await openFixture(page);
@@ -131,6 +186,63 @@ test('append a row from the trailing ghost row and undo it', async ({ page }) =>
   await page.getByTestId('undo-button').click();
   await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (4)');
   await page.getByTestId('undo-button').click();
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');
+});
+
+test('plain Delete clears the selected cell, keeps the row, and undoes', async ({ page }) => {
+  await mockTauri(page);
+  await openFixture(page);
+
+  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await canvas.waitFor();
+  await canvas.focus();
+  await page.keyboard.press('ArrowDown');
+  // type → name → label → hint, so the hint text of the second row is active.
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  const formula = page.getByTestId('formula-bar-input');
+  await expect(formula).toHaveValue('In years');
+
+  await page.keyboard.press('Delete');
+  await expect(formula).toHaveValue('');
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');
+  await expect(page.getByTestId('save-state')).toHaveText('Unsaved');
+
+  await page.keyboard.press('Control+z');
+  await expect(formula).toHaveValue('In years');
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');
+});
+
+test('Shift+Delete deletes the selected row and undoes', async ({ page }) => {
+  await mockTauri(page);
+  await openFixture(page);
+
+  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await canvas.waitFor();
+  await canvas.focus();
+  await page.keyboard.press('ArrowDown');
+
+  await page.keyboard.press('Shift+Delete');
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (2)');
+
+  await page.keyboard.press('Control+z');
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');
+});
+
+test('Ctrl+Delete deletes the selected row and undoes', async ({ page }) => {
+  await mockTauri(page);
+  await openFixture(page);
+
+  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await canvas.waitFor();
+  await canvas.focus();
+  await page.keyboard.press('ArrowDown');
+
+  await page.keyboard.press('Control+Delete');
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (2)');
+
+  await page.keyboard.press('Control+z');
   await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');
 });
 

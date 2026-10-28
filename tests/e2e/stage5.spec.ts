@@ -173,5 +173,8 @@ test('Ctrl+K jumps to a variable and runs a command by name', async ({ page }) =
   await expect(palette.getByRole('option', { name: /Keyboard shortcuts/ })).toBeVisible();
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('shortcuts-sheet')).toBeVisible();
-  await expect(page.getByTestId('shortcut-row')).toHaveCount(15);
+  await expect(page.getByTestId('shortcut-row')).toHaveCount(17);
+  await expect(
+    page.getByTestId('shortcuts-sheet').getByText('Delete selected rows', { exact: true }),
+  ).toHaveCount(2);
 });

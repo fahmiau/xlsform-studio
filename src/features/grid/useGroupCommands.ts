@@ -125,6 +125,22 @@ export function isBeginRow(rowId: string | undefined): boolean {
   return base === 'begin_group' || base === 'begin_repeat';
 }
 
+/**
+ * Shift/Ctrl+Delete row delete. The choices drawer and the right-panel Choices
+ * tab share the survey tab, so the owning grid is the active cell's sheet, not
+ * `activeSheet` (and not `choiceDrawer.open`, which only the drawer sets).
+ */
+function deleteRowsForActiveGrid(): void {
+  const ui = useUiStore.getState();
+  const target = ui.activeCell?.sheet ?? ui.activeSheet;
+  if (target === 'settings') return;
+  if (target === 'choices') {
+    deleteSelectedRows('choices');
+    return;
+  }
+  deleteRowsWithGroupPrompt(selectedRowIds());
+}
+
 /** Wrap commands, shared by shortcuts and the palette (Task 3.8). */
 export function groupCommands(): AppCommand[] {
   return [
@@ -141,6 +157,19 @@ export function groupCommands(): AppCommand[] {
       shortcut: { code: 'KeyG', ctrlOrMeta: true, shift: true },
       when: () => useUiStore.getState().activeSheet === 'survey',
       run: () => wrapSelectedRows('repeat'),
+    },
+    // Plain Delete clears cells (Glide default); row delete keeps its own keys.
+    {
+      id: 'grid.row.delete',
+      title: 'Delete selected rows',
+      shortcut: { code: 'Delete', shift: true },
+      run: deleteRowsForActiveGrid,
+    },
+    {
+      id: 'grid.row.deleteCtrl',
+      title: 'Delete selected rows',
+      shortcut: { code: 'Delete', ctrlOrMeta: true },
+      run: deleteRowsForActiveGrid,
     },
   ];
 }

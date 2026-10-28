@@ -25,6 +25,15 @@ import { SheetTabs } from './SheetTabs';
 import { StatusBar } from './StatusBar';
 import { TopBar } from './TopBar';
 
+/**
+ * Panel separators keep the 4 px track and draw the red → green → blue rail
+ * inline, so the gradient cannot be purged or re-mapped by the theme.
+ */
+const SEPARATOR_CLASS = 'w-1 cursor-col-resize transition-[filter] hover:brightness-125';
+const SEPARATOR_STYLE = {
+  backgroundImage: 'linear-gradient(to bottom, #ef4444 0%, #22c55e 50%, #3b82f6 100%)',
+};
+
 function LeftPanel() {
   const tab = useUiStore((state) => state.leftTab);
   const setLeftTab = useUiStore((state) => state.setLeftTab);
@@ -160,7 +169,11 @@ export function AppShell() {
                 <Panel id="left" defaultSize={`${leftSize}%`} minSize="10%">
                   <LeftPanel />
                 </Panel>
-                <Separator className="bg-border data-[separator]:hover:bg-accent w-1" />
+                <Separator
+                  className={SEPARATOR_CLASS}
+                  style={SEPARATOR_STYLE}
+                  data-testid="panel-separator-left"
+                />
               </>
             ) : null}
             <Panel id="center" defaultSize={`${defaultLayout.center}%`} minSize="30%">
@@ -168,7 +181,11 @@ export function AppShell() {
             </Panel>
             {rightPanel ? (
               <>
-                <Separator className="bg-border data-[separator]:hover:bg-accent w-1" />
+                <Separator
+                  className={SEPARATOR_CLASS}
+                  style={SEPARATOR_STYLE}
+                  data-testid="panel-separator-right"
+                />
                 <Panel id="right" defaultSize={`${rightSize}%`} minSize="10%">
                   <RightPanel />
                 </Panel>

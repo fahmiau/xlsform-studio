@@ -84,4 +84,6 @@ export const enumRenderer: CustomRenderer<EnumCell> = {
     return cell;
   },
   onPaste: (value, data) => ({ ...data, value }),
+  // Plain Delete clears the enum text; Glide needs the empty cell back.
+  onDelete: (cell) => ({ ...cell, copyData: '', data: { ...cell.data, value: '' } }),
 };

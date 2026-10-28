@@ -78,4 +78,6 @@ export const choiceNameRenderer: CustomRenderer<ChoiceNameCell> = {
     return cell;
   },
   onPaste: (value, data) => ({ ...data, value }),
+  // Plain Delete clears the choice code; the row keeps its lock flag.
+  onDelete: (cell) => ({ ...cell, copyData: '', data: { ...cell.data, value: '' } }),
 };

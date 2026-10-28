@@ -33,9 +33,16 @@ export interface CodeMirrorEditorProps {
   autoFocus?: boolean;
   ariaLabel?: string;
   className?: string;
+  /** Wrap long lines (default true). The formula bar turns this off to stay one line tall. */
+  lineWrapping?: boolean;
   /** Commit on Tab with the movement [1, 0] (in-cell grid editor). */
   commitOnTab?: boolean;
   onTabCommit?: (value: string) => void;
+  /**
+   * Commit when focus leaves the host (default true). The in-cell editor turns
+   * this off because Glide's overlay owns outside-click finishing.
+   */
+  commitOnBlur?: boolean;
   testId?: string;
   /** Typing triggers completions (Preferences → Editor). */
   autocomplete?: boolean;
@@ -55,8 +62,10 @@ export function CodeMirrorEditor({
   autoFocus = false,
   ariaLabel,
   className,
+  lineWrapping = true,
   commitOnTab = false,
   onTabCommit,
+  commitOnBlur = true,
   testId,
   autocomplete = true,
   fontSize = 12,
@@ -126,6 +135,7 @@ export function CodeMirrorEditor({
         fontSize,
       }),
     ];
+    if (lineWrapping) extensions.push(EditorView.lineWrapping);
     if (xpath) {
       extensions.push(
         autocompletion({
@@ -167,7 +177,7 @@ export function CodeMirrorEditor({
     // `value` is intentionally not a dependency: external updates are synced
     // by the effect below so remounting does not steal focus.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ariaLabel, autoFocus, autocomplete, commitOnTab, dark, fontSize, xpath]);
+  }, [ariaLabel, autoFocus, autocomplete, commitOnTab, dark, fontSize, lineWrapping, xpath]);
 
   useEffect(() => {
     const view = viewRef.current;
@@ -211,6 +221,7 @@ export function CodeMirrorEditor({
         }
       }}
       onBlur={(event) => {
+        if (!commitOnBlur) return;
         if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
         callbacks.current.onCommit?.(viewRef.current?.state.doc.toString() ?? value);
       }}

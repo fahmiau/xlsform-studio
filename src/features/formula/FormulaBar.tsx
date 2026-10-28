@@ -140,7 +140,8 @@ function XPathFormulaInput({
       autocomplete={autocomplete}
       fontSize={fontSize}
       ariaLabel="Formula bar"
-      className="border-input bg-background min-h-7 min-w-0 flex-1 overflow-hidden rounded border"
+      className="border-input bg-background h-8 min-w-0 flex-1 overflow-hidden rounded border"
+      lineWrapping={false}
       testId="formula-bar-editor"
       onChange={onChange}
       onCommit={onCommit}
@@ -178,7 +179,7 @@ function PlainFormulaInput({
 
   return (
     <input
-      className="border-input bg-background focus-visible:ring-ring min-w-0 flex-1 rounded border px-2 py-0.5 font-mono text-xs focus-visible:ring-1 focus-visible:outline-none disabled:opacity-50"
+      className="border-input bg-background focus-visible:ring-ring h-8 min-w-0 flex-1 rounded border px-2 font-mono text-xs focus-visible:ring-1 focus-visible:outline-none disabled:opacity-50"
       style={{ fontSize }}
       data-testid="formula-bar-input"
       value={enabled ? draft : ''}

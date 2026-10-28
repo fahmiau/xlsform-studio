@@ -1,4 +1,5 @@
 /** In-cell CodeMirror formula editor (Task 4.6). */
+import { useEffect, useRef } from 'react';
 import type { ProvideEditorComponent } from '@glideapps/glide-data-grid';
 
 import { diagnosticCellKey } from '@/core/lint/diagnostics';
@@ -13,31 +14,50 @@ import { makeXPathCell, type XPathCell } from '../cells/XPathCell';
 
 type EditorProps = Parameters<ProvideEditorComponent<XPathCell>>[0];
 
-export function CellFormulaEditor({ value, onFinishedEditing }: EditorProps) {
+export function CellFormulaEditor({
+  value,
+  initialValue,
+  onChange,
+  onFinishedEditing,
+}: EditorProps) {
   const theme = usePrefsStore((state) => state.theme);
   const autocomplete = usePrefsStore((state) => state.autocompleteOnDollar);
   const fontSize = usePrefsStore((state) => state.formulaFontSize);
   const dark = useIsDark(theme);
   const cell = { sheet: 'survey' as const, rowId: value.data.rowId, column: value.data.column };
+  const startDoc = initialValue ?? value.data.value;
+  const seeded = useRef(false);
 
+  // Glide commits its own overlay `tempValue` on outside click; a typed "$"
+  // arrives as `initialValue` without touching the cell, so seed the overlay
+  // once or clicking outside would commit the old value. The ref stops
+  // StrictMode's double effect from looping on value changes.
+  useEffect(() => {
+    if (seeded.current) return;
+    seeded.current = true;
+    onChange(makeXPathCell({ ...value.data, value: startDoc }));
+  }, [onChange, startDoc, value.data]);
+
+  const update = (next: string) => makeXPathCell({ ...value.data, value: next });
   const finish = (next: string, movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) => {
-    const updated = makeXPathCell({ ...value.data, value: next });
-    onFinishedEditing(updated, movement);
+    onFinishedEditing(update(next), movement);
   };
 
   return (
     <div className="bg-background min-h-[72px] w-[min(560px,80vw)] overflow-hidden">
       <CodeMirrorEditor
-        value={value.data.value}
+        value={startDoc}
         xpath
         dark={dark}
         autocomplete={autocomplete}
         fontSize={fontSize}
         autoFocus
         commitOnTab
+        commitOnBlur={false}
         ariaLabel="Formula cell editor"
         className="max-h-[220px] min-h-[72px] overflow-auto"
         testId="cell-formula-editor"
+        onChange={(next) => onChange(update(next))}
         onCommit={(next) => finish(next)}
         onCancel={() => onFinishedEditing(undefined)}
         onTabCommit={(next) => finish(next, [1, 0])}

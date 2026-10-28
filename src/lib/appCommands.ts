@@ -165,6 +165,8 @@ export const PRD_SHORTCUTS: ReadonlyArray<{
   { id: 'grid.group.expand', keys: 'Ctrl+]', label: 'Expand active block' },
   { id: 'grid.row.insertBelow', keys: 'Ctrl+I', label: 'Insert row below' },
   { id: 'grid.row.insertAbove', keys: 'Ctrl+Shift+I', label: 'Insert row above' },
+  { id: 'grid.row.delete', keys: 'Shift+Delete', label: 'Delete selected rows' },
+  { id: 'grid.row.deleteCtrl', keys: 'Ctrl+Delete', label: 'Delete selected rows' },
   { id: 'ai.toggle', keys: 'Ctrl+J', label: 'Toggle AI assistant' },
   { id: 'palette.open', keys: 'Ctrl+K', label: 'Open command palette' },
 ];
