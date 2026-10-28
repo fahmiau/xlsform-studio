@@ -182,6 +182,8 @@ plans/             stage-1…stage-6 plans; checkboxes are the progress tracker
 
 Full detail, including exports and call paths: [docs/agents/codebase-map.md](./docs/agents/codebase-map.md).
 
+Use codegraph to find context if needed
+
 ---
 
 ## 6. Where to change what
