@@ -10,12 +10,18 @@ import { useUiStore } from '@/state/uiStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 
 import { flattenOutline, type OutlineItem } from './flattenTree';
+import { ChoicesOutline } from './ChoicesOutline';
 import { OutlineNode } from './OutlineNode';
 import { useOutlineDnd } from './useOutlineDnd';
 
 const ROW_HEIGHT = 24;
 
 export function OutlinePanel() {
+  const activeSheet = useUiStore((state) => state.activeSheet);
+  return activeSheet === 'choices' ? <ChoicesOutline /> : <SurveyOutline />;
+}
+
+function SurveyOutline() {
   const data = useWorkbookStore((state) => state.data);
   const indexes = useDerivedStore((state) => state.indexes);
   const collapsed = useUiStore((state) => state.collapsedGroupIds);
