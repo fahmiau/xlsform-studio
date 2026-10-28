@@ -50,7 +50,12 @@ import { makeCollapsedPillCell, collapsedPillRenderer } from './cells/CollapsedP
 import { makeEnumCell, enumRenderer } from './cells/EnumCell';
 import { gutterRenderer } from './cells/GutterCell';
 import { makeXPathCell, xpathRenderer } from './cells/XPathCell';
-import { buildDisplayColumns, columnKeyAt, type SheetGridConfig } from './columns';
+import {
+  buildDisplayColumns,
+  columnKeyAt,
+  moveDisplayColumn,
+  type SheetGridConfig,
+} from './columns';
 import { pasteMatrix } from './clipboard';
 import { isCellEditable, structuralRowKind, type StructuralRowKind } from './editability';
 import { useEditorRouting } from './editors/useEditorRouting';
@@ -144,6 +149,7 @@ export function SheetGrid({
   const diagnosticIndex = useDerivedStore((state) => state.diagnosticIndex);
   const cellPreview = useUiStore((state) => state.cellPreview);
   const widths = useUiStore((state) => state.columnWidths[sheetName]);
+  const storedOrder = useUiStore((state) => state.columnOrder[sheetName]);
   const hidden = useUiStore((state) => state.hiddenColumns[sheetName]);
   const collapsedGroupIds = useUiStore((state) => state.collapsedGroupIds);
   const flashRowId = useUiStore((state) => state.flashRowId);
@@ -188,9 +194,11 @@ export function SheetGrid({
       buildDisplayColumns(viewSheet, config, {
         widths,
         hidden,
+        // The drawer's explicit columnKeys are ordered by the caller.
+        order: columnKeys ? undefined : storedOrder,
         ...(view ? { keys: view.columns, frozen: view.frozen } : {}),
       }),
-    [config, hidden, view, viewSheet, widths],
+    [columnKeys, config, hidden, storedOrder, view, viewSheet, widths],
   );
   const untranslated = useMemo(() => {
     if (!view || languageView.mode !== 'split') return new Set<string>();
@@ -742,6 +750,17 @@ export function SheetGrid({
     [display.keys, sheetName],
   );
 
+  // Session-only display order (Category C4); the frozen block and the
+  // scrollable block never trade columns, and the gutter is never a target.
+  const onColumnMoved = useCallback<NonNullable<DataEditorProps['onColumnMoved']>>(
+    (startIndex, endIndex) => {
+      const next = moveDisplayColumn(display, startIndex, endIndex);
+      if (!next) return;
+      useUiStore.getState().setColumnOrder(sheetName, next);
+    },
+    [display, sheetName],
+  );
+
   const handleSelectionChange = useCallback(
     (selection: GridSelection) => {
       setGridSelection(selection);
@@ -910,6 +929,7 @@ export function SheetGrid({
           }}
           onColumnResize={onColumnResize}
           onColumnResizeEnd={onColumnResizeEnd}
+          onColumnMoved={columnKeys ? undefined : onColumnMoved}
           onHeaderContextMenu={(columnIndex, event) => {
             if (compact) return;
             const key = display.keys[columnIndex - 1];

@@ -82,4 +82,18 @@ describe('uiStore', () => {
     ui.setPreferencesOpen(false);
     ui.setAddLanguageOpen(false);
   });
+
+  it('stores a session column order per sheet outside the document', () => {
+    const dataBefore = useWorkbookStore.getState().data;
+    useUiStore.getState().setColumnOrder('survey', ['name', 'type', 'label', 'relevant']);
+    useUiStore.getState().setColumnOrder('choices', ['list_name', 'name', 'label']);
+
+    expect(useUiStore.getState().columnOrder).toMatchObject({
+      survey: ['name', 'type', 'label', 'relevant'],
+      choices: ['list_name', 'name', 'label'],
+    });
+    expect(useWorkbookStore.getState().data).toBe(dataBefore);
+    expect(selectIsDirty(useWorkbookStore.getState())).toBe(false);
+    expect(useWorkbookStore.temporal.getState().pastStates).toHaveLength(0);
+  });
 });

@@ -76,6 +76,8 @@ export interface UiState {
   addLanguageOpen: boolean;
   /** Session-only per-sheet column widths (Task 2.2). */
   columnWidths: Partial<Record<SheetTab, Record<ColumnKey, number>>>;
+  /** Session-only display order per sheet (Category C4); file order is untouched. */
+  columnOrder: Partial<Record<SheetTab, ColumnKey[]>>;
   /** View-only hidden columns (Task 2.6). */
   hiddenColumns: Partial<Record<SheetTab, Set<ColumnKey>>>;
   reveal: RevealRequest | null;
@@ -105,6 +107,7 @@ export interface UiState {
   setPreferencesOpen: (open: boolean) => void;
   setAddLanguageOpen: (open: boolean) => void;
   setColumnWidth: (sheet: SheetTab, column: ColumnKey, width: number) => void;
+  setColumnOrder: (sheet: SheetTab, keys: readonly ColumnKey[]) => void;
   toggleColumnHidden: (sheet: SheetTab, column: ColumnKey) => void;
   showAllColumns: (sheet: SheetTab) => void;
   requestReveal: (sheet: SheetTab, rowId: RowId) => void;
@@ -136,6 +139,7 @@ export const useUiStore = create<UiState>()((set) => ({
   preferencesOpen: false,
   addLanguageOpen: false,
   columnWidths: {},
+  columnOrder: {},
   hiddenColumns: {},
   reveal: null,
   cellPreview: null,
@@ -213,6 +217,8 @@ export const useUiStore = create<UiState>()((set) => ({
         [sheet]: { ...state.columnWidths[sheet], [column]: width },
       },
     })),
+  setColumnOrder: (sheet, keys) =>
+    set((state) => ({ columnOrder: { ...state.columnOrder, [sheet]: [...keys] } })),
   toggleColumnHidden: (sheet, column) =>
     set((state) => {
       const hidden = new Set(state.hiddenColumns[sheet] ?? []);

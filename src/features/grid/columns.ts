@@ -3,7 +3,8 @@
  *
  * Glide requires frozen columns to be leftmost, so the display order pulls the
  * configured frozen set to the front. File order is untouched and still governs
- * export (master plan AD-6).
+ * export (master plan AD-6). A session-only `order` (Category C4) reorders the
+ * display keys only; hidden/new columns fall back to file order.
  */
 import type { GridColumn } from '@glideapps/glide-data-grid';
 
@@ -62,6 +63,11 @@ export interface BuildDisplayColumnsOptions {
   /** View-only hidden headers. */
   hidden?: ReadonlySet<ColumnKey>;
   /**
+   * Session display order (Category C4). Keys missing from it keep file order
+   * after the listed ones (hidden columns that are shown again, new columns).
+   */
+  order?: readonly ColumnKey[];
+  /**
    * Display keys when a language view restricts the sheet (Task 5.4). File
    * order is ignored; the provided order wins.
    */
@@ -83,6 +89,20 @@ function columnWidth(
   return FALLBACK_WIDTH;
 }
 
+/** Apply the session order, then append keys it does not mention in file order. */
+function applyOrder(
+  columns: readonly ColumnKey[],
+  order: readonly ColumnKey[] | undefined,
+): ColumnKey[] {
+  if (!order || order.length === 0) return [...columns];
+  const present = new Set(columns);
+  const listed = new Set<ColumnKey>();
+  for (const key of order) {
+    if (present.has(key)) listed.add(key);
+  }
+  return [...listed, ...columns.filter((key) => !listed.has(key))];
+}
+
 export function buildDisplayColumns(
   sheet: SheetData,
   config: SheetGridConfig,
@@ -90,7 +110,9 @@ export function buildDisplayColumns(
 ): DisplayColumns {
   const widths = options.widths ?? {};
   const hidden = options.hidden ?? new Set<ColumnKey>();
-  const available = (options.keys ?? sheet.columns).filter((key) => !hidden.has(key));
+  const available = applyOrder(options.keys ?? sheet.columns, options.order).filter(
+    (key) => !hidden.has(key),
+  );
 
   const frozen: ColumnKey[] = [];
   if (options.frozen) {
@@ -104,6 +126,14 @@ export function buildDisplayColumns(
       );
       if (key !== undefined) frozen.push(key);
     }
+  }
+
+  // A session order may move columns inside the frozen block (e.g. name before
+  // type) but never past it; keys the order omits keep the config order.
+  if (options.order) {
+    const position = new Map(options.order.map((key, index) => [key, index]));
+    const at = (key: ColumnKey) => position.get(key) ?? Number.MAX_SAFE_INTEGER;
+    frozen.sort((a, b) => at(a) - at(b));
   }
 
   const keys = [...frozen, ...available.filter((key) => !frozen.includes(key))];
@@ -131,4 +161,32 @@ export function buildDisplayColumns(
 export function columnKeyAt(display: DisplayColumns, columnIndex: number): ColumnKey | undefined {
   if (columnIndex <= 0) return undefined;
   return display.keys[columnIndex - 1];
+}
+
+/**
+ * Display keys after dropping `startIndex` onto `endIndex` (both include the
+ * gutter, matching Glide's `onColumnMoved`). Returns `undefined` when the move
+ * touches the gutter or crosses the frozen/scrollable boundary; the frozen set
+ * and its leftmost position never change.
+ */
+export function moveDisplayColumn(
+  display: Pick<DisplayColumns, 'keys' | 'frozenCount'>,
+  startIndex: number,
+  endIndex: number,
+): ColumnKey[] | undefined {
+  const { keys } = display;
+  if (startIndex <= 0 || endIndex <= 0) return undefined;
+  if (startIndex > keys.length || endIndex > keys.length) return undefined;
+  if (startIndex === endIndex) return undefined;
+
+  const frozenKeys = display.frozenCount - 1;
+  const startFrozen = startIndex - 1 < frozenKeys;
+  const endFrozen = endIndex - 1 < frozenKeys;
+  if (startFrozen !== endFrozen) return undefined;
+
+  const next = [...keys];
+  const [moved] = next.splice(startIndex - 1, 1);
+  if (moved === undefined) return undefined;
+  next.splice(endIndex - 1, 0, moved);
+  return next;
 }
