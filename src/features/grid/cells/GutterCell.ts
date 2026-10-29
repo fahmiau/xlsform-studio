@@ -15,6 +15,7 @@ import type { RowId } from '@/core/model/types';
 import { useUiStore } from '@/state/uiStore';
 
 import type { StructuralRowKind } from '../editability';
+import type { GutterRail } from '../groupRails';
 
 export const GUTTER_CELL_KIND = 'xlsform-gutter';
 
@@ -25,6 +26,7 @@ const NUMBER_RIGHT = NUMBER_WIDTH - 4;
 const ORPHAN_X = NUMBER_WIDTH + 3;
 const INDENT_X = NUMBER_WIDTH + 8;
 const INDENT_STEP = 8;
+const RAIL_WIDTH = 2;
 const NUMBER_FONT = '500 9px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
 
 export type GutterRowKind = 'group' | 'repeat' | 'end_group' | 'end_repeat' | null;
@@ -53,6 +55,8 @@ export interface GutterCellData {
   rowId?: RowId;
   /** Worst diagnostic in the row, for the gutter dot (XLS-001…011). */
   diagnosticSeverity?: 'error' | 'warning';
+  /** Per-group color rails at the far-left edge; outermost first. */
+  rails?: readonly GutterRail[];
 }
 
 export type GutterCell = CustomCell<GutterCellData>;
@@ -94,12 +98,18 @@ function drawChevron(
 
 export function drawGutter(args: DrawArgs<GutterCell>): void {
   const { ctx, rect, theme, cell } = args;
-  const { depth, rowKind, orphan, collapsed, canCollapse, diagnosticSeverity, rowNumber } =
+  const { depth, rowKind, orphan, collapsed, canCollapse, diagnosticSeverity, rowNumber, rails } =
     cell.data;
 
   ctx.save();
   ctx.lineWidth = 1;
   const centerY = rect.y + rect.height / 2;
+
+  // Group rails first so a deep rail never sits on top of the row number text.
+  for (const rail of rails ?? []) {
+    ctx.fillStyle = rail.color;
+    ctx.fillRect(rect.x + rail.offset, rect.y, RAIL_WIDTH, rect.height);
+  }
 
   // Real sheet row number, in its own left slot. Drawn for every row so a
   // collapsed group shows 10 then 20 instead of renumbering to 11 (C5).

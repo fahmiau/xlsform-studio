@@ -91,6 +91,12 @@ export const ROW_TINTS = {
   },
 } as const;
 
+/** Group rail colors, cycled in document order (one rail per group). */
+export const GROUP_RAIL_COLORS = {
+  light: ['#dc2626', '#16a34a', '#2563eb'],
+  dark: ['#f87171', '#4ade80', '#60a5fa'],
+} as const;
+
 /** Amber cell wash for a modified cell in a staged draft. */
 export function stagingCellTheme(dark: boolean): Partial<Theme> {
   const tints = dark ? ROW_TINTS.dark : ROW_TINTS.light;

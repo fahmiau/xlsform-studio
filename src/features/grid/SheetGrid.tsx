@@ -61,6 +61,7 @@ import { isCellEditable, structuralRowKind, type StructuralRowKind } from './edi
 import { useEditorRouting } from './editors/useEditorRouting';
 import { tileFill } from './fill';
 import { GRID_HEADER_HEIGHT, GRID_ROW_HEIGHT } from './geometry';
+import { buildGroupRails } from './groupRails';
 import { HeaderMenu, type HeaderMenuState } from './HeaderMenu';
 import { AddColumnDialog } from './AddColumnDialog';
 import {
@@ -82,7 +83,7 @@ import {
   findRowIndex,
 } from './selection';
 import { mergedSheet } from './stagingView';
-import { buildGridTheme, stagingCellTheme, stagingRowTheme } from './theme';
+import { buildGridTheme, GROUP_RAIL_COLORS, stagingCellTheme, stagingRowTheme } from './theme';
 import { useClipboard } from './useClipboard';
 import {
   deleteSelectedRows,
@@ -225,6 +226,11 @@ export function SheetGrid({
   const groupsForDepth = useMemo(
     () => (stagedDraft && sheetName === 'survey' ? buildGroupTree(sheet) : indexes.groups),
     [indexes.groups, sheet, sheetName, stagedDraft],
+  );
+  const railPalette = dark ? GROUP_RAIL_COLORS.dark : GROUP_RAIL_COLORS.light;
+  const railsByRealRow = useMemo(
+    () => (sheetName === 'survey' ? buildGroupRails(sheet, groupsForDepth, railPalette) : []),
+    [groupsForDepth, railPalette, sheet, sheetName],
   );
   const gridSelection = useMemo(() => {
     if (!storedGridSelection || rowCount === 0) return fallbackGridSelection;
@@ -390,6 +396,7 @@ export function SheetGrid({
         const rowKind = structuralToGutterKind(structuralRowKind(typeValue));
         const group = groupByRowId.get(row.id);
         const counts = diagnosticIndex.byRow.get(row.id);
+        const rails = railsByRealRow[real];
         return makeGutterCell({
           // The drawer's own 48 px gutter has no number slot: Glide's marker
           // column already shows the row number there.
@@ -400,6 +407,7 @@ export function SheetGrid({
           collapsed: collapsedGroupIds.has(row.id),
           canCollapse: Boolean(group && group.endRowIndex >= 0),
           rowId: row.id,
+          ...(rails && rails.length > 0 ? { rails } : {}),
           ...(counts
             ? {
                 diagnosticSeverity:
@@ -514,6 +522,7 @@ export function SheetGrid({
       orphanRows,
       primaryLabelKey,
       projection,
+      railsByRealRow,
       sheet,
       sheetName,
       stagedDiff,
