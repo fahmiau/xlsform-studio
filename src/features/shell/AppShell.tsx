@@ -26,13 +26,10 @@ import { StatusBar } from './StatusBar';
 import { TopBar } from './TopBar';
 
 /**
- * Panel separators keep the 4 px track and draw the red → green → blue rail
- * inline, so the gradient cannot be purged or re-mapped by the theme.
+ * Panel separators keep the 4 px resize track. The old RGB rail is gone now
+ * that groups have their own rails in the gutter.
  */
-const SEPARATOR_CLASS = 'w-1 cursor-col-resize transition-[filter] hover:brightness-125';
-const SEPARATOR_STYLE = {
-  backgroundImage: 'linear-gradient(to bottom, #ef4444 0%, #22c55e 50%, #3b82f6 100%)',
-};
+const SEPARATOR_CLASS = 'bg-border hover:bg-accent w-1 cursor-col-resize transition-colors';
 
 function LeftPanel() {
   const tab = useUiStore((state) => state.leftTab);
@@ -171,7 +168,6 @@ export function AppShell() {
                 </Panel>
                 <Separator
                   className={SEPARATOR_CLASS}
-                  style={SEPARATOR_STYLE}
                   data-testid="panel-separator-left"
                 />
               </>
@@ -183,7 +179,6 @@ export function AppShell() {
               <>
                 <Separator
                   className={SEPARATOR_CLASS}
-                  style={SEPARATOR_STYLE}
                   data-testid="panel-separator-right"
                 />
                 <Panel id="right" defaultSize={`${rightSize}%`} minSize="10%">
