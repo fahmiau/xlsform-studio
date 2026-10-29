@@ -246,6 +246,44 @@ test('Ctrl+Delete deletes the selected row and undoes', async ({ page }) => {
   await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');
 });
 
+test('context menus open at the pointer for cells and headers', async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await mockTauri(page);
+  await openFixture(page);
+
+  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await canvas.waitFor();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('grid canvas has no layout box');
+
+  // x = 250 sits in the frozen `name` column (gutter 88 + type 130) and
+  // y = one and a half rows down puts the pointer on the second data row. Both
+  // pre-fix offsets (cell-left and row-top) are far above the 12 px tolerance,
+  // so a menu anchored to the grid's left edge can never pass.
+  const clickX = box.x + 250;
+  const cellY = box.y + GRID_HEADER_HEIGHT + GRID_ROW_HEIGHT * 1.5;
+
+  await page.mouse.click(clickX, cellY, { button: 'right' });
+  const rowMenu = page.getByTestId('row-context-menu');
+  await expect(rowMenu).toBeVisible();
+  const rowBox = await rowMenu.boundingBox();
+  if (!rowBox) throw new Error('row menu has no layout box');
+  expect(Math.abs(rowBox.x - clickX)).toBeLessThanOrEqual(12);
+  expect(Math.abs(rowBox.y - cellY)).toBeLessThanOrEqual(12);
+
+  await page.keyboard.press('Escape');
+  await expect(rowMenu).toHaveCount(0);
+
+  const headerY = box.y + GRID_HEADER_HEIGHT / 2;
+  await page.mouse.click(clickX, headerY, { button: 'right' });
+  const headerMenu = page.getByTestId('header-menu');
+  await expect(headerMenu).toBeVisible();
+  const headerBox = await headerMenu.boundingBox();
+  if (!headerBox) throw new Error('header menu has no layout box');
+  expect(Math.abs(headerBox.x - clickX)).toBeLessThanOrEqual(12);
+  expect(Math.abs(headerBox.y - headerY)).toBeLessThanOrEqual(12);
+});
+
 test('edit the settings form and undo it', async ({ page }) => {
   await mockTauri(page);
   await page.goto('/');

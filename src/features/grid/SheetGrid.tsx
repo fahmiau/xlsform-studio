@@ -805,10 +805,13 @@ export function SheetGrid({
     [display.keys, projection, sheet, sheetName],
   );
 
-  const hostPoint = (localX: number, localY: number) => {
-    const rect = hostRef.current?.getBoundingClientRect();
-    return { x: (rect?.left ?? 0) + localX, y: (rect?.top ?? 0) + localY };
-  };
+  // Glide's `bounds` already include the canvas offset (client coordinates) and
+  // localEventX/Y are offsets inside the clicked cell, so their sum is the
+  // pointer. Adding `hostRef`'s rect on top doubles that offset.
+  const contextMenuPoint = (bounds: Rectangle, localX: number, localY: number) => ({
+    x: bounds.x + localX,
+    y: bounds.y + localY,
+  });
 
   const activeTarget = () => {
     const current = gridSelection.current;
@@ -934,13 +937,13 @@ export function SheetGrid({
             const key = display.keys[columnIndex - 1];
             if (!key) return;
             event.preventDefault();
-            const point = hostPoint(event.localEventX, event.localEventY);
+            const point = contextMenuPoint(event.bounds, event.localEventX, event.localEventY);
             setHeaderMenu({ x: point.x, y: point.y, column: key });
           }}
           onCellContextMenu={(item, event) => {
             if (item[1] < 0) return;
             event.preventDefault();
-            const point = hostPoint(event.localEventX, event.localEventY);
+            const point = contextMenuPoint(event.bounds, event.localEventX, event.localEventY);
             openRowMenu(item[0] <= 0 ? [1, item[1]] : item, point.x, point.y);
           }}
           trailingRowOptions={
