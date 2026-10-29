@@ -62,6 +62,31 @@ async function openFixture(page: Page) {
   await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');
 }
 
+/**
+ * Click through the first data row until the `relevant` cell is selected. The
+ * grid is canvas, so the active column is identified through the formula bar;
+ * each probe closes any overlay a previous click opened (it covers `relevant`).
+ */
+async function openRelevantCell(page: Page): Promise<void> {
+  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await canvas.waitFor();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('grid canvas has no layout box');
+
+  const column = page.getByTestId('formula-bar-column');
+  const rowY = box.y + GRID_HEADER_HEIGHT + GRID_ROW_HEIGHT / 2;
+  let found = false;
+  for (let x = 60; x <= box.width - 20; x += 40) {
+    await page.keyboard.press('Escape');
+    await page.mouse.click(box.x + x, rowY);
+    if ((await column.textContent()) === '[Column: relevant]') {
+      found = true;
+      break;
+    }
+  }
+  expect(found).toBe(true);
+}
+
 test('edit a grid cell with the keyboard and undo it', async ({ page }) => {
   await mockTauri(page);
   await openFixture(page);
@@ -89,26 +114,8 @@ test('in-cell XPath editor keeps "$" visible and commits it (StrictMode)', async
   await page.setViewportSize({ width: 1920, height: 900 });
   await mockTauri(page);
   await openFixture(page);
-
-  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
-  await canvas.waitFor();
-  const box = await canvas.boundingBox();
-  if (!box) throw new Error('grid canvas has no layout box');
-
+  await openRelevantCell(page);
   const column = page.getByTestId('formula-bar-column');
-  const rowY = box.y + GRID_HEADER_HEIGHT + GRID_ROW_HEIGHT / 2;
-  let found = false;
-  for (let x = 60; x <= box.width - 20; x += 40) {
-    // A second click on a cell opens its editor; the in-cell formula editor is
-    // wide enough to cover `relevant`, so close it before probing the next x.
-    await page.keyboard.press('Escape');
-    await page.mouse.click(box.x + x, rowY);
-    if ((await column.textContent()) === '[Column: relevant]') {
-      found = true;
-      break;
-    }
-  }
-  expect(found).toBe(true);
 
   // Typing "$" opens Glide's overlay with initialValue "$". StrictMode used to
   // tear the CodeMirror mount down once, blur, commit, and close the editor.
@@ -136,6 +143,54 @@ test('in-cell XPath editor keeps "$" visible and commits it (StrictMode)', async
 
   await page.keyboard.press('Control+z');
   await expect(page.getByTestId('formula-bar-editor').locator('.cm-content')).toHaveText('');
+});
+
+test('accepts a function completion with Enter in the in-cell XPath editor', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 900 });
+  await mockTauri(page);
+  await openFixture(page);
+  await openRelevantCell(page);
+
+  // Enter activates the selected cell's overlay editor.
+  await page.keyboard.press('Enter');
+  const editor = page.getByTestId('cell-formula-editor');
+  await expect(editor).toBeVisible();
+  await page.keyboard.type('if');
+
+  await expect(page.locator('.cm-tooltip-autocomplete')).toBeVisible();
+  // CodeMirror ignores accept keys during its 75 ms interaction delay.
+  await page.waitForTimeout(150);
+
+  await page.keyboard.press('Enter');
+  await expect(editor).toBeVisible();
+  await expect(editor.locator('.cm-content')).toHaveText('if()');
+
+  await page.keyboard.press('Enter');
+  await expect(editor).toHaveCount(0);
+  await expect(page.getByTestId('formula-bar-editor').locator('.cm-content')).toHaveText('if()');
+});
+
+test('keeps the in-cell editor open when a completion item is clicked', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 900 });
+  await mockTauri(page);
+  await openFixture(page);
+  await openRelevantCell(page);
+
+  await page.keyboard.press('Enter');
+  const editor = page.getByTestId('cell-formula-editor');
+  await expect(editor).toBeVisible();
+  await page.keyboard.type('if');
+
+  const popup = page.locator('.cm-tooltip-autocomplete');
+  await expect(popup).toBeVisible();
+  await popup.locator('li', { hasText: 'if(cond' }).click();
+
+  await expect(editor).toBeVisible();
+  await expect(editor.locator('.cm-content')).toHaveText('if()');
+
+  await page.keyboard.press('Enter');
+  await expect(editor).toHaveCount(0);
+  await expect(page.getByTestId('formula-bar-editor').locator('.cm-content')).toHaveText('if()');
 });
 
 test('insert rows with the keyboard and undo/redo them', async ({ page }) => {

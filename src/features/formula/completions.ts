@@ -4,7 +4,6 @@
  */
 import {
   pickedCompletion,
-  snippet,
   type Completion,
   type CompletionContext,
   type CompletionResult,
@@ -121,7 +120,20 @@ function functionOptions(prefix: string): Completion[] {
     detail: fn.signature,
     info: () => functionCompletionInfo(fn),
     type: 'function',
-    apply: snippet(fn.snippet),
+    apply: (view, completion, from, to) => {
+      const doc = view.state.doc.toString();
+      const suffix = doc.slice(to, to + 2);
+      // If the user already typed `(` or `()`, consume it so the template
+      // never becomes `if()(` / `if())`.
+      const replaceTo = suffix === '()' ? to + 2 : suffix.startsWith('(') ? to + 1 : to;
+      const text = `${fn.name}()`;
+      view.dispatch({
+        changes: { from, to: replaceTo, insert: text },
+        selection: { anchor: from + fn.name.length + 1 },
+        annotations: [pickedCompletion.of(completion)],
+        userEvent: 'input.complete',
+      });
+    },
   }));
 }
 

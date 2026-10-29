@@ -140,12 +140,40 @@ describe('XPath completion source (Task 4.5)', () => {
     expect(run()).toBeNull();
   });
 
-  it('lists functions and inserts snippets', () => {
-    const { run } = sourceFor('sel|');
-    const result = run();
+  it('applies function completions as name() with the cursor inside', () => {
+    const result = sourceFor('if|').run();
+    const option = result?.options.find((candidate) => candidate.label === 'if');
+    const apply = option?.apply;
+    expect(typeof apply).toBe('function');
+    const view = new EditorView({ state: EditorState.create({ doc: 'if' }) });
+    if (typeof apply === 'function') apply(view, option!, 0, 2);
+    expect(view.state.doc.toString()).toBe('if()');
+    expect(view.state.selection.main.head).toBe(3);
+    view.destroy();
+  });
+
+  it('consumes an already typed "(" instead of doubling it', () => {
+    const result = sourceFor('if|').run();
+    const option = result?.options.find((candidate) => candidate.label === 'if');
+    const apply = option?.apply;
+    expect(typeof apply).toBe('function');
+    const view = new EditorView({ state: EditorState.create({ doc: 'if(' }) });
+    if (typeof apply === 'function') apply(view, option!, 0, 2);
+    expect(view.state.doc.toString()).toBe('if()');
+    view.destroy();
+  });
+
+  it('applies selected() from the catalog', () => {
+    const result = sourceFor('sel|').run();
     expect((result?.options ?? []).map((option) => option.label)).toContain('selected');
     const option = result?.options.find((candidate) => candidate.label === 'selected');
-    expect(typeof option?.apply).toBe('function');
+    const apply = option?.apply;
+    expect(typeof apply).toBe('function');
+    const view = new EditorView({ state: EditorState.create({ doc: 'sel' }) });
+    if (typeof apply === 'function') apply(view, option!, 0, 3);
+    expect(view.state.doc.toString()).toBe('selected()');
+    expect(view.state.selection.main.head).toBe(9);
+    view.destroy();
   });
 
   it('explicit completion at an empty position lists variables and functions', () => {

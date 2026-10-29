@@ -63,9 +63,12 @@ export function baseExtensions(options: BaseExtensionsOptions): Extension {
     xlsformTheme(options.dark, options.fontSize),
     EditorState.allowMultipleSelections.of(false),
     keymap.of([
+      // Completion keys must win while the popup is open: `acceptCompletion`
+      // and friends return false when nothing is active, so the bindings below
+      // keep their behavior once the popup closes.
+      ...completionKeymap,
       ...(options.keymap ?? []),
       ...closeBracketsKeymap,
-      ...completionKeymap,
       ...historyKeymap,
       ...defaultKeymap,
     ]),

@@ -926,6 +926,13 @@ export function SheetGrid({
           onGridSelectionChange={handleSelectionChange}
           gridSelection={gridSelection}
           provideEditor={provideEditor}
+          // The completion tooltip is mounted in `document.body`, outside this
+          // overlay; without the veto Glide would treat a click on a completion
+          // item as an outside click and close the in-cell editor first.
+          isOutsideClick={(event) => {
+            const target = event.target;
+            return !(target instanceof Element && target.closest('.cm-tooltip') !== null);
+          }}
           onVisibleRegionChanged={(_range, tx, ty) => {
             scrollMemory.set(compact ? `${sheetName}:drawer` : sheetName, { tx, ty });
           }}
