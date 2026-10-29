@@ -103,6 +103,17 @@ export function appCommands(): AppCommand[] {
       },
     },
     {
+      id: 'outline.search',
+      title: 'Search outline',
+      shortcut: { code: 'KeyF', ctrlOrMeta: true },
+      allowInInput: true,
+      run: () => {
+        usePrefsStore.getState().setPanelVisible('left', true);
+        useUiStore.getState().setLeftTab('outline');
+        useUiStore.getState().focusOutlineSearch();
+      },
+    },
+    {
       id: 'palette.open',
       title: 'Command palette',
       shortcut: { code: 'KeyK', ctrlOrMeta: true },
@@ -168,5 +179,6 @@ export const PRD_SHORTCUTS: ReadonlyArray<{
   { id: 'grid.row.delete', keys: 'Shift+Delete', label: 'Delete selected rows' },
   { id: 'grid.row.deleteCtrl', keys: 'Ctrl+Delete', label: 'Delete selected rows' },
   { id: 'ai.toggle', keys: 'Ctrl+J', label: 'Toggle AI assistant' },
+  { id: 'outline.search', keys: 'Ctrl+F', label: 'Search outline' },
   { id: 'palette.open', keys: 'Ctrl+K', label: 'Open command palette' },
 ];

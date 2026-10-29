@@ -67,6 +67,8 @@ export interface UiState {
   aiMode: AiMode;
   /** Bumped by Ctrl+J so the drawer focuses its input. */
   aiFocusNonce: number;
+  /** Bumped by Ctrl+F so the Outline panel focuses its search box. */
+  outlineSearchNonce: number;
   panels: { outline: boolean; lint: boolean; ai: boolean };
   languageView: LanguageViewState;
   /** Command palette, shortcut help, and preferences dialogs (Task 5.6/5.7). */
@@ -99,6 +101,7 @@ export interface UiState {
   setLeftTab: (tab: LeftTab) => void;
   setAiMode: (mode: AiMode) => void;
   focusAiInput: () => void;
+  focusOutlineSearch: () => void;
   setPanel: (panel: keyof UiState['panels'], visible: boolean) => void;
   setLanguageView: (mode: LanguageViewState['mode'], language?: string | null) => void;
   setLanguageViewState: (view: LanguageViewState) => void;
@@ -132,6 +135,7 @@ export const useUiStore = create<UiState>()((set) => ({
   leftTab: 'outline',
   aiMode: 'chat',
   aiFocusNonce: 0,
+  outlineSearchNonce: 0,
   panels: { outline: true, lint: false, ai: false },
   languageView: { mode: 'all', language: null, source: null, target: null },
   paletteOpen: false,
@@ -201,6 +205,7 @@ export const useUiStore = create<UiState>()((set) => ({
   setLeftTab: (leftTab) => set({ leftTab }),
   setAiMode: (aiMode) => set({ aiMode }),
   focusAiInput: () => set((state) => ({ aiFocusNonce: state.aiFocusNonce + 1 })),
+  focusOutlineSearch: () => set((state) => ({ outlineSearchNonce: state.outlineSearchNonce + 1 })),
   setPanel: (panel, visible) => set((state) => ({ panels: { ...state.panels, [panel]: visible } })),
   setLanguageView: (mode, language = null) =>
     set((state) => ({ languageView: { ...state.languageView, mode, language } })),

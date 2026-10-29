@@ -61,6 +61,47 @@ async function openFixture(page: Page) {
   await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');
 }
 
+test('Ctrl+F reveals the left panel and focuses the outline search from anywhere', async ({
+  page,
+}) => {
+  await openFixture(page);
+
+  await page.getByTestId('toggle-left-panel').click();
+  await expect(page.getByTestId('outline-panel')).toHaveCount(0);
+
+  await page.keyboard.press('Control+f');
+  await expect(page.getByTestId('outline-panel')).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'outline' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('outline-search')).toBeFocused();
+  await expect(page.getByTestId('outline-search')).toHaveAccessibleName('Search outline');
+
+  await page.keyboard.type('consent');
+  await expect(page.getByTestId('outline-panel')).toContainText('consent');
+  await expect(page.getByTestId('outline-panel')).not.toContainText('respondent_name');
+
+  // allowInInput: Ctrl+F works while the search box itself has focus, and
+  // select() makes typing replace the existing filter.
+  await page.keyboard.press('Control+f');
+  await page.keyboard.type('respondent');
+  await expect(page.getByTestId('outline-panel')).toContainText('respondent_name');
+  await expect(page.getByTestId('outline-panel')).not.toContainText('consent');
+
+  // The lint tab must yield: Ctrl+F switches back to the outline and focuses.
+  await page.getByTestId('lint-badge').click();
+  await expect(page.getByRole('tab', { name: 'lint' })).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('Control+f');
+  await expect(page.getByRole('tab', { name: 'outline' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('outline-search')).toBeFocused();
+
+  // The choices sheet gets the choice-list search, still from the keyboard.
+  await page.getByTestId('sheet-tab-choices').click();
+  await page.keyboard.press('Control+f');
+  await expect(page.getByTestId('outline-search')).toBeFocused();
+  await expect(page.getByTestId('outline-search')).toHaveAccessibleName('Search choice lists');
+  await page.keyboard.type('yes');
+  await expect(page.getByTestId('outline-choice-list-yes_no')).toBeVisible();
+});
+
 test('choices outline lists list names, filters them, and jumps to the first choice', async ({
   page,
 }) => {

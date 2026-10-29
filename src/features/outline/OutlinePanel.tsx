@@ -1,5 +1,5 @@
 /** Left-panel Outline Tree (Tasks 3.9/3.10). */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { DndContext, DragOverlay } from '@dnd-kit/core';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Search } from 'lucide-react';
@@ -29,8 +29,18 @@ function SurveyOutline() {
   const diagnosticsByRow = useDerivedStore((state) => state.diagnosticIndex.byRow);
   const [filter, setFilter] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
+  const focusNonce = useUiStore((state) => state.outlineSearchNonce);
+  const searchRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const flashTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    const input = searchRef.current;
+    if (focusNonce > 0 && input) {
+      input.focus();
+      input.select();
+    }
+  }, [focusNonce]);
 
   const items = useMemo(
     () =>
@@ -79,6 +89,7 @@ function SurveyOutline() {
       <div className="flex items-center gap-1 border-b px-2 py-1">
         <Search aria-hidden className="text-muted-foreground size-3.5" />
         <input
+          ref={searchRef}
           value={filter}
           onChange={(event) => {
             setFilter(event.target.value);

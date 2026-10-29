@@ -1,5 +1,5 @@
 /** Choice-list Outline for the choices sheet (C3). No groups, no drag-and-drop. */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ListChecks, Search } from 'lucide-react';
 
 import { findColumnKey } from '@/core/indexes/columns';
@@ -14,8 +14,18 @@ export function ChoicesOutline() {
   const data = useWorkbookStore((state) => state.data);
   const [filter, setFilter] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
+  const focusNonce = useUiStore((state) => state.outlineSearchNonce);
+  const searchRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const flashTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    const input = searchRef.current;
+    if (focusNonce > 0 && input) {
+      input.focus();
+      input.select();
+    }
+  }, [focusNonce]);
 
   const items = useMemo(() => flattenChoices(byList, filter), [byList, filter]);
   const boundedIndex = items.length === 0 ? -1 : Math.min(activeIndex, items.length - 1);
@@ -45,6 +55,7 @@ export function ChoicesOutline() {
       <div className="flex items-center gap-1 border-b px-2 py-1">
         <Search aria-hidden className="text-muted-foreground size-3.5" />
         <input
+          ref={searchRef}
           value={filter}
           onChange={(event) => {
             setFilter(event.target.value);
