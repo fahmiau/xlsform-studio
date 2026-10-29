@@ -102,6 +102,31 @@ test('Ctrl+F reveals the left panel and focuses the outline search from anywhere
   await expect(page.getByTestId('outline-choice-list-yes_no')).toBeVisible();
 });
 
+test('outline remounts after the shortcut do not steal focus', async ({ page }) => {
+  await openFixture(page);
+
+  await page.keyboard.press('Control+f');
+  await expect(page.getByTestId('outline-search')).toBeFocused();
+
+  // Switching sheets remounts the outline with the same, already-handled nonce.
+  await page.getByTestId('sheet-tab-choices').click();
+  const search = page.getByTestId('outline-search');
+  await expect(search).toBeVisible();
+  await expect(search).toHaveAccessibleName('Search choice lists');
+  await expect(search).not.toBeFocused();
+
+  // Hiding and showing the left panel remounts it too.
+  await page.getByTestId('toggle-left-panel').click();
+  await expect(page.getByTestId('outline-panel')).toHaveCount(0);
+  await page.getByTestId('toggle-left-panel').click();
+  await expect(search).toBeVisible();
+  await expect(search).not.toBeFocused();
+
+  // A real Ctrl+F still focuses it after those remounts.
+  await page.keyboard.press('Control+f');
+  await expect(search).toBeFocused();
+});
+
 test('choices outline lists list names, filters them, and jumps to the first choice', async ({
   page,
 }) => {

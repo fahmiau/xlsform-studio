@@ -8,6 +8,7 @@ import { useUiStore } from '@/state/uiStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 
 import { flattenChoices, type ChoiceListItem } from './flattenChoices';
+import { handleOutlineSearchNonce } from './outlineSearchFocus';
 
 export function ChoicesOutline() {
   const byList = useDerivedStore((state) => state.indexes.choices.byList);
@@ -21,7 +22,7 @@ export function ChoicesOutline() {
 
   useEffect(() => {
     const input = searchRef.current;
-    if (focusNonce > 0 && input) {
+    if (input && handleOutlineSearchNonce(focusNonce)) {
       input.focus();
       input.select();
     }

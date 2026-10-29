@@ -12,6 +12,7 @@ import { useWorkbookStore } from '@/state/workbookStore';
 import { flattenOutline, type OutlineItem } from './flattenTree';
 import { ChoicesOutline } from './ChoicesOutline';
 import { OutlineNode } from './OutlineNode';
+import { handleOutlineSearchNonce } from './outlineSearchFocus';
 import { useOutlineDnd } from './useOutlineDnd';
 
 const ROW_HEIGHT = 24;
@@ -36,7 +37,7 @@ function SurveyOutline() {
 
   useEffect(() => {
     const input = searchRef.current;
-    if (focusNonce > 0 && input) {
+    if (input && handleOutlineSearchNonce(focusNonce)) {
       input.focus();
       input.select();
     }
