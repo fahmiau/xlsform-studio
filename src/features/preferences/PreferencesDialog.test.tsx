@@ -31,4 +31,10 @@ describe('PreferencesDialog selects (Task 5.7)', () => {
     await choose('pref-slug-mode', 'camelCase');
     expect(usePrefsStore.getState().defaultSlugMode).toBe('camel');
   });
+
+  it('commits the zoom select', async () => {
+    render(<PreferencesDialog open onOpenChange={() => undefined} />);
+    await choose('pref-zoom', '125%');
+    expect(usePrefsStore.getState().zoom).toBe(1.25);
+  });
 });

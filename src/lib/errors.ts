@@ -27,6 +27,8 @@ export function appErrorMessage(error: unknown): string {
       return `Network error: ${error.detail}`;
     case 'Provider':
       return `The AI provider returned an error: ${error.detail}`;
+    case 'Window':
+      return `Could not change the window: ${error.detail}`;
     case 'Io':
     default:
       return `File error: ${error.detail}`;

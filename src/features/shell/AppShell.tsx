@@ -4,6 +4,7 @@ import { AlertTriangle } from 'lucide-react';
 import { Group, Panel, Separator } from 'react-resizable-panels';
 
 import { applyTheme } from '@/lib/theme';
+import { applyZoom } from '@/lib/zoom';
 import { usePrefsStore } from '@/state/prefsStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 import { useUiStore, type SheetTab } from '@/state/uiStore';
@@ -125,6 +126,7 @@ export function AppShell() {
   const layout = usePrefsStore((state) => state.layout);
   const setLayout = usePrefsStore((state) => state.setLayout);
   const hydrated = usePrefsStore((state) => state.hydrated);
+  const zoom = usePrefsStore((state) => state.zoom);
   const activeSheet = useUiStore((state) => state.activeSheet);
 
   useAutosave();
@@ -138,6 +140,10 @@ export function AppShell() {
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (hydrated) void applyZoom(zoom);
+  }, [hydrated, zoom]);
 
   const leftSize = layout.left ?? 18;
   const rightSize = layout.right ?? 18;

@@ -13,6 +13,7 @@ import { useUiStore } from '@/state/uiStore';
 import { useDerivedStore } from '@/state/derivedStore';
 
 import { AUTOCOMPLETE_EVENT, type AppCommand } from './commands';
+import { nextZoom } from './zoom';
 
 export { AUTOCOMPLETE_EVENT };
 
@@ -121,6 +122,33 @@ export function appCommands(): AppCommand[] {
       run: () => useUiStore.getState().setPaletteOpen(true),
     },
     {
+      id: 'view.zoomIn',
+      title: 'Zoom in',
+      shortcut: { code: 'Equal', ctrlOrMeta: true },
+      allowInInput: true,
+      run: () => {
+        const prefs = usePrefsStore.getState();
+        prefs.update({ zoom: nextZoom(prefs.zoom, 1) });
+      },
+    },
+    {
+      id: 'view.zoomOut',
+      title: 'Zoom out',
+      shortcut: { code: 'Minus', ctrlOrMeta: true },
+      allowInInput: true,
+      run: () => {
+        const prefs = usePrefsStore.getState();
+        prefs.update({ zoom: nextZoom(prefs.zoom, -1) });
+      },
+    },
+    {
+      id: 'view.zoomReset',
+      title: 'Reset zoom to 100%',
+      shortcut: { code: 'Digit0', ctrlOrMeta: true },
+      allowInInput: true,
+      run: () => usePrefsStore.getState().update({ zoom: 1 }),
+    },
+    {
       id: 'shortcuts.help',
       title: 'Keyboard shortcuts',
       shortcut: { code: 'Slash', shift: true },
@@ -181,4 +209,7 @@ export const PRD_SHORTCUTS: ReadonlyArray<{
   { id: 'ai.toggle', keys: 'Ctrl+J', label: 'Toggle AI assistant' },
   { id: 'outline.search', keys: 'Ctrl+F', label: 'Search outline' },
   { id: 'palette.open', keys: 'Ctrl+K', label: 'Open command palette' },
+  { id: 'view.zoomIn', keys: 'Ctrl+=', label: 'Zoom in' },
+  { id: 'view.zoomOut', keys: 'Ctrl+-', label: 'Zoom out' },
+  { id: 'view.zoomReset', keys: 'Ctrl+0', label: 'Reset zoom to 100%' },
 ];

@@ -15,6 +15,7 @@ const DEFAULTS = {
   listNamePattern: '{name}',
   defaultSlugMode: 'snake' as const,
   slugMaxLength: 32,
+  zoom: 1,
   formulaFontSize: 12,
   autocompleteOnDollar: true,
   languageViews: {},
@@ -136,6 +137,18 @@ describe('parsePrefs (Task 5.7)', () => {
   it('accepts both supported slug styles and the passthrough mode', () => {
     expect(parsePrefs({ defaultSlugMode: 'camel' }).defaultSlugMode).toBe('camel');
     expect(parsePrefs({ defaultSlugMode: 'passthrough' }).defaultSlugMode).toBe('passthrough');
+  });
+
+  it('defaults zoom to 100% and accepts a persisted 125%', () => {
+    expect(parsePrefs({}).zoom).toBe(1);
+    expect(parsePrefs({ zoom: 1.25 }).zoom).toBe(1.25);
+  });
+
+  it('snaps a persisted off-preset zoom and falls back on invalid values', () => {
+    expect(parsePrefs({ zoom: 1.12 }).zoom).toBe(1.1);
+    expect(parsePrefs({ zoom: 0.1 }).zoom).toBe(1);
+    expect(parsePrefs({ zoom: 9 }).zoom).toBe(1);
+    expect(parsePrefs({ zoom: 'big' }).zoom).toBe(1);
   });
 });
 

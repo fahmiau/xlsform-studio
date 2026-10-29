@@ -20,6 +20,8 @@ export const commands = {
 	aiProxy: (request: ProxyRequest, onEvent: Channel<ProxyEvent>) => __TAURI_INVOKE<null>("ai_proxy", { request, onEvent }),
 	/**  Cancel an in-flight proxy stream. Idempotent: unknown ids are a no-op. */
 	aiProxyCancel: (requestId: string) => __TAURI_INVOKE<null>("ai_proxy_cancel", { requestId }),
+	/**  Set the main webview zoom factor (`1.0` = 100%). */
+	setZoom: (scale: number | null) => __TAURI_INVOKE<null>("set_zoom", { scale }),
 };
 
 /* Types */
@@ -30,7 +32,7 @@ export const commands = {
  *  show `detail` in a collapsible section. Never include secrets or workbook
  *  contents in `detail`.
  */
-export type AppError = { kind: "Io"; detail: string } | { kind: "FileLocked"; detail: string } | { kind: "NotFound"; detail: string } | { kind: "InvalidPath"; detail: string } | { kind: "Keyring"; detail: string } | { kind: "Network"; detail: string } | { kind: "Provider"; detail: string };
+export type AppError = { kind: "Io"; detail: string } | { kind: "FileLocked"; detail: string } | { kind: "NotFound"; detail: string } | { kind: "InvalidPath"; detail: string } | { kind: "Keyring"; detail: string } | { kind: "Network"; detail: string } | { kind: "Provider"; detail: string } | { kind: "Window"; detail: string };
 
 /**  Smoke command proving the Specta surface end to end (Task 1.2). */
 export type AppInfo = {

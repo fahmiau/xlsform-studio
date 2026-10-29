@@ -31,6 +31,9 @@ pub enum AppError {
 
     #[error("provider error: {0}")]
     Provider(String),
+
+    #[error("window error: {0}")]
+    Window(String),
 }
 
 impl AppError {
@@ -48,5 +51,12 @@ mod tests {
         let value = serde_json::to_value(AppError::FileLocked("C:/form.xlsx".into())).unwrap();
         assert_eq!(value["kind"], "FileLocked");
         assert_eq!(value["detail"], "C:/form.xlsx");
+    }
+
+    #[test]
+    fn serializes_the_window_variant() {
+        let value = serde_json::to_value(AppError::Window("zoom out of range: 3".into())).unwrap();
+        assert_eq!(value["kind"], "Window");
+        assert_eq!(value["detail"], "zoom out of range: 3");
     }
 }

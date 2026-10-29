@@ -22,6 +22,7 @@ import { buildListName } from '@/core/ops/choices';
 import type { SlugStyle } from '@/core/slug/slugify';
 import { AiSection } from '@/features/preferences/sections/AiSection';
 import { UpdatesSection } from '@/features/preferences/sections/UpdatesSection';
+import { ZOOM_LEVELS, formatZoom } from '@/lib/zoom';
 import { usePrefsStore } from '@/state/prefsStore';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -87,6 +88,28 @@ export function PreferencesDialog({
                   <SelectItem value="dark" className="text-xs">
                     Dark
                   </SelectItem>
+                </SelectContent>
+              </Select>
+            </Row>
+            <Row label="Zoom">
+              <Select
+                value={String(prefs.zoom)}
+                onValueChange={(value) => update({ zoom: Number(value) })}
+              >
+                <SelectTrigger
+                  size="sm"
+                  className="w-32 text-xs"
+                  aria-label="Zoom"
+                  data-testid="pref-zoom"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ZOOM_LEVELS.map((level) => (
+                    <SelectItem key={level} value={String(level)} className="text-xs">
+                      {formatZoom(level)}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Row>

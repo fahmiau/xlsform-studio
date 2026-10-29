@@ -12,6 +12,7 @@ import { z } from 'zod';
 
 import type { LanguageViewState, LanguageViewMode } from '@/core/languages/viewModes';
 import type { SlugStyle } from '@/core/slug/slugify';
+import { nearestZoom } from '@/lib/zoom';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -32,6 +33,8 @@ export interface PrefsValues {
   defaultSlugMode: SlugStyle;
   /** Choice-name length cap. */
   slugMaxLength: number;
+  /** Whole-app webview zoom factor (`1` = 100%). */
+  zoom: number;
   formulaFontSize: number;
   autocompleteOnDollar: boolean;
   /** Language view per file path (empty string for untitled workbooks). */
@@ -90,6 +93,7 @@ const DEFAULT_VALUES: PrefsValues = {
   listNamePattern: '{name}',
   defaultSlugMode: 'snake',
   slugMaxLength: 32,
+  zoom: 1,
   formulaFontSize: 12,
   autocompleteOnDollar: true,
   languageViews: {},
@@ -138,6 +142,7 @@ const prefsSchema = z.object({
   listNamePattern: z.string().min(1).max(64).catch(DEFAULT_VALUES.listNamePattern),
   defaultSlugMode: z.enum(SLUG_STYLES).catch(DEFAULT_VALUES.defaultSlugMode),
   slugMaxLength: z.number().int().min(1).max(64).catch(DEFAULT_VALUES.slugMaxLength),
+  zoom: z.number().min(0.5).max(2).transform(nearestZoom).catch(1),
   formulaFontSize: z.number().int().min(9).max(24).catch(DEFAULT_VALUES.formulaFontSize),
   autocompleteOnDollar: z.boolean().catch(DEFAULT_VALUES.autocompleteOnDollar),
   languageViews: z.record(z.string(), languageViewSchema).catch({}),
@@ -202,6 +207,7 @@ function valuesOf(state: PrefsState): PrefsValues {
     listNamePattern,
     defaultSlugMode,
     slugMaxLength,
+    zoom,
     formulaFontSize,
     autocompleteOnDollar,
     languageViews,
@@ -216,6 +222,7 @@ function valuesOf(state: PrefsState): PrefsValues {
     listNamePattern,
     defaultSlugMode,
     slugMaxLength,
+    zoom,
     formulaFontSize,
     autocompleteOnDollar,
     languageViews,

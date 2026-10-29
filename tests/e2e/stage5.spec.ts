@@ -173,10 +173,19 @@ test('Ctrl+K jumps to a variable and runs a command by name', async ({ page }) =
   await expect(palette.getByRole('option', { name: /Keyboard shortcuts/ })).toBeVisible();
   await page.keyboard.press('Enter');
   await expect(page.getByTestId('shortcuts-sheet')).toBeVisible();
-  // PRD_SHORTCUTS has 18 rows now: the 17 PRD §6.2 entries plus Ctrl+F.
-  await expect(page.getByTestId('shortcut-row')).toHaveCount(18);
+  // PRD_SHORTCUTS has 21 rows now: the 17 PRD §6.2 entries plus Ctrl+F and zoom.
+  await expect(page.getByTestId('shortcut-row')).toHaveCount(21);
   await expect(
     page.getByTestId('shortcuts-sheet').getByText('Search outline', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByTestId('shortcuts-sheet').getByText('Zoom in', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByTestId('shortcuts-sheet').getByText('Zoom out', { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByTestId('shortcuts-sheet').getByText('Reset zoom to 100%', { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByTestId('shortcuts-sheet').getByText('Delete selected rows', { exact: true }),

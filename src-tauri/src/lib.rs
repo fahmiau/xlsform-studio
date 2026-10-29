@@ -24,6 +24,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::secrets::secret_delete,
             commands::ai_proxy::ai_proxy,
             commands::ai_proxy::ai_proxy_cancel,
+            commands::zoom::set_zoom,
         ])
         .events(tauri_specta::collect_events![])
         .error_handling(tauri_specta::ErrorHandlingMode::Throw)

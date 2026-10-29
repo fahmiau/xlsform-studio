@@ -14,6 +14,15 @@ export interface ShortcutSpec {
 /** Event the focused CodeMirror editor listens for (`Ctrl+Space`). */
 export const AUTOCOMPLETE_EVENT = 'xlsform:autocomplete';
 
+function keyLabel(code: string): string {
+  if (code.startsWith('Key')) return code.slice(3);
+  if (code.startsWith('Bracket')) return code.slice(7).replace('Left', '[').replace('Right', ']');
+  if (code.startsWith('Digit')) return code.slice(5);
+  if (code === 'Equal') return '=';
+  if (code === 'Minus') return '-';
+  return code;
+}
+
 /** Human-readable shortcut for the palette and the help sheet. */
 export function shortcutLabel(shortcut: ShortcutSpec | undefined): string {
   if (!shortcut) return '';
@@ -21,13 +30,7 @@ export function shortcutLabel(shortcut: ShortcutSpec | undefined): string {
   if (shortcut.ctrlOrMeta) parts.push('Ctrl');
   if (shortcut.shift) parts.push('Shift');
   if (shortcut.alt) parts.push('Alt');
-  parts.push(
-    shortcut.code.startsWith('Key')
-      ? shortcut.code.slice(3)
-      : shortcut.code.startsWith('Bracket')
-        ? shortcut.code.slice(7).replace('Left', '[').replace('Right', ']')
-        : shortcut.code,
-  );
+  parts.push(keyLabel(shortcut.code));
   return parts.join('+');
 }
 

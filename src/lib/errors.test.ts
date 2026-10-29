@@ -21,6 +21,9 @@ describe('appErrorMessage', () => {
     );
     expect(appErrorMessage({ kind: 'Network', detail: 'timeout' })).toContain('Network error');
     expect(appErrorMessage({ kind: 'Provider', detail: '401' })).toContain('provider');
+    expect(appErrorMessage({ kind: 'Window', detail: 'zoom out of range: 3' })).toBe(
+      'Could not change the window: zoom out of range: 3',
+    );
     expect(appErrorMessage({ kind: 'Io', detail: 'disk full' })).toContain('disk full');
   });
 

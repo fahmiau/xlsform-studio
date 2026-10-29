@@ -6,6 +6,7 @@ import {
   isEditableTarget,
   matchesShortcut,
   registerCommands,
+  shortcutLabel,
   type AppCommand,
 } from './commands';
 
@@ -80,5 +81,22 @@ describe('command registry', () => {
     ];
     registerCommands(commands);
     expect(findCommandForEvent(key({ code: 'F1' }))?.id).toBe('a');
+  });
+});
+
+describe('shortcutLabel', () => {
+  it('prints digits and the zoom keys', () => {
+    expect(shortcutLabel({ code: 'Digit0', ctrlOrMeta: true })).toBe('Ctrl+0');
+    expect(shortcutLabel({ code: 'Digit1' })).toBe('1');
+    expect(shortcutLabel({ code: 'Equal', ctrlOrMeta: true })).toBe('Ctrl+=');
+    expect(shortcutLabel({ code: 'Minus', ctrlOrMeta: true })).toBe('Ctrl+-');
+  });
+
+  it('keeps the existing letter, bracket, and bare-code behavior', () => {
+    expect(shortcutLabel({ code: 'KeyS', ctrlOrMeta: true, shift: true })).toBe('Ctrl+Shift+S');
+    expect(shortcutLabel({ code: 'BracketLeft', ctrlOrMeta: true })).toBe('Ctrl+[');
+    expect(shortcutLabel({ code: 'BracketRight', ctrlOrMeta: true })).toBe('Ctrl+]');
+    expect(shortcutLabel({ code: 'F8', shift: true })).toBe('Shift+F8');
+    expect(shortcutLabel(undefined)).toBe('');
   });
 });
