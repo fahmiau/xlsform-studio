@@ -21,6 +21,7 @@ import {
 import { buildListName } from '@/core/ops/choices';
 import type { SlugStyle } from '@/core/slug/slugify';
 import { AiSection } from '@/features/preferences/sections/AiSection';
+import { UpdatesSection } from '@/features/preferences/sections/UpdatesSection';
 import { usePrefsStore } from '@/state/prefsStore';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -183,6 +184,8 @@ export function PreferencesDialog({
           </section>
 
           <AiSection />
+
+          <UpdatesSection />
         </div>
       </DialogContent>
     </Dialog>

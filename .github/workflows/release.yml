@@ -70,31 +70,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # Windows only until the app is code-signed: Gatekeeper reports an
+          # unsigned macOS build as damaged and it cannot auto-update. See
+          # docs/releasing.md "Windows only".
+          #
+          # NSIS only, deliberately: publishing MSI (per-machine) *and* NSIS
+          # (per-user) gives the updater two upgrade paths and leaves users with
+          # a duplicate install. One installer, one upgrade path.
           - name: windows-x64
             os: windows-latest
             target: x86_64-pc-windows-msvc
-            bundles: nsis,msi
+            bundles: nsis
             binary: xlsform-studio.exe
             checksums: SHA256SUMS-windows-x64.txt
-          - name: linux-x64
-            os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            bundles: deb,appimage
-            binary: xlsform-studio
-            checksums: SHA256SUMS-linux-x64.txt
-          # Q4: separate DMGs, no universal binary.
-          - name: macos-arm64
-            os: macos-latest
-            target: aarch64-apple-darwin
-            bundles: dmg
-            binary: xlsform-studio
-            checksums: SHA256SUMS-macos-arm64.txt
-          - name: macos-x64
-            os: macos-latest
-            target: x86_64-apple-darwin
-            bundles: dmg
-            binary: xlsform-studio
-            checksums: SHA256SUMS-macos-x64.txt
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -117,13 +105,6 @@ jobs:
           workspaces: src-tauri
           key: ${{ matrix.target }}
 
-      - name: Install Linux WebKit dependencies
-        if: matrix.os == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
-            patchelf libgtk-3-dev libfuse2
-
       - run: pnpm install --frozen-lockfile
 
       - name: Build installers and create the draft release
@@ -131,13 +112,19 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Updater signing (docs/releasing.md A3). Without the key the bundle
+          # step fails, because createUpdaterArtifacts is on.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: xlsform-studio ${{ github.ref_name }}
           releaseBody: |
-            Unsigned v1 installers (Q3). See the README for Windows SmartScreen
-            and macOS Gatekeeper instructions. SHA-256 checksums are attached as
-            `${{ matrix.checksums }}`.
+            Windows installer, unsigned (Q3). See the README for the SmartScreen
+            prompt. SHA-256 checksums are attached as `${{ matrix.checksums }}`.
+
+            Installed copies update themselves via **Preferences → Updates →
+            Check for updates**.
           releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}

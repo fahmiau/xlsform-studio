@@ -62,6 +62,9 @@ pub fn run() {
         // Q-AI1: "Get a key" / billing links open in the system browser. The
         // capability allows exact URLs only; no file/path opening.
         .plugin(tauri_plugin_opener::init())
+        // Updates are user-initiated only (docs/releasing.md A5): no startup
+        // check, so the app still makes no background request.
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(
             commands::ai_proxy::AiProxyState::new()
                 .expect("failed to initialize the AI proxy HTTP client"),

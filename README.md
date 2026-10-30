@@ -27,32 +27,29 @@ files, built with Tauri v2, React 19, and TypeScript.
 - Round-trip-preserving `.xlsx` I/O via ExcelJS: values, headers, column and
   sheet order, and unmanaged sheets survive a save.
 
-## Install (v1, unsigned — Q3)
+## Install (Windows, unsigned — Q3)
 
-Releases contain `.msi`, NSIS `.exe`, `.deb`, `.AppImage`, and separate
-`aarch64`/`x86_64` `.dmg` files (Q4). The builds are **not code-signed** yet.
+**[Download the latest release](https://github.com/fahmiau/xlsform-studio/releases/latest)**
+(one NSIS `.exe`; the SHA-256 sums are attached to each release). Windows 10/11
+x64 only for now — Linux and macOS builds are not published, because an unsigned
+build cannot update itself and macOS reports one as damaged.
 
-**Windows 11 (SmartScreen).** Run the installer, choose **More info**, then
-**Run anyway**. Windows may also show a “Windows protected your PC” prompt for
-the NSIS `.exe`; the same bypass applies. If your organization blocks unsigned
-binaries, install from source instead.
+The builds are **not code-signed** yet. Run the installer, choose **More info**,
+then **Run anyway**. If your organization blocks unsigned binaries, install from
+source instead.
 
-**macOS (Gatekeeper).** Open the DMG, drag the app to Applications, then
-right-click the app and choose **Open** once (or use System Settings → Privacy &
-Security → **Open Anyway**). macOS 15+ may require the same confirmation in
-Privacy & Security after the first attempt.
-
-**Linux.** Install the `.deb` with `sudo apt install ./xlsform-studio_*.deb`, or
-make the AppImage executable (`chmod +x`) and run it. The app needs WebKitGTK
-4.1; most current desktops provide it.
+Updates ship inside the app: **Preferences → Updates → Check for updates**. The
+check is manual — the app never phones home on its own.
 
 ## Offline & privacy
 
 The app is offline-first. With the network disconnected, editing, linting,
-refactoring, AI setup, and local models all work. There is **no telemetry**, no
-update check, and no background request. The WebView CSP has no external
-`connect-src`; the only network egress is the Rust `ai_proxy` command, and only
-after the user sends an AI request.
+refactoring, AI setup, and local models all work. There is **no telemetry** and
+no background request: the only network traffic is what you start — an AI
+request, or **Check for updates** (one HTTPS call to GitHub Releases, which
+fetches `latest.json` and, if there is a newer build, the signed installer). The
+WebView CSP has no external `connect-src`; both of those calls are Rust
+commands/plugins, not WebView fetches.
 
 - API keys live in the OS credential store (Windows Credential Manager, macOS
   Keychain, Linux Secret Service). No command returns a key to the UI, and the

@@ -327,7 +327,16 @@ pub fn load_binding(app_data_dir: &Path, provider_id: &str) -> Result<Option<Bin
     if let Some(binding) = read_keyless_bindings(app_data_dir)?.remove(provider_id) {
         return Ok(Some(binding));
     }
-    let Some(json) = keyring_get(provider_id)? else {
+    // A machine with no Secret Service (headless CI, a minimal Linux desktop)
+    // has no keyed bindings to find. Keyless local providers must keep working
+    // there (R6), so "backend unavailable" means "nothing stored" — not an
+    // error that takes the whole lookup down. Storing a key still reports the
+    // real failure.
+    let Some(json) = keyring_get(provider_id).or_else(|err| match err {
+        AppError::Keyring(_) => Ok(None),
+        other => Err(other),
+    })?
+    else {
         return Ok(None);
     };
     let binding: Binding = serde_json::from_str(&json)

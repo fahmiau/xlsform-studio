@@ -1,6 +1,6 @@
 [package]
 name = "xlsform-studio"
-version = "0.1.0"
+version = "1.0.0"
 description = "Offline-first desktop IDE for authoring XLSForm .xlsx files"
 authors = ["xlsform-studio contributors"]
 edition = "2021"
@@ -24,6 +24,10 @@ tauri-plugin-dialog = "=2.6.0"
 tauri-plugin-fs = "=2.4.5"
 tauri-plugin-store = "2"
 tauri-plugin-window-state = "2"
+# In-app updates (docs/releasing.md). Windows-only distribution for now, but the
+# crate builds on every desktop target. rustls-tls keeps OpenSSL out of the
+# build, matching the reqwest choice below.
+tauri-plugin-updater = "=2.14.1"
 # Q-AI1 (plans/stage-6): "Get a key" opens the system browser. Pinned to the
 # frontend package version; see docs/adr/0002-tauri-dependency-pins.md.
 tauri-plugin-opener = "=2.7.2"
