@@ -6,21 +6,14 @@ Tauri v2 desktop IDE for authoring [XLSForm](https://xlsform.org/) `.xlsx` files
 
 This file is the entry point. It is deliberately short on prose and long on
 rules, paths, and commands. Everything here is verified against the code, not
-the older design docs, where they disagree.
+the older design notes, where they disagree.
 
-**Read next, in this order:**
-
-| Doc                                                      | When you need it                                                 |
-| -------------------------------------------------------- | ---------------------------------------------------------------- |
-| [docs/agents/codebase-map.md](./docs/agents/codebase-map.md)   | Module-by-module graph: what lives where, what depends on what   |
-| [docs/agents/recipes.md](./docs/agents/recipes.md)             | Step-by-step playbooks for the changes this repo actually gets   |
-| [docs/agents/domain-glossary.md](./docs/agents/domain-glossary.md) | XLSForm/ODK vocabulary and the project's own shorthand     |
-| [docs/agents/status.md](./docs/agents/status.md)               | What is done, what is unverified, what is intentionally absent   |
-
-**Authoritative but longer:** [PRD.md](./PRD.md) (requirements) →
-[plan.md](./plan.md) (architecture decisions AD-1…AD-15 + stage map) →
-[CONTRIBUTING.md](./CONTRIBUTING.md) (human-facing gates) →
-[docs/adr/](./docs/adr) (three ratified decisions).
+**Read next:** [README.md](./README.md) for the product surface,
+[CONTRIBUTING.md](./CONTRIBUTING.md) for the human-facing gates,
+[RELEASING.md](./RELEASING.md) for the version/tag/publish loop, and
+[SECURITY.md](./SECURITY.md) for the threat model. Architecture decisions are
+cited as `AD-n` in code docblocks; the three that still matter are summarized in
+the README's "Architecture decisions".
 
 ---
 
@@ -78,7 +71,7 @@ Pick the row that matches the change. Do not skip rows because they look slow.
 | `.xlsx` read/write                       | `pnpm test` — `roundtrip.test.ts` + `corpus.test.ts` must stay green |
 | Docs only                                | nothing, but keep links valid                                   |
 
-Non-negotiables (from plan.md §7):
+Non-negotiables:
 
 - No new `@ts-ignore`, `eslint-disable`, `.skip`, `.todo`, or lowered coverage
   threshold without a written reason in the change description.
@@ -152,7 +145,7 @@ knows nothing about the frontend's shape beyond the command signatures.
 | R8 | **Round-trip is load-bearing.** Values, header text, column order, sheet order, and unmanaged sheets survive a save; data-row styling after row moves is best effort. | `src/core/xlsx/roundtrip.test.ts` + the fixture corpus. Never "fix" a failing round-trip by normalizing the input. |
 | R9 | **Linter must not produce false positives.** | `src/core/lint/corpus.test.ts` runs the whole rule set over real-world forms and asserts zero findings. |
 | R10 | **Chat Mode never gets tools.** Build tools run on the staging draft only. | Enforced by construction in `features/ai/client.ts` (`chatStreamParams` has no `tools`) and tests. |
-| R11 | **No silent scope creep.** Post-v1 backlog is listed in plan.md §11. | If a request is on that list, say so instead of building it. |
+| R11 | **No silent scope creep.** Adding a surface, a dependency, or a second implementation of something listed in R3 is a change to discuss, not a detail to slip in. | Say what is out of scope instead of building it. |
 
 ---
 
@@ -176,11 +169,7 @@ src/lib/           command registry, shortcuts, base64, AppError → copy, theme
 src-tauri/src/     commands/{files,recovery,secrets,ai_proxy,app_info}.rs, error.rs, lib.rs
 tests/             fixtures/ (xlsx corpus, reference form), e2e/ (Playwright)
 scripts/           benches, binary-size check, checksums, version bump
-docs/              adr/ · agents/ · perf/ · qa/ · security/
-plans/             stage-1…stage-6 plans; checkboxes are the progress tracker
 ```
-
-Full detail, including exports and call paths: [docs/agents/codebase-map.md](./docs/agents/codebase-map.md).
 
 Use codegraph to find context if needed
 
@@ -191,7 +180,7 @@ Use codegraph to find context if needed
 | Task                                   | Touch this                                                                 |
 | -------------------------------------- | -------------------------------------------------------------------------- |
 | A lint message is wrong or missing     | `src/core/lint/rules/xls0NN.ts`; register in `rules/index.ts`; add a case to `rules.test.ts`; re-run `corpus.test.ts` |
-| Add a new lint rule                    | New `rules/xls012.ts` exporting `LintRule`, register it, test it, benchmark it — recipe in [recipes.md](./docs/agents/recipes.md) |
+| Add a new lint rule                    | New `rules/xls012.ts` exporting `LintRule`, register it, test it, benchmark it |
 | A column is misread                    | `core/model/columns.ts` (`resolveColumn`, alias tables) + `header-aliases.test.ts` |
 | A cell value is mangled on open/save   | `core/xlsx/coerce.ts` (typing) or `write.ts` (emit rules); add a fixture, not a special case |
 | Autocomplete / highlighting is off     | `core/xpath/*` for semantics; `features/formula/*` for presentation only   |
@@ -200,7 +189,7 @@ Use codegraph to find context if needed
 | A keyboard shortcut does nothing       | `lib/appCommands.ts` (registry) → `lib/shortcuts.ts` (capture-phase handler) → WebView2 accelerator lock in `src-tauri/src/lib.rs` |
 | File save/open behavior                | `features/file/fileActions.ts` + `src-tauri/src/commands/files.rs` (atomic write, lock mapping) |
 | AI provider setup / streaming          | `features/ai/*` for UX, `src-tauri/src/commands/ai_proxy.rs` for egress, `capabilities/default.json` for new opener URLs |
-| Add a native command                   | `src-tauri/src/commands/*.rs`, register in `specta_builder()` in `lib.rs`, `pnpm bindings`, then wrap in `features/` — recipe in [recipes.md](./docs/agents/recipes.md) |
+| Add a native command                   | `src-tauri/src/commands/*.rs`, register in `specta_builder()` in `lib.rs`, `pnpm bindings`, then wrap in `features/` |
 
 ---
 
@@ -215,12 +204,10 @@ Use codegraph to find context if needed
 - **Tests live next to the source** (`foo.ts` + `foo.test.ts`). Only e2e and
   shared fixtures live under `tests/`. Component tests use Testing Library on
   jsdom; the Glide canvas is not pixel-tested — test the pure adapters instead.
-- **Docblocks carry provenance.** Existing code cites `AD-n`, `Task n.n`, and
-  `PRD §n` in comments; match that style so a reader can trace a line back to a
-  decision.
+- **Docblocks carry provenance.** Existing code cites `AD-n` and `Task n.n` in
+  comments; match that style so a reader can trace a line back to a decision.
 - **Commit messages** are Conventional Commits (`feat(core): …`, `fix(lint): …`,
-  `docs(plan): …`). When a plan task lands, tick its checkbox in
-  `plans/stage-N-*.md` — those files are the progress tracker.
+  `docs: …`).
 - **Rust**: keep `lib.rs` thin (builder + registration); commands live in
   `commands/`, every command returns `Result<T, AppError>`, and Tauri/Specta
   crates stay pinned with `=` in `Cargo.toml` (ADR 0002).
@@ -257,5 +244,5 @@ Use codegraph to find context if needed
 - If you change a rule in §4, a command in §1, or a path in §5 in the same
   change, update this file in that change.
 - If a claim here contradicts the code, the **code wins** — fix the doc.
-- `docs/agents/status.md` is a snapshot with a date. Refresh the date when you
-  update it; do not let it drift into fiction.
+- Keep [README.md](./README.md) and [RELEASING.md](./RELEASING.md) consistent
+  with the code too; they are what outsiders and future releases rely on.

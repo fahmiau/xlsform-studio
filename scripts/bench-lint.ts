@@ -2,7 +2,7 @@
  * `pnpm bench:lint` — full lint run on the reference form.
  * Gate (Task 4.9 / AD-12): median ≤ 15 ms on the main thread.
  * `LINT_BENCH_LIMIT_MS` is an explicit CI-only override for noisy shared
- * runners; the app target itself stays 15 ms (docs/perf/stage-4.md).
+ * runners; the app target itself stays 15 ms.
  */
 import { buildAllIndexes } from '../src/core/indexes';
 import { runLint } from '../src/core/lint';

@@ -10,7 +10,7 @@ vi.mock('@tauri-apps/plugin-updater', () => ({ check: () => check() }));
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }));
 
-describe('UpdatesSection (docs/releasing.md A5)', () => {
+describe('UpdatesSection (RELEASING.md)', () => {
   beforeEach(() => {
     check.mockReset();
   });

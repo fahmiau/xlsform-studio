@@ -1,5 +1,5 @@
 /**
- * Preferences → Updates (docs/releasing.md A5).
+ * Preferences → Updates (RELEASING.md).
  *
  * The check is user-initiated on purpose: a startup check would break the
  * README's "no background request" promise. The network call itself happens in

@@ -1,8 +1,8 @@
 name: release
 
-# Push a tag like v1.0.0 to build the five installer types and create a draft
-# GitHub release. The draft is published by a human after the QA checklist in
-# docs/qa/v1-checklist.md is signed off.
+# Push a tag like v1.0.0 to build the Windows installer and create a draft
+# GitHub release. The draft is published by a human after the smoke checklist in
+# RELEASING.md passes on an installed build.
 on:
   push:
     tags: ['v*']
@@ -72,7 +72,7 @@ jobs:
         include:
           # Windows only until the app is code-signed: Gatekeeper reports an
           # unsigned macOS build as damaged and it cannot auto-update. See
-          # docs/releasing.md "Windows only".
+          # RELEASING.md.
           #
           # NSIS only, deliberately: publishing MSI (per-machine) *and* NSIS
           # (per-user) gives the updater two upgrade paths and leaves users with
@@ -112,8 +112,8 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Updater signing (docs/releasing.md A3). Without the key the bundle
-          # step fails, because createUpdaterArtifacts is on.
+          # Updater signing (RELEASING.md). Without the key the bundle step
+          # fails, because createUpdaterArtifacts is on.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:

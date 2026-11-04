@@ -35,12 +35,9 @@ pnpm bindings:check  # when commands/types/events change
 
 Windows note: Smart App Control can transiently block fresh Rust build scripts
 (`os error 4551`, `E0463`). Wait and retry, or `cargo clean -p <crate>`. Do not
-change Rust code to work around it. See
-[docs/adr/0002-tauri-dependency-pins.md](./docs/adr/0002-tauri-dependency-pins.md).
+change Rust code to work around it.
 
 ## Architecture rules
-
-Read [plan.md](./plan.md) (AD-1…AD-15) and [CONTEXT.md](./CONTEXT.md) first.
 
 - **Pure core (AD-1).** `src/core/**` has no React, Zustand, Tauri, or app
   imports. Lint enforces it.
@@ -65,8 +62,7 @@ Read [plan.md](./plan.md) (AD-1…AD-15) and [CONTEXT.md](./CONTEXT.md) first.
 
 ## Commits and releases
 
-Use Conventional Commits (`feat(core): …`, `fix(lint): …`, `docs(plan): …`).
-Update the stage checkbox in `plans/stage-N-*.md` when a task lands.
+Use Conventional Commits (`feat(core): …`, `fix(lint): …`, `docs: …`).
 
 Versions are single-sourced from `package.json`:
 
@@ -74,9 +70,9 @@ Versions are single-sourced from `package.json`:
 pnpm bump-version 1.0.0
 ```
 
-Tag `v1.0.0` only after the human sign-off in
-[docs/qa/v1-checklist.md](./docs/qa/v1-checklist.md). The release workflow
-builds unsigned installers into a draft GitHub release.
+Tag `v1.0.0` only after the smoke checklist in
+[RELEASING.md](./RELEASING.md) passes on an installed build. The release workflow
+builds a signed Windows installer into a draft GitHub release.
 
 ## Fixtures
 
