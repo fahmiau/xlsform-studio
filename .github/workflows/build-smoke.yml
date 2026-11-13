@@ -50,8 +50,8 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - name: Build bundles (unsigned v1)
-        run: pnpm tauri build
+      - name: Build release binary (smoke)
+        run: pnpm tauri build --no-bundle
 
       - name: Report main binary size
         shell: bash
@@ -59,10 +59,10 @@ jobs:
           node scripts/check-binary-size.mjs "${{ matrix.binary }}" 15 | tee size.txt
           cat size.txt >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Upload bundles
+      - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
           name: xlsform-studio-${{ matrix.os }}
-          path: src-tauri/target/release/bundle/**
+          path: ${{ matrix.binary }}
           if-no-files-found: error
           retention-days: 14
