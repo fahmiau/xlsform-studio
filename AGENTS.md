@@ -31,20 +31,20 @@ pnpm dev              # Vite only, port 1420, NO native IPC — most features ar
 `pnpm dev` is only useful for pure UI work and for Playwright, which stubs the
 IPC bridge. If you claim a behavior works, it was checked in `pnpm tauri dev`.
 
-| Command                        | What it actually runs                                      |
-| ------------------------------ | ---------------------------------------------------------- |
-| `pnpm build`                   | `tsc -b && vite build` (not a Tauri bundle)                |
-| `pnpm lint`                    | `eslint .` — includes the AD-1 boundary rule               |
-| `pnpm typecheck`               | `tsc -b --noEmit` (strict, `noUncheckedIndexedAccess`)     |
-| `pnpm test`                    | `vitest run` — jsdom, setup in `tests/setup.ts`            |
-| `pnpm coverage`                | v8 coverage with the `src/core` gate (see §2)              |
-| `pnpm bench:lint`              | linter benchmark, **≤ 15 ms** local median                 |
-| `pnpm bench:indexes`           | index rebuild, ≤ 5 ms target                               |
-| `pnpm bench:grid`              | grid projection benchmark                                  |
-| `pnpm test:e2e`                | Playwright on `pnpm dev`, Tauri IPC mocked per test        |
-| `pnpm bindings:check`          | regenerate Specta bindings and fail on drift               |
-| `pnpm fixtures`                | rebuild the synthetic corpus + reference form              |
-| `pnpm bump-version <x.y.z>`    | sync `package.json` / `tauri.conf.json` / `Cargo.toml`     |
+| Command                     | What it actually runs                                  |
+| --------------------------- | ------------------------------------------------------ |
+| `pnpm build`                | `tsc -b && vite build` (not a Tauri bundle)            |
+| `pnpm lint`                 | `eslint .` — includes the AD-1 boundary rule           |
+| `pnpm typecheck`            | `tsc -b --noEmit` (strict, `noUncheckedIndexedAccess`) |
+| `pnpm test`                 | `vitest run` — jsdom, setup in `tests/setup.ts`        |
+| `pnpm coverage`             | v8 coverage with the `src/core` gate (see §2)          |
+| `pnpm bench:lint`           | linter benchmark, **≤ 15 ms** local median             |
+| `pnpm bench:indexes`        | index rebuild, ≤ 5 ms target                           |
+| `pnpm bench:grid`           | grid projection benchmark                              |
+| `pnpm test:e2e`             | Playwright on `pnpm dev`, Tauri IPC mocked per test    |
+| `pnpm bindings:check`       | regenerate Specta bindings and fail on drift           |
+| `pnpm fixtures`             | rebuild the synthetic corpus + reference form          |
+| `pnpm bump-version <x.y.z>` | sync `package.json` / `tauri.conf.json` / `Cargo.toml` |
 
 Rust gates (always with the manifest path):
 
@@ -60,16 +60,16 @@ cargo test  --manifest-path src-tauri/Cargo.toml
 
 Pick the row that matches the change. Do not skip rows because they look slow.
 
-| Changed                                  | Required before reporting done                                  |
-| ---------------------------------------- | --------------------------------------------------------------- |
-| Anything in `src/`                       | `pnpm lint`, `pnpm typecheck`, `pnpm test`                      |
-| `src/core/**`                            | above **+** `pnpm coverage` (gate fails below the thresholds)   |
-| `src/core/lint/**`, `xpath/**`, `indexes/**` | above **+** `pnpm bench:lint` / `bench:indexes`             |
-| Anything in `src-tauri/**`               | the three `cargo` gates above                                   |
-| A `#[tauri::command]`, `AppError` variant, or event | `pnpm bindings` then `pnpm bindings:check` must show no diff |
-| UI flow, shortcut, or dialog             | `pnpm test:e2e` **and** a manual pass in `pnpm tauri dev`        |
-| `.xlsx` read/write                       | `pnpm test` — `roundtrip.test.ts` + `corpus.test.ts` must stay green |
-| Docs only                                | nothing, but keep links valid                                   |
+| Changed                                             | Required before reporting done                                       |
+| --------------------------------------------------- | -------------------------------------------------------------------- |
+| Anything in `src/`                                  | `pnpm lint`, `pnpm typecheck`, `pnpm test`                           |
+| `src/core/**`                                       | above **+** `pnpm coverage` (gate fails below the thresholds)        |
+| `src/core/lint/**`, `xpath/**`, `indexes/**`        | above **+** `pnpm bench:lint` / `bench:indexes`                      |
+| Anything in `src-tauri/**`                          | the three `cargo` gates above                                        |
+| A `#[tauri::command]`, `AppError` variant, or event | `pnpm bindings` then `pnpm bindings:check` must show no diff         |
+| UI flow, shortcut, or dialog                        | `pnpm test:e2e` **and** a manual pass in `pnpm tauri dev`            |
+| `.xlsx` read/write                                  | `pnpm test` — `roundtrip.test.ts` + `corpus.test.ts` must stay green |
+| Docs only                                           | nothing, but keep links valid                                        |
 
 Non-negotiables:
 
@@ -133,19 +133,19 @@ knows nothing about the frontend's shape beyond the command signatures.
 
 ## 4. Hard rules and how each one is enforced
 
-| #   | Rule | Enforcement / failure mode |
-| --- | ---- | -------------------------- |
-| R1 | **`src/core` stays pure.** No React, Zustand, zundo, Tauri, IPC, or app-layer imports. | ESLint `no-restricted-imports` in `eslint.config.js`. If you "need" Zustand in core, the state belongs in the caller. |
-| R2 | **One user action = one `workbookStore.apply` = one undo entry.** Composite work composes ops inside the updater. | Call `apply` once. Two `apply` calls for one intent means users need two `Ctrl+Z`. |
-| R3 | **One XPath implementation.** `core/xpath/tokenize.ts` feeds highlighting, autocomplete, lint rules XLS-004/005/008/011, and rename. | Do not add a regex or Lezer parser beside it. |
-| R4 | **No network from the WebView.** CSP is `default-src 'self'` with IPC origins only; no external `connect-src`. | All provider traffic goes through `ai_proxy` in Rust. Adding a browser `fetch` to a provider will be blocked at runtime. |
-| R5 | **API keys never enter JS.** Rust reads them from the OS keychain, injects headers, refuses redirects. | No command may return a key; the AI SDK receives a placeholder. Opener URLs are an exact allow-list in `src-tauri/capabilities/default.json` and a test fails if a provider is missing. |
-| R6 | **`src/ipc/bindings.ts` is generated.** | Edit Rust and run `pnpm bindings`. A manual edit is erased and fails `bindings:check`. |
-| R7 | **Headers are stored verbatim.** `ColumnKey` is the literal header text; meaning comes from `resolveColumn()`. | Breaking this renames columns on save and destroys round-trip fidelity. Duplicate headers get a `#2` model key but keep `headerText` for writing. |
-| R8 | **Round-trip is load-bearing.** Values, header text, column order, sheet order, and unmanaged sheets survive a save; data-row styling after row moves is best effort. | `src/core/xlsx/roundtrip.test.ts` + the fixture corpus. Never "fix" a failing round-trip by normalizing the input. |
-| R9 | **Linter must not produce false positives.** | `src/core/lint/corpus.test.ts` runs the whole rule set over real-world forms and asserts zero findings. |
-| R10 | **Chat Mode never gets tools.** Build tools run on the staging draft only. | Enforced by construction in `features/ai/client.ts` (`chatStreamParams` has no `tools`) and tests. |
-| R11 | **No silent scope creep.** Adding a surface, a dependency, or a second implementation of something listed in R3 is a change to discuss, not a detail to slip in. | Say what is out of scope instead of building it. |
+| #   | Rule                                                                                                                                                                  | Enforcement / failure mode                                                                                                                                                              |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R1  | **`src/core` stays pure.** No React, Zustand, zundo, Tauri, IPC, or app-layer imports.                                                                                | ESLint `no-restricted-imports` in `eslint.config.js`. If you "need" Zustand in core, the state belongs in the caller.                                                                   |
+| R2  | **One user action = one `workbookStore.apply` = one undo entry.** Composite work composes ops inside the updater.                                                     | Call `apply` once. Two `apply` calls for one intent means users need two `Ctrl+Z`.                                                                                                      |
+| R3  | **One XPath implementation.** `core/xpath/tokenize.ts` feeds highlighting, autocomplete, lint rules XLS-004/005/008/011, and rename.                                  | Do not add a regex or Lezer parser beside it.                                                                                                                                           |
+| R4  | **No network from the WebView.** CSP is `default-src 'self'` with IPC origins only; no external `connect-src`.                                                        | All provider traffic goes through `ai_proxy` in Rust. Adding a browser `fetch` to a provider will be blocked at runtime.                                                                |
+| R5  | **API keys never enter JS.** Rust reads them from the OS keychain, injects headers, refuses redirects.                                                                | No command may return a key; the AI SDK receives a placeholder. Opener URLs are an exact allow-list in `src-tauri/capabilities/default.json` and a test fails if a provider is missing. |
+| R6  | **`src/ipc/bindings.ts` is generated.**                                                                                                                               | Edit Rust and run `pnpm bindings`. A manual edit is erased and fails `bindings:check`.                                                                                                  |
+| R7  | **Headers are stored verbatim.** `ColumnKey` is the literal header text; meaning comes from `resolveColumn()`.                                                        | Breaking this renames columns on save and destroys round-trip fidelity. Duplicate headers get a `#2` model key but keep `headerText` for writing.                                       |
+| R8  | **Round-trip is load-bearing.** Values, header text, column order, sheet order, and unmanaged sheets survive a save; data-row styling after row moves is best effort. | `src/core/xlsx/roundtrip.test.ts` + the fixture corpus. Never "fix" a failing round-trip by normalizing the input.                                                                      |
+| R9  | **Linter must not produce false positives.**                                                                                                                          | `src/core/lint/corpus.test.ts` runs the whole rule set over real-world forms and asserts zero findings.                                                                                 |
+| R10 | **Chat Mode never gets tools.** Build tools run on the staging draft only.                                                                                            | Enforced by construction in `features/ai/client.ts` (`chatStreamParams` has no `tools`) and tests.                                                                                      |
+| R11 | **No silent scope creep.** Adding a surface, a dependency, or a second implementation of something listed in R3 is a change to discuss, not a detail to slip in.      | Say what is out of scope instead of building it.                                                                                                                                        |
 
 ---
 
@@ -177,19 +177,19 @@ Use codegraph to find context if needed
 
 ## 6. Where to change what
 
-| Task                                   | Touch this                                                                 |
-| -------------------------------------- | -------------------------------------------------------------------------- |
-| A lint message is wrong or missing     | `src/core/lint/rules/xls0NN.ts`; register in `rules/index.ts`; add a case to `rules.test.ts`; re-run `corpus.test.ts` |
-| Add a new lint rule                    | New `rules/xls012.ts` exporting `LintRule`, register it, test it, benchmark it |
-| A column is misread                    | `core/model/columns.ts` (`resolveColumn`, alias tables) + `header-aliases.test.ts` |
-| A cell value is mangled on open/save   | `core/xlsx/coerce.ts` (typing) or `write.ts` (emit rules); add a fixture, not a special case |
-| Autocomplete / highlighting is off     | `core/xpath/*` for semantics; `features/formula/*` for presentation only   |
-| Rename misses a reference              | `core/refactor/*` — replacement is token-based, never `String.replace` across text |
-| Grid renders or edits wrongly          | `features/grid/` — `projection.ts`, `cellEditPipeline.ts`, `cells/*`, `editors/*` |
-| A keyboard shortcut does nothing       | `lib/appCommands.ts` (registry) → `lib/shortcuts.ts` (capture-phase handler) → WebView2 accelerator lock in `src-tauri/src/lib.rs` |
-| File save/open behavior                | `features/file/fileActions.ts` + `src-tauri/src/commands/files.rs` (atomic write, lock mapping) |
-| AI provider setup / streaming          | `features/ai/*` for UX, `src-tauri/src/commands/ai_proxy.rs` for egress, `capabilities/default.json` for new opener URLs |
-| Add a native command                   | `src-tauri/src/commands/*.rs`, register in `specta_builder()` in `lib.rs`, `pnpm bindings`, then wrap in `features/` |
+| Task                                 | Touch this                                                                                                                         |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| A lint message is wrong or missing   | `src/core/lint/rules/xls0NN.ts`; register in `rules/index.ts`; add a case to `rules.test.ts`; re-run `corpus.test.ts`              |
+| Add a new lint rule                  | New `rules/xls012.ts` exporting `LintRule`, register it, test it, benchmark it                                                     |
+| A column is misread                  | `core/model/columns.ts` (`resolveColumn`, alias tables) + `header-aliases.test.ts`                                                 |
+| A cell value is mangled on open/save | `core/xlsx/coerce.ts` (typing) or `write.ts` (emit rules); add a fixture, not a special case                                       |
+| Autocomplete / highlighting is off   | `core/xpath/*` for semantics; `features/formula/*` for presentation only                                                           |
+| Rename misses a reference            | `core/refactor/*` — replacement is token-based, never `String.replace` across text                                                 |
+| Grid renders or edits wrongly        | `features/grid/` — `projection.ts`, `cellEditPipeline.ts`, `cells/*`, `editors/*`                                                  |
+| A keyboard shortcut does nothing     | `lib/appCommands.ts` (registry) → `lib/shortcuts.ts` (capture-phase handler) → WebView2 accelerator lock in `src-tauri/src/lib.rs` |
+| File save/open behavior              | `features/file/fileActions.ts` + `src-tauri/src/commands/files.rs` (atomic write, lock mapping)                                    |
+| AI provider setup / streaming        | `features/ai/*` for UX, `src-tauri/src/commands/ai_proxy.rs` for egress, `capabilities/default.json` for new opener URLs           |
+| Add a native command                 | `src-tauri/src/commands/*.rs`, register in `specta_builder()` in `lib.rs`, `pnpm bindings`, then wrap in `features/`               |
 
 ---
 

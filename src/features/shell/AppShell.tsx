@@ -172,10 +172,7 @@ export function AppShell() {
                 <Panel id="left" defaultSize={`${leftSize}%`} minSize="10%">
                   <LeftPanel />
                 </Panel>
-                <Separator
-                  className={SEPARATOR_CLASS}
-                  data-testid="panel-separator-left"
-                />
+                <Separator className={SEPARATOR_CLASS} data-testid="panel-separator-left" />
               </>
             ) : null}
             <Panel id="center" defaultSize={`${defaultLayout.center}%`} minSize="30%">
@@ -183,10 +180,7 @@ export function AppShell() {
             </Panel>
             {rightPanel ? (
               <>
-                <Separator
-                  className={SEPARATOR_CLASS}
-                  data-testid="panel-separator-right"
-                />
+                <Separator className={SEPARATOR_CLASS} data-testid="panel-separator-right" />
                 <Panel id="right" defaultSize={`${rightSize}%`} minSize="10%">
                   <RightPanel />
                 </Panel>

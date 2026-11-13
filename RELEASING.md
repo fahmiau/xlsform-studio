@@ -29,7 +29,7 @@ Rules that follow from that picture:
 
 1. **A version is immutable.** Never re-tag the same number with different bits.
    Users who already updated will not come back for it.
-2. **Drafts are invisible.** Users and the updater only see *published* releases.
+2. **Drafts are invisible.** Users and the updater only see _published_ releases.
 3. **`latest` is the newest published, non-prerelease release.** Publish in order.
 4. **The tag must equal the version** — `v1.0.0` for `1.0.0`. The release workflow
    fails the build if they disagree (`scripts/bump-version.mjs --check`).
@@ -38,13 +38,13 @@ Rules that follow from that picture:
 
 | Area       | State                                                                                |
 | ---------- | ------------------------------------------------------------------------------------ |
-| Version    | `1.0.0` in `package.json`, `tauri.conf.json`, `Cargo.toml`, `Cargo.lock`              |
-| Updater    | `tauri-plugin-updater = "=2.14.1"`, registered in `src-tauri/src/lib.rs`              |
-| JS         | `@tauri-apps/plugin-updater@2.14.1` (exact, matches the crate)                         |
-| Config     | `plugins.updater.pubkey` + the GitHub `latest.json` endpoint                           |
-| Bundling   | `createUpdaterArtifacts: true`, `targets: ["nsis"]`, `installMode: currentUser`        |
-| Capability | `updater:default` in `src-tauri/capabilities/default.json`                             |
-| UI         | **Preferences → Updates → Check for updates** (`src/features/preferences/sections/`)   |
+| Version    | `1.0.0` in `package.json`, `tauri.conf.json`, `Cargo.toml`, `Cargo.lock`             |
+| Updater    | `tauri-plugin-updater = "=2.14.1"`, registered in `src-tauri/src/lib.rs`             |
+| JS         | `@tauri-apps/plugin-updater@2.14.1` (exact, matches the crate)                       |
+| Config     | `plugins.updater.pubkey` + the GitHub `latest.json` endpoint                         |
+| Bundling   | `createUpdaterArtifacts: true`, `targets: ["nsis"]`, `installMode: currentUser`      |
+| Capability | `updater:default` in `src-tauri/capabilities/default.json`                           |
+| UI         | **Preferences → Updates → Check for updates** (`src/features/preferences/sections/`) |
 
 Nothing checks for updates on startup. The only update traffic is a click, so the
 README's "no background request" claim holds.
@@ -59,7 +59,7 @@ half is the `TAURI_SIGNING_PRIVATE_KEY` repository secret.
 installed copy is stuck on its current version forever — there is no recovery and
 no rotation without shipping a new public key.
 
-It was generated **without a password**. If you want one, do it *before* the
+It was generated **without a password**. If you want one, do it _before_ the
 first release: regenerate with `-p`, put the new public key in `tauri.conf.json`,
 re-set both secrets. After `1.0.0` ships, changing the key breaks updates for
 everyone who installed it.
@@ -78,7 +78,7 @@ gh secret list --repo fahmiau/xlsform-studio
 The last one must show `TAURI_SIGNING_PRIVATE_KEY`. Without it the Windows
 bundle step fails at signing time, after a 20-minute build.
 
-Then, in **Settings → Code security**: *Secret scanning* and *Push protection*
+Then, in **Settings → Code security**: _Secret scanning_ and _Push protection_
 on. A `LICENSE` file already exists.
 
 ## First release
@@ -95,8 +95,8 @@ git push origin v1.0.0        # a plain `git push` does NOT push tags
    spend a Windows build.
 2. **Actions → release** — quality gates (~5 min), then the Windows build
    (~15–25 min cold, faster with the Rust cache).
-3. **Releases → the new draft → Edit → Publish release.** Leave *Set as the
-   latest release* checked, *pre-release* unchecked.
+3. **Releases → the new draft → Edit → Publish release.** Leave _Set as the
+   latest release_ checked, _pre-release_ unchecked.
 4. **Verify the public path:** open
    `https://github.com/fahmiau/xlsform-studio/releases/latest` in a private
    window, download the `.exe`, install it, and confirm **Preferences → Updates
@@ -114,7 +114,7 @@ Run these against the installed `.exe`, not `pnpm tauri dev`:
 - [ ] **Preferences → Updates → Check for updates** reports "newest version".
 - [ ] Close and reopen: window size and position are restored.
 
-If the workflow fails at *Version files are in sync*, the tag and the file version
+If the workflow fails at _Version files are in sync_, the tag and the file version
 disagree — delete nothing, fix the version, delete the tag
 (`git tag -d v1.0.0 && git push origin :refs/tags/v1.0.0`) and retry. Nobody has
 seen the release yet.
