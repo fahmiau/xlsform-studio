@@ -70,9 +70,9 @@ Versions are single-sourced from `package.json`:
 pnpm bump-version 1.0.0
 ```
 
-Tag `v1.0.0` only after the smoke checklist in
-[RELEASING.md](./RELEASING.md) passes on an installed build. The release workflow
-builds a signed Windows installer into a draft GitHub release.
+Tag a `v*` release only after the smoke checklist passes on an installed build.
+The release workflow builds a signed Windows installer into a draft GitHub
+release.
 
 ## Fixtures
 

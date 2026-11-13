@@ -24,7 +24,7 @@ tauri-plugin-dialog = "=2.6.0"
 tauri-plugin-fs = "=2.4.5"
 tauri-plugin-store = "2"
 tauri-plugin-window-state = "2"
-# In-app updates (RELEASING.md). Windows-only distribution for now, but the
+# In-app updates. Windows-only distribution for now, but the
 # crate builds on every desktop target. rustls-tls keeps OpenSSL out of the
 # build, matching the reqwest choice below.
 tauri-plugin-updater = "=2.14.1"

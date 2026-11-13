@@ -9,8 +9,7 @@ rules, paths, and commands. Everything here is verified against the code, not
 the older design notes, where they disagree.
 
 **Read next:** [README.md](./README.md) for the product surface,
-[CONTRIBUTING.md](./CONTRIBUTING.md) for the human-facing gates,
-[RELEASING.md](./RELEASING.md) for the version/tag/publish loop, and
+[CONTRIBUTING.md](./CONTRIBUTING.md) for the human-facing gates, and
 [SECURITY.md](./SECURITY.md) for the threat model. Architecture decisions are
 cited as `AD-n` in code docblocks; the three that still matter are summarized in
 the README's "Architecture decisions".
@@ -244,5 +243,5 @@ Use codegraph to find context if needed
 - If you change a rule in §4, a command in §1, or a path in §5 in the same
   change, update this file in that change.
 - If a claim here contradicts the code, the **code wins** — fix the doc.
-- Keep [README.md](./README.md) and [RELEASING.md](./RELEASING.md) consistent
-  with the code too; they are what outsiders and future releases rely on.
+- Keep [README.md](./README.md) consistent with the code too; it is what
+  outsiders rely on.
