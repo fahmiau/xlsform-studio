@@ -29,8 +29,31 @@ export class AiHttpError extends Error {
 
 const cache = new Map<string, ModelOption[]>();
 
+/** Anthropic requires this header on every request, including model listing. */
+const ANTHROPIC_VERSION = '2023-06-01';
+
 export function clearModelCache(): void {
   cache.clear();
+}
+
+/**
+ * API roots to try for a user-entered custom base URL. Gateways are often
+ * pasted without their `/v1` prefix, which otherwise only fails on the first
+ * request.
+ */
+export function modelBaseUrlCandidates(baseUrl: string): string[] {
+  const base = baseUrl
+    .trim()
+    .replace(/\/+$/, '')
+    .replace(/\/(chat\/completions|messages|models)$/, '');
+  if (!base) return [];
+  try {
+    const path = new URL(base).pathname;
+    if (path !== '' && path !== '/') return [base];
+  } catch {
+    return [base];
+  }
+  return [base, `${base}/v1`];
 }
 
 function cacheKey(presetId: string, baseUrl: string): string {
@@ -119,7 +142,10 @@ export async function listModels(
   }
   const response = await fetchImpl(modelsUrl(baseUrl, preset), {
     method: 'GET',
-    headers: { accept: 'application/json' },
+    headers: {
+      accept: 'application/json',
+      ...(preset.protocol === 'anthropic' ? { 'anthropic-version': ANTHROPIC_VERSION } : {}),
+    },
   });
   const text = await response.text();
   if (!response.ok) throw new AiHttpError(response.status, text);

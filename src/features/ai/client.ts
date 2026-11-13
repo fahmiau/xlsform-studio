@@ -9,10 +9,11 @@ import {
   type LanguageModel,
   type ModelMessage,
   type ToolSet,
+  type UserContent,
 } from 'ai';
 
 export { stepCountIs, tool };
-export type { LanguageModel, ModelMessage, ToolSet };
+export type { LanguageModel, ModelMessage, ToolSet, UserContent };
 
 export interface ChatStreamOptions {
   model: LanguageModel;

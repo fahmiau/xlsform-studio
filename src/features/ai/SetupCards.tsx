@@ -1,6 +1,6 @@
 /**
  * BYOK setup: three cards — paste a key, use a local model, or a custom
- * OpenAI-compatible endpoint (Task 6.2b). The happy path is paste → Save.
+ * OpenAI/Anthropic endpoint (Task 6.2b). The happy path is paste → Save.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle2, KeyRound, Laptop, Settings2 } from 'lucide-react';
@@ -19,11 +19,25 @@ import { AiErrorBanner } from './AiErrorBanner';
 import { setProviderSecret, tauriProxyTransport } from './aiIpc';
 import { detectProvider } from './detectProvider';
 import { describeAiError, type AiErrorInfo } from './errors';
-import { defaultModel, listModels, probeLocal, type LocalProbeResult } from './listModels';
+import {
+  AiHttpError,
+  defaultModel,
+  listModels,
+  modelBaseUrlCandidates,
+  probeLocal,
+  type LocalProbeResult,
+  type ModelOption,
+} from './listModels';
 import { openExternalUrl } from './openExternal';
 import { createProxyFetch } from './proxyFetch';
 import { LOCAL_PRESETS, PASTE_PRESETS, presetById, type ProviderPreset } from './providers';
 import type { AiConfig } from './useAiConfig';
+
+type CustomProtocol = 'openai' | 'anthropic';
+
+function customPresetFor(protocol: CustomProtocol): ProviderPreset | undefined {
+  return presetById(protocol === 'anthropic' ? 'custom-anthropic' : 'custom-openai');
+}
 
 const inputClass = 'border-input bg-background w-full rounded border px-2 py-1 text-xs';
 const buttonClass =
@@ -73,8 +87,11 @@ export function SetupCards({ onConfigured }: { onConfigured?: (config: AiConfig)
   const [error, setError] = useState<AiErrorInfo | null>(null);
   const [customOpen, setCustomOpen] = useState(false);
   const [customUrl, setCustomUrl] = useState('https://');
+  const [customProtocol, setCustomProtocol] = useState<CustomProtocol>('openai');
   const [customKey, setCustomKey] = useState('');
   const [customModel, setCustomModel] = useState('');
+  const [customModels, setCustomModels] = useState<ModelOption[]>([]);
+  const [fetching, setFetching] = useState(false);
   const [probes, setProbes] = useState<Record<string, LocalProbeResult | null>>({});
 
   const detected = useMemo(() => detectProvider(key), [key]);
@@ -134,24 +151,100 @@ export function SetupCards({ onConfigured }: { onConfigured?: (config: AiConfig)
     void run(() => connect(local, {}));
   };
 
+  const fetchCustomModels = async () => {
+    const entered = customUrl.trim().replace(/\/+$/, '');
+    const custom = customPresetFor(customProtocol);
+    if (!custom) return;
+    if (!/^https?:\/\/[^\s/]+/.test(entered)) {
+      setError(describeAiError({ error: new Error('Enter a valid http(s) base URL.') }));
+      return;
+    }
+    setFetching(true);
+    setError(null);
+    const apiKey = customKey.trim();
+    let lastError: unknown = new Error('No model endpoint answered.');
+    try {
+      // A gateway pasted without `/v1` 404s on the first try; the fallback
+      // keeps that from looking like a broken provider.
+      for (const baseUrl of modelBaseUrlCandidates(entered)) {
+        try {
+          await setProviderSecret('probe_custom', {
+            baseUrl,
+            auth: apiKey ? custom.auth : 'none',
+            ...(apiKey ? { apiKey } : {}),
+          });
+          const models = await listModels(
+            createProxyFetch('probe_custom', baseUrl, tauriProxyTransport),
+            custom,
+            baseUrl,
+            { refresh: true },
+          );
+          setCustomUrl(baseUrl);
+          setCustomModels(models);
+          const first = models[0];
+          if (models.length === 0) {
+            setError(
+              describeAiError({
+                error: new Error('The endpoint returned no models. Type the model ID instead.'),
+                preset: custom,
+              }),
+            );
+          } else if (!customModel.trim() && first) {
+            setCustomModel(first.id);
+          }
+          return;
+        } catch (caught) {
+          lastError = caught;
+          if (!(caught instanceof AiHttpError) || caught.status !== 404) break;
+        }
+      }
+      setCustomModels([]);
+      const info = describeAiError({ error: lastError, preset: custom });
+      setError(
+        lastError instanceof AiHttpError && lastError.status === 404
+          ? {
+              ...info,
+              title: 'Model list not found',
+              message:
+                'No model list at that URL. Check the base URL (it usually ends in /v1), or type the model ID manually.',
+              action: 'none',
+              retryable: false,
+            }
+          : info,
+      );
+    } finally {
+      setFetching(false);
+    }
+  };
+
   const saveCustom = () => {
     const baseUrl = customUrl.trim();
     if (!/^https?:\/\/[^\s/]+/.test(baseUrl)) {
       setError(describeAiError({ error: new Error('Enter a valid http(s) base URL.') }));
       return;
     }
-    const custom = presetById('custom');
+    const custom = customPresetFor(customProtocol);
     if (!custom) return;
     if (!customModel.trim()) {
       setError(describeAiError({ error: new Error('Enter the model ID to use.') }));
       return;
+    }
+    if (customProtocol === 'anthropic' && !customKey.trim()) {
+      setError(describeAiError({ error: new Error('Paste an API key first.') }));
+      return;
+    }
+    let label = 'Custom';
+    try {
+      label = new URL(baseUrl).hostname || label;
+    } catch {
+      // The URL regex above already validated it; keep the fallback label.
     }
     void run(() =>
       connect(custom, {
         baseUrl,
         modelId: customModel,
         ...(customKey.trim() ? { apiKey: customKey.trim() } : {}),
-        label: 'Custom',
+        label,
       }),
     );
   };
@@ -295,7 +388,7 @@ export function SetupCards({ onConfigured }: { onConfigured?: (config: AiConfig)
         >
           <Settings2 className="size-3.5" /> Other / Custom
           <span className="text-muted-foreground ml-auto text-[11px]">
-            {customOpen ? 'Hide' : 'OpenAI-compatible'}
+            {customOpen ? 'Hide' : 'OpenAI / Anthropic'}
           </span>
         </button>
         {customOpen ? (
@@ -305,9 +398,40 @@ export function SetupCards({ onConfigured }: { onConfigured?: (config: AiConfig)
               <input
                 className={inputClass}
                 value={customUrl}
+                placeholder="https://gateway.example/v1"
                 data-testid="ai-custom-url"
-                onChange={(event) => setCustomUrl(event.target.value)}
+                onChange={(event) => {
+                  setCustomUrl(event.target.value);
+                  setCustomModels([]);
+                }}
               />
+            </label>
+            <label className="block text-[11px]">
+              API protocol
+              <Select
+                value={customProtocol}
+                onValueChange={(value) => {
+                  setCustomProtocol(value as CustomProtocol);
+                  setCustomModels([]);
+                }}
+              >
+                <SelectTrigger
+                  size="sm"
+                  className="mt-0.5 h-7 w-full px-2 text-xs"
+                  aria-label="API protocol"
+                  data-testid="ai-custom-protocol"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="openai" className="text-xs">
+                    OpenAI Chat Completions
+                  </SelectItem>
+                  <SelectItem value="anthropic" className="text-xs">
+                    Anthropic
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </label>
             <label className="block text-[11px]">
               API key (optional)
@@ -317,11 +441,47 @@ export function SetupCards({ onConfigured }: { onConfigured?: (config: AiConfig)
                 value={customKey}
                 autoComplete="off"
                 data-testid="ai-custom-key"
-                onChange={(event) => setCustomKey(event.target.value)}
+                onChange={(event) => {
+                  setCustomKey(event.target.value);
+                  setCustomModels([]);
+                }}
               />
             </label>
-            <label className="block text-[11px]">
-              Model ID
+            <div className="space-y-1 text-[11px]">
+              <div className="flex items-center gap-2">
+                <span>Model ID</span>
+                <button
+                  type="button"
+                  className="ml-auto rounded border px-1.5 py-0.5 disabled:opacity-40"
+                  disabled={fetching || busy}
+                  onClick={() => void fetchCustomModels()}
+                  data-testid="ai-custom-fetch"
+                >
+                  {fetching ? 'Fetching…' : 'Fetch models'}
+                </button>
+              </div>
+              {customModels.length > 0 ? (
+                <Select
+                  value={customModels.some((model) => model.id === customModel) ? customModel : ''}
+                  onValueChange={setCustomModel}
+                >
+                  <SelectTrigger
+                    size="sm"
+                    className="h-7 w-full px-2 text-xs"
+                    aria-label="Fetched models"
+                    data-testid="ai-custom-model-select"
+                  >
+                    <SelectValue placeholder="Select a fetched model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customModels.map((model) => (
+                      <SelectItem key={model.id} value={model.id} className="text-xs">
+                        {model.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : null}
               <input
                 className={inputClass}
                 value={customModel}
@@ -329,7 +489,7 @@ export function SetupCards({ onConfigured }: { onConfigured?: (config: AiConfig)
                 data-testid="ai-custom-model"
                 onChange={(event) => setCustomModel(event.target.value)}
               />
-            </label>
+            </div>
             <button
               type="button"
               className={buttonClass}

@@ -3,7 +3,14 @@ import type { ReactElement, ReactNode } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+import { AiProcessStatus } from './AiProcessStatus';
+import { createInitialProcessState, type AiProcessState } from './aiProcess';
+import { AiQuestionCard } from './AiQuestionCard';
+import { splitQuestionBlocks, type AiQuestionAnswer } from './aiQuestion';
+import { AttachmentChips } from './AttachmentChips';
+import type { ChatAttachment } from './attachments';
 import { CodeBlock } from './CodeBlock';
+import type { ChatQuestionResult } from './useChat';
 
 function textOf(node: ReactNode): string {
   if (node === null || node === undefined || typeof node === 'boolean') return '';
@@ -56,11 +63,19 @@ export function MarkdownMessage({ content }: { content: string }) {
 }
 
 export interface MessageListProps {
-  messages: Array<{ id: string; role: 'user' | 'assistant'; content: string }>;
+  messages: Array<{
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    attachments?: ChatAttachment[];
+    process?: AiProcessState;
+    questionResult?: ChatQuestionResult;
+  }>;
   streaming: boolean;
+  onAnswerQuestion?: (messageId: string, answers: AiQuestionAnswer[] | null) => void;
 }
 
-export function MessageList({ messages, streaming }: MessageListProps) {
+export function MessageList({ messages, streaming, onAnswerQuestion }: MessageListProps) {
   if (messages.length === 0) {
     return (
       <p className="text-muted-foreground p-3 text-xs" data-testid="ai-chat-empty">
@@ -70,23 +85,58 @@ export function MessageList({ messages, streaming }: MessageListProps) {
   }
   return (
     <div className="space-y-3 p-3" data-testid="ai-message-list">
-      {messages.map((message) => (
-        <div key={message.id} className="space-y-1" data-role={message.role}>
-          <p className="text-muted-foreground text-[10px] font-medium uppercase">
-            {message.role === 'user' ? 'You' : 'Assistant'}
-          </p>
-          {message.role === 'user' ? (
-            <p className="whitespace-pre-wrap text-xs">{message.content}</p>
-          ) : (
-            <div>
-              <MarkdownMessage content={message.content} />
-              {streaming && message.content === '' ? (
-                <span className="text-muted-foreground text-xs">Thinking…</span>
-              ) : null}
-            </div>
-          )}
-        </div>
-      ))}
+      {messages.map((message, index) => {
+        const isLast = index === messages.length - 1;
+        const activeFallback =
+          !message.process && streaming && isLast && message.content === ''
+            ? createInitialProcessState()
+            : undefined;
+        const process = message.process ?? activeFallback;
+        const parsedQuestions =
+          message.role === 'assistant'
+            ? splitQuestionBlocks(message.content, streaming && isLast)
+            : null;
+        return (
+          <div key={message.id} className="space-y-1" data-role={message.role}>
+            <p className="text-muted-foreground text-[10px] font-medium uppercase">
+              {message.role === 'user' ? 'You' : 'Assistant'}
+            </p>
+            {message.role === 'user' ? (
+              <div className="space-y-1">
+                {message.content ? (
+                  <p className="whitespace-pre-wrap text-xs">{message.content}</p>
+                ) : null}
+                <AttachmentChips attachments={message.attachments ?? []} />
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <AiProcessStatus process={process} />
+                {parsedQuestions?.text ? <MarkdownMessage content={parsedQuestions.text} /> : null}
+                {parsedQuestions?.streamingIncomplete ? (
+                  <p className="text-muted-foreground text-[11px]">Preparing choices…</p>
+                ) : null}
+                {parsedQuestions && parsedQuestions.questions.length > 0 ? (
+                  <AiQuestionCard
+                    state={{
+                      id: `${message.id}-q`,
+                      questions: parsedQuestions.questions,
+                      status:
+                        message.questionResult?.status ??
+                        (isLast || !onAnswerQuestion ? 'pending' : 'skipped'),
+                      ...(message.questionResult?.answers
+                        ? { answers: message.questionResult.answers }
+                        : {}),
+                    }}
+                    disabled={streaming || !isLast || !onAnswerQuestion}
+                    onAnswer={(answers) => onAnswerQuestion?.(message.id, answers)}
+                    onSkip={() => onAnswerQuestion?.(message.id, null)}
+                  />
+                ) : null}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

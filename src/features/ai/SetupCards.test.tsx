@@ -109,4 +109,59 @@ describe('SetupCards (Task 6.2b)', () => {
     await userEvent.click(screen.getByTestId('ai-custom-save'));
     expect(screen.getByTestId('ai-error-banner')).toHaveTextContent('model ID');
   });
+
+  it('fetches models for a custom endpoint and saves the selected model', async () => {
+    render(<SetupCards />);
+    await userEvent.click(screen.getByTestId('ai-setup-custom').querySelector('button')!);
+    fireEvent.change(screen.getByTestId('ai-custom-url'), {
+      target: { value: 'http://localhost:8080/v1' },
+    });
+    await userEvent.click(screen.getByTestId('ai-custom-fetch'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('ai-custom-model-select')).toHaveAttribute('role', 'combobox'),
+    );
+    expect(screen.getByTestId('ai-custom-model')).toHaveValue('claude-haiku-4-5');
+    expect(setProviderSecret).toHaveBeenCalledWith('probe_custom', {
+      baseUrl: 'http://localhost:8080/v1',
+      auth: 'none',
+    });
+
+    await userEvent.click(screen.getByTestId('ai-custom-save'));
+    await waitFor(() => expect(usePrefsStore.getState().ai.providers).toHaveLength(1));
+    expect(usePrefsStore.getState().ai.providers[0]).toMatchObject({
+      presetId: 'custom-openai',
+      modelId: 'claude-haiku-4-5',
+      baseUrlOverride: 'http://localhost:8080/v1',
+    });
+  });
+
+  it('retries a gateway base URL without its /v1 prefix', async () => {
+    const { AiHttpError, listModels } = await import('./listModels');
+    vi.mocked(listModels).mockImplementation(async (_fetch, _preset, baseUrl) => {
+      if (baseUrl === 'http://localhost:8080') throw new AiHttpError(404, 'not found');
+      return [{ id: 'vikey-model', label: 'vikey-model' }];
+    });
+
+    render(<SetupCards />);
+    await userEvent.click(screen.getByTestId('ai-setup-custom').querySelector('button')!);
+    fireEvent.change(screen.getByTestId('ai-custom-url'), {
+      target: { value: 'http://localhost:8080' },
+    });
+    await userEvent.click(screen.getByTestId('ai-custom-fetch'));
+
+    await waitFor(() => expect(screen.getByTestId('ai-custom-model')).toHaveValue('vikey-model'));
+    expect(screen.getByTestId('ai-custom-url')).toHaveValue('http://localhost:8080/v1');
+    expect(setProviderSecret).toHaveBeenCalledWith('probe_custom', {
+      baseUrl: 'http://localhost:8080/v1',
+      auth: 'none',
+    });
+
+    await userEvent.click(screen.getByTestId('ai-custom-save'));
+    await waitFor(() => expect(usePrefsStore.getState().ai.providers).toHaveLength(1));
+    expect(usePrefsStore.getState().ai.providers[0]).toMatchObject({
+      presetId: 'custom-openai',
+      baseUrlOverride: 'http://localhost:8080/v1',
+    });
+  });
 });

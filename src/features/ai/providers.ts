@@ -219,6 +219,27 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = deepFreeze([
     local: { probePath: '/models' },
   },
   {
+    // Custom endpoints pick a real wire protocol so documents and the
+    // protocol-specific model listing parse correctly.
+    id: 'custom-openai',
+    label: 'Custom (OpenAI Chat Completions)',
+    protocol: 'openai',
+    baseUrl: '',
+    auth: 'bearer',
+    modelsPath: '/models',
+    recommendedModels: [],
+  },
+  {
+    id: 'custom-anthropic',
+    label: 'Custom (Anthropic)',
+    protocol: 'anthropic',
+    baseUrl: '',
+    auth: 'x-api-key',
+    modelsPath: '/models',
+    recommendedModels: [],
+  },
+  {
+    // Kept so providers saved before the protocol split keep resolving.
     id: 'custom',
     label: 'Custom (OpenAI-compatible)',
     protocol: 'openai-compatible',
@@ -231,6 +252,15 @@ export const PROVIDER_PRESETS: readonly ProviderPreset[] = deepFreeze([
 
 export const CUSTOM_PRESET_ID = 'custom';
 
+/** Custom endpoint presets: never offered in the pasted-key picker. */
+export const CUSTOM_PRESET_IDS: readonly string[] = PROVIDER_PRESETS.filter(
+  (preset) => preset.baseUrl === '' && !preset.local,
+).map((preset) => preset.id);
+
+export function isCustomPreset(preset: ProviderPreset): boolean {
+  return CUSTOM_PRESET_IDS.includes(preset.id);
+}
+
 const BY_ID = new Map(PROVIDER_PRESETS.map((preset) => [preset.id, preset]));
 
 /** Registry order, for tests and settings validation. */
@@ -242,7 +272,7 @@ export function presetById(id: string): ProviderPreset | undefined {
 
 /** A preset the user can pick in the setup flow (everything but Custom). */
 export const PASTE_PRESETS: readonly ProviderPreset[] = PROVIDER_PRESETS.filter(
-  (preset) => preset.id !== CUSTOM_PRESET_ID && !preset.local,
+  (preset) => !isCustomPreset(preset) && !preset.local,
 );
 
 export const LOCAL_PRESETS: readonly ProviderPreset[] = PROVIDER_PRESETS.filter(

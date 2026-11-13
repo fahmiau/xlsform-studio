@@ -15,6 +15,7 @@ pub fn specta_builder() -> tauri_specta::Builder<tauri::Wry> {
             commands::app_info::app_info,
             commands::files::read_workbook,
             commands::files::save_workbook,
+            commands::files::read_attachment,
             commands::recovery::recovery_write,
             commands::recovery::recovery_read,
             commands::recovery::recovery_clear,

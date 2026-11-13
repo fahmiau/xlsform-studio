@@ -34,6 +34,8 @@ export interface RevealRequest {
   rowId: RowId;
   /** Bumped so repeated reveals of the same row still fire. */
   nonce: number;
+  /** Staged-change reveals must not steal focus from the chat input. */
+  focus?: boolean;
 }
 
 /** Live edit preview while the formula bar has focus (UI-only, no undo). */
@@ -113,7 +115,7 @@ export interface UiState {
   setColumnOrder: (sheet: SheetTab, keys: readonly ColumnKey[]) => void;
   toggleColumnHidden: (sheet: SheetTab, column: ColumnKey) => void;
   showAllColumns: (sheet: SheetTab) => void;
-  requestReveal: (sheet: SheetTab, rowId: RowId) => void;
+  requestReveal: (sheet: SheetTab, rowId: RowId, options?: { focus?: boolean }) => void;
   setCellPreview: (preview: CellPreview | null) => void;
 }
 
@@ -233,11 +235,16 @@ export const useUiStore = create<UiState>()((set) => ({
     }),
   showAllColumns: (sheet) =>
     set((state) => ({ hiddenColumns: { ...state.hiddenColumns, [sheet]: new Set() } })),
-  requestReveal: (sheet, rowId) =>
+  requestReveal: (sheet, rowId, options) =>
     set((state) => ({
       activeSheet: sheet,
       activeCell: state.activeCells[sheet] ?? null,
-      reveal: { sheet, rowId, nonce: (revealNonce += 1) },
+      reveal: {
+        sheet,
+        rowId,
+        nonce: (revealNonce += 1),
+        ...(options?.focus === false ? { focus: false } : {}),
+      },
     })),
   setCellPreview: (cellPreview) => set({ cellPreview }),
 }));

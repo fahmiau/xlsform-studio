@@ -5,10 +5,12 @@ import { join } from 'node:path';
 
 import { detectProvider, normalizePastedKey } from './detectProvider';
 import {
-  CUSTOM_PRESET_ID,
+  CUSTOM_PRESET_IDS,
   LOCAL_PRESETS,
+  PASTE_PRESETS,
   PRESET_IDS,
   PROVIDER_PRESETS,
+  isCustomPreset,
   isLocalPreset,
   presetUrls,
 } from './providers';
@@ -40,9 +42,21 @@ describe('provider registry', () => {
 
   it('uses https for every non-local preset', () => {
     for (const preset of PROVIDER_PRESETS) {
-      if (isLocalPreset(preset) || preset.id === CUSTOM_PRESET_ID) continue;
+      if (isLocalPreset(preset) || isCustomPreset(preset)) continue;
       expect(preset.baseUrl.startsWith('https://'), preset.id).toBe(true);
     }
+  });
+
+  it('has a custom preset per supported protocol', () => {
+    expect(CUSTOM_PRESET_IDS).toEqual(
+      expect.arrayContaining(['custom-openai', 'custom-anthropic', 'custom']),
+    );
+    expect(PRESET_IDS).toEqual(expect.arrayContaining([...CUSTOM_PRESET_IDS]));
+  });
+
+  it('keeps custom endpoints out of the pasted-key picker', () => {
+    const pasteIds = PASTE_PRESETS.map((preset) => preset.id);
+    for (const id of CUSTOM_PRESET_IDS) expect(pasteIds).not.toContain(id);
   });
 
   it('uses loopback http for local presets', () => {
@@ -63,7 +77,7 @@ describe('provider registry', () => {
 
   it('has a recommended model for every cloud preset', () => {
     for (const preset of PROVIDER_PRESETS) {
-      if (isLocalPreset(preset) || preset.id === CUSTOM_PRESET_ID) continue;
+      if (isLocalPreset(preset) || isCustomPreset(preset)) continue;
       expect(preset.recommendedModels.length, preset.id).toBeGreaterThan(0);
     }
   });

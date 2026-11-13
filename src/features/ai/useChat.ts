@@ -9,15 +9,31 @@ import { useDerivedStore } from '@/state/derivedStore';
 import { useUiStore } from '@/state/uiStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 
+import {
+  consumeAiStream,
+  createInitialProcessState,
+  finalizeProcessState,
+  type AiProcessState,
+} from './aiProcess';
+import { formatAnswersAsMessage, type AiQuestionAnswer } from './aiQuestion';
 import { streamChat } from './client';
+import { toModelMessages, type ChatAttachment } from './attachments';
 import { classifySdkError, type AiErrorInfo } from './errors';
 import { chatSystemPrompt } from './prompts';
 import { modelForConfig, type AiConfig } from './useAiConfig';
+
+export interface ChatQuestionResult {
+  status: 'answered' | 'skipped';
+  answers?: AiQuestionAnswer[];
+}
 
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
   content: string;
+  attachments?: ChatAttachment[];
+  process?: AiProcessState;
+  questionResult?: ChatQuestionResult;
 }
 
 export type ChatStatus = 'idle' | 'streaming';
@@ -26,7 +42,8 @@ export interface ChatState {
   messages: ChatMessage[];
   status: ChatStatus;
   error: AiErrorInfo | null;
-  send: (text: string, config: AiConfig) => Promise<void>;
+  send: (text: string, config: AiConfig, attachments?: ChatAttachment[]) => Promise<void>;
+  answerQuestion: (messageId: string, answers: AiQuestionAnswer[] | null, config: AiConfig) => void;
   stop: () => void;
   reset: () => void;
   clearError: () => void;
@@ -60,12 +77,22 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   status: 'idle',
   error: null,
 
-  send: async (text, config) => {
+  send: async (text, config, attachments = []) => {
     const trimmed = text.trim();
-    if (!trimmed || get().status === 'streaming') return;
+    if ((!trimmed && attachments.length === 0) || get().status === 'streaming') return;
 
-    const userMessage: ChatMessage = { id: nextId(), role: 'user', content: trimmed };
-    const assistantMessage: ChatMessage = { id: nextId(), role: 'assistant', content: '' };
+    const userMessage: ChatMessage = {
+      id: nextId(),
+      role: 'user',
+      content: trimmed,
+      ...(attachments.length > 0 ? { attachments } : {}),
+    };
+    const assistantMessage: ChatMessage = {
+      id: nextId(),
+      role: 'assistant',
+      content: '',
+      process: createInitialProcessState(),
+    };
     const history = [...get().messages, userMessage];
     set({ messages: [...history, assistantMessage], status: 'streaming', error: null });
 
@@ -74,31 +101,64 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const result = streamChat({
         model: modelForConfig(config),
         system: chatSystemPrompt(buildAiContext()),
-        messages: history.map((message) => ({ role: message.role, content: message.content })),
+        messages: toModelMessages(history),
         signal: controller.signal,
         ...(config.provider.temperature !== undefined
           ? { temperature: config.provider.temperature }
           : {}),
       });
-      for await (const delta of result.textStream) {
+      const finalProcess = await consumeAiStream(result.fullStream, (delta, process) => {
         set((state) => ({
           messages: state.messages.map((message) =>
             message.id === assistantMessage.id
-              ? { ...message, content: message.content + delta }
+              ? { ...message, content: message.content + delta, process }
               : message,
           ),
         }));
-      }
+      });
+      set((state) => ({
+        messages: state.messages.map((message) =>
+          message.id === assistantMessage.id ? { ...message, process: finalProcess } : message,
+        ),
+      }));
     } catch (error) {
       const aborted =
         (error instanceof DOMException && error.name === 'AbortError') ||
         (error instanceof Error && error.name === 'AbortError');
-      if (!aborted) {
-        set({ error: classifySdkError(error, config.preset) });
-      }
+      set((state) => ({
+        error: aborted ? state.error : classifySdkError(error, config.preset),
+        messages: state.messages.map((message) =>
+          message.id === assistantMessage.id
+            ? {
+                ...message,
+                process: finalizeProcessState(
+                  message.process ?? createInitialProcessState(),
+                  aborted ? 'stopped' : 'error',
+                ),
+              }
+            : message,
+        ),
+      }));
     } finally {
       controller = null;
       set({ status: 'idle' });
+    }
+  },
+
+  answerQuestion: (messageId, answers, config) => {
+    if (get().status === 'streaming') return;
+    set((state) => ({
+      messages: state.messages.map((message) =>
+        message.id === messageId
+          ? {
+              ...message,
+              questionResult: answers ? { status: 'answered', answers } : { status: 'skipped' },
+            }
+          : message,
+      ),
+    }));
+    if (answers && answers.length > 0) {
+      void get().send(formatAnswersAsMessage(answers), config);
     }
   },
 

@@ -6,10 +6,14 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use base64::Engine as _;
+use serde::Serialize;
 
 use crate::error::AppError;
 
 const XLSX_EXTENSION: &str = "xlsx";
+/// Chat attachments are read into memory and sent as base64 over IPC. 5 MB
+/// matches the strictest per-image limit among the supported providers.
+const MAX_ATTACHMENT_BYTES: u64 = 5 * 1024 * 1024;
 #[cfg(windows)]
 const ERROR_SHARING_VIOLATION: i32 = 32;
 #[cfg(windows)]
@@ -140,6 +144,62 @@ pub async fn save_workbook(path: String, base64: String) -> Result<(), AppError>
     .map_err(|err| AppError::Io(format!("save task failed: {err}")))?
 }
 
+/// One image/PDF read for an AI chat message.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, specta::Type)]
+#[serde(rename_all = "camelCase")]
+pub struct AttachmentPayload {
+    pub media_type: String,
+    pub base64: String,
+}
+
+/// Media types the model providers accept as file parts.
+fn attachment_media_type(path: &Path) -> Result<&'static str, AppError> {
+    let extension = path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    match extension.as_str() {
+        "png" => Ok("image/png"),
+        "jpg" | "jpeg" => Ok("image/jpeg"),
+        "webp" => Ok("image/webp"),
+        "gif" => Ok("image/gif"),
+        "pdf" => Ok("application/pdf"),
+        _ => Err(AppError::InvalidPath(
+            "expected a PNG, JPEG, WEBP, GIF, or PDF file".into(),
+        )),
+    }
+}
+
+/// Read a user-picked image or PDF for the AI drawer. Paths come from the
+/// dialog plugin; the extension whitelist and size cap are the trust boundary.
+fn read_attachment_payload(path: &Path) -> Result<AttachmentPayload, AppError> {
+    let media_type = attachment_media_type(path)?;
+    if !path.is_file() {
+        return Err(AppError::NotFound(path.display().to_string()));
+    }
+    let metadata = fs::metadata(path).map_err(|err| map_io_error(&err, path))?;
+    if metadata.len() > MAX_ATTACHMENT_BYTES {
+        return Err(AppError::InvalidPath(format!(
+            "attachment is larger than {} MB",
+            MAX_ATTACHMENT_BYTES / (1024 * 1024)
+        )));
+    }
+    let bytes = fs::read(path).map_err(|err| map_io_error(&err, path))?;
+    Ok(AttachmentPayload {
+        media_type: media_type.to_owned(),
+        base64: base64::engine::general_purpose::STANDARD.encode(bytes),
+    })
+}
+
+#[tauri::command]
+#[specta::specta]
+pub async fn read_attachment(path: String) -> Result<AttachmentPayload, AppError> {
+    tauri::async_runtime::spawn_blocking(move || read_attachment_payload(Path::new(&path)))
+        .await
+        .map_err(|err| AppError::Io(format!("read task failed: {err}")))?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -166,6 +226,75 @@ mod tests {
         assert!(matches!(
             validate_workbook_path(Path::new("")),
             Err(AppError::InvalidPath(_))
+        ));
+    }
+
+    #[test]
+    fn maps_supported_attachment_extensions() {
+        for (path, media_type) in [
+            ("C:/x/photo.PNG", "image/png"),
+            ("C:/x/photo.jpg", "image/jpeg"),
+            ("C:/x/photo.jpeg", "image/jpeg"),
+            ("C:/x/photo.webp", "image/webp"),
+            ("C:/x/photo.gif", "image/gif"),
+            ("C:/x/paper.pdf", "application/pdf"),
+        ] {
+            assert_eq!(
+                attachment_media_type(Path::new(path)).unwrap(),
+                media_type,
+                "unexpected media type for {path}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_other_attachment_extensions() {
+        for path in ["C:/x/notes.txt", "C:/x/photo.svg", "C:/x/attachment"] {
+            assert!(matches!(
+                attachment_media_type(Path::new(path)),
+                Err(AppError::InvalidPath(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn reads_a_supported_attachment_as_base64() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("scan.PNG");
+        let bytes = b"\x89PNG\r\n\x1a\n";
+        fs::write(&path, bytes).unwrap();
+
+        let payload = read_attachment_payload(&path).unwrap();
+        assert_eq!(payload.media_type, "image/png");
+        assert_eq!(
+            base64::engine::general_purpose::STANDARD
+                .decode(payload.base64)
+                .unwrap(),
+            bytes
+        );
+    }
+
+    #[test]
+    fn rejects_an_oversized_attachment() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("huge.pdf");
+        File::create(&path)
+            .unwrap()
+            .set_len(MAX_ATTACHMENT_BYTES + 1)
+            .unwrap();
+        assert!(matches!(
+            read_attachment_payload(&path),
+            Err(AppError::InvalidPath(_))
+        ));
+    }
+
+    #[test]
+    fn missing_attachment_is_not_found() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("missing.png");
+        assert!(matches!(
+            read_attachment_payload(&path),
+            Err(AppError::NotFound(_))
         ));
     }
 

@@ -78,6 +78,7 @@ export const ROW_TINTS = {
     /** Build Mode staged changes (Task 6.7). */
     inserted: 'rgba(16, 185, 129, 0.16)',
     modifiedCell: 'rgba(245, 158, 11, 0.24)',
+    modifiedRow: 'rgba(245, 158, 11, 0.1)',
     deleted: 'rgba(244, 63, 94, 0.16)',
   },
   dark: {
@@ -87,6 +88,7 @@ export const ROW_TINTS = {
     translation: 'rgba(120, 53, 15, 0.28)',
     inserted: 'rgba(16, 185, 129, 0.22)',
     modifiedCell: 'rgba(245, 158, 11, 0.26)',
+    modifiedRow: 'rgba(245, 158, 11, 0.14)',
     deleted: 'rgba(244, 63, 94, 0.22)',
   },
 } as const;
@@ -101,6 +103,12 @@ export const GROUP_RAIL_COLORS = {
 export function stagingCellTheme(dark: boolean): Partial<Theme> {
   const tints = dark ? ROW_TINTS.dark : ROW_TINTS.light;
   return { bgCell: tints.modifiedCell };
+}
+
+/** Light amber row wash so modified rows are visible from a distance. */
+export function stagingModifiedRowTheme(dark: boolean): Partial<Theme> {
+  const tints = dark ? ROW_TINTS.dark : ROW_TINTS.light;
+  return { bgCell: tints.modifiedRow };
 }
 
 /** Emerald/rose row wash for inserted/deleted staged rows. */

@@ -2,8 +2,9 @@
  * Auto-reveal staged rows inside collapsed groups (Task 6.7).
  * Deleted rows are looked up in the base tree, everything else in the draft.
  */
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
+import { changedRows, type WorkbookDiff } from '@/core/ai/diff';
 import { buildGroupTree } from '@/core/indexes/groupTree';
 import type { RowId, SheetData } from '@/core/model/types';
 import { useDerivedStore } from '@/state/derivedStore';
@@ -25,6 +26,17 @@ export function useStagingAutoReveal(): void {
   const base = useStagingStore((state) => state.base);
   const draft = useStagingStore((state) => state.draft);
   const diff = useStagingStore((state) => state.diff);
+
+  const running = useStagingStore((state) => state.running);
+  const revealedDiff = useRef<WorkbookDiff | null>(null);
+
+  useEffect(() => {
+    if (running || !base || !draft || !diff || diff.summary.total === 0) return;
+    if (revealedDiff.current === diff) return;
+    revealedDiff.current = diff;
+    const first = changedRows(base, draft, diff)[0];
+    if (first) useUiStore.getState().requestReveal(first.sheet, first.rowId, { focus: false });
+  }, [running, base, draft, diff]);
 
   useEffect(() => {
     if (!base || !draft || !diff) return;

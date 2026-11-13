@@ -211,6 +211,7 @@ test.describe('Build Mode staging (Task 6.7)', () => {
 
     await expect(page.getByTestId('ai-staging-summary')).toContainText('3 changes');
     await expect(page.getByTestId('ai-staging-summary')).toContainText('1 group created');
+    await expect(page.getByTestId('ai-staging-nav')).toContainText('1/3');
     await expect(page.getByTestId('ai-staging-lock')).toBeVisible();
     await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (2)');
 
@@ -240,5 +241,35 @@ test.describe('Build Mode staging (Task 6.7)', () => {
     await expect(page.getByTestId('ai-staging-lock')).toContainText('Accept or Revert');
     await page.getByTestId('ai-revert').click();
     await expect(page.getByTestId('ai-build-input')).toBeEnabled();
+  });
+
+  test('attaches dropped files and pasted clipboard images', async ({ page }) => {
+    await openBuildMode(page);
+    const dropTransfer = await page.evaluateHandle(() => {
+      const transfer = new DataTransfer();
+      transfer.items.add(
+        new File([new Uint8Array([1, 2, 3])], 'dropped.png', { type: 'image/png' }),
+      );
+      return transfer;
+    });
+    await page.getByTestId('ai-build-view').dispatchEvent('drop', { dataTransfer: dropTransfer });
+    await expect(page.getByTestId('ai-attachment-chip')).toHaveCount(1);
+    await expect(page.getByTestId('ai-attachment-chip')).toContainText('dropped.png');
+
+    await page.getByTestId('ai-build-input').evaluate((el) => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([new Uint8Array([4, 5])], '', { type: 'image/png' }));
+      el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: transfer, bubbles: true }));
+    });
+    await expect(page.getByTestId('ai-attachment-chip')).toHaveCount(2);
+    await expect(page.getByTestId('ai-attachment-chip').nth(1)).toContainText('image_1.png');
+
+    await page.getByTestId('ai-build-input').evaluate((el) => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File([new Uint8Array([6, 7])], 'image.png', { type: 'image/png' }));
+      el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: transfer, bubbles: true }));
+    });
+    await expect(page.getByTestId('ai-attachment-chip')).toHaveCount(3);
+    await expect(page.getByTestId('ai-attachment-chip').nth(2)).toContainText('image_2.png');
   });
 });

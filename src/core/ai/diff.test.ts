@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { WorkbookData } from '@/core/model/types';
 
-import { cellChangeKey, diffWorkbooks, isCellModified, rowChange } from './diff';
+import { cellChangeKey, changedRows, diffWorkbooks, isCellModified, rowChange } from './diff';
 
 function workbook(): WorkbookData {
   return {
@@ -140,5 +140,26 @@ describe('diffWorkbooks', () => {
     const diff = diffWorkbooks(base, draft);
     expect(diff.summary.total).toBe(2);
     expect(diff.summary.text).toBe('2 changes (2 modified)');
+  });
+});
+
+describe('changedRows', () => {
+  it('lists live changes in document order and deleted rows after them', () => {
+    const base = workbook();
+    const draft = clone(base);
+    draft.survey.rows[0]!.cells.label = 'Age (years)';
+    draft.survey.rows.push({ id: 's3', cells: { type: 'text', name: 'new' } });
+    draft.choices.rows = [];
+    const diff = diffWorkbooks(base, draft);
+    expect(changedRows(base, draft, diff)).toEqual([
+      { sheet: 'survey', rowId: 's1' },
+      { sheet: 'survey', rowId: 's3' },
+      { sheet: 'choices', rowId: 'c1' },
+    ]);
+  });
+
+  it('returns nothing for an empty draft diff', () => {
+    const base = workbook();
+    expect(changedRows(base, clone(base), diffWorkbooks(base, clone(base)))).toEqual([]);
   });
 });

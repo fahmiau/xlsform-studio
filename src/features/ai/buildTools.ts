@@ -7,6 +7,11 @@ import { TOOL_DESCRIPTIONS, TOOL_SCHEMAS, type ToolName } from '@/core/ai/tools'
 import type { ToolResult } from '@/core/ai/applyTools';
 import { useStagingStore } from '@/state/stagingStore';
 
+import {
+  ASK_QUESTION_DESCRIPTION,
+  askQuestionInputSchema,
+  type AskQuestionHandler,
+} from './aiQuestion';
 import { tool, type ToolSet } from './client';
 
 export interface ToolTranscriptEntry {
@@ -17,6 +22,10 @@ export interface ToolTranscriptEntry {
 }
 
 export type ToolListener = (entry: ToolTranscriptEntry) => void;
+
+export interface BuildToolsOptions {
+  onAskQuestion?: AskQuestionHandler;
+}
 
 function runTool(name: ToolName, input: unknown, onEntry: ToolListener): ToolResult {
   const staging = useStagingStore.getState();
@@ -34,7 +43,10 @@ function runTool(name: ToolName, input: unknown, onEntry: ToolListener): ToolRes
   return result;
 }
 
-export function buildTools(onEntry: ToolListener = () => undefined): ToolSet {
+export function buildTools(
+  onEntry: ToolListener = () => undefined,
+  options?: BuildToolsOptions,
+): ToolSet {
   return {
     insert_survey_rows: tool({
       description: TOOL_DESCRIPTIONS.insert_survey_rows,
@@ -56,6 +68,16 @@ export function buildTools(onEntry: ToolListener = () => undefined): ToolSet {
       inputSchema: TOOL_SCHEMAS.delete_survey_rows,
       execute: async (input) => runTool('delete_survey_rows', input, onEntry),
     }),
+    ...(options?.onAskQuestion
+      ? {
+          ask_question: tool({
+            description: ASK_QUESTION_DESCRIPTION,
+            inputSchema: askQuestionInputSchema,
+            execute: async (input, execOptions) =>
+              options.onAskQuestion!(input, execOptions?.abortSignal),
+          }),
+        }
+      : {}),
   };
 }
 

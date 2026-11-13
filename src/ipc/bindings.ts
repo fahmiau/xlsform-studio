@@ -7,6 +7,7 @@ export const commands = {
 	appInfo: () => __TAURI_INVOKE<AppInfo>("app_info"),
 	readWorkbook: (path: string) => __TAURI_INVOKE<string>("read_workbook", { path }),
 	saveWorkbook: (path: string, base64: string) => __TAURI_INVOKE<null>("save_workbook", { path, base64 }),
+	readAttachment: (path: string) => __TAURI_INVOKE<AttachmentPayload>("read_attachment", { path }),
 	recoveryWrite: (json: string) => __TAURI_INVOKE<null>("recovery_write", { json }),
 	recoveryRead: () => __TAURI_INVOKE<{
 	json: string,
@@ -36,6 +37,12 @@ export type AppInfo = {
 	version: string,
 	platform: string,
 	arch: string,
+};
+
+/**  One image/PDF read for an AI chat message. */
+export type AttachmentPayload = {
+	mediaType: string,
+	base64: string,
 };
 
 /**

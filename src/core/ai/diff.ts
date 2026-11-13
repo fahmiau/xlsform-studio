@@ -144,6 +144,36 @@ export function diffWorkbooks(base: WorkbookData, draft: WorkbookData): Workbook
   };
 }
 
+export interface ChangedRow {
+  sheet: ManagedSheetName;
+  rowId: RowId;
+}
+
+const SHEET_ORDER: readonly ManagedSheetName[] = ['survey', 'choices', 'settings'];
+
+/** Changed rows in document order; deleted rows follow the live ones. */
+export function changedRows(
+  base: WorkbookData,
+  draft: WorkbookData,
+  diff: WorkbookDiff,
+): ChangedRow[] {
+  const result: ChangedRow[] = [];
+  for (const sheet of SHEET_ORDER) {
+    const rows = diff[sheet].rows;
+    if (rows.size === 0) continue;
+    const seen = new Set<RowId>();
+    for (const row of draft[sheet].rows) {
+      if (!rows.has(row.id)) continue;
+      result.push({ sheet, rowId: row.id });
+      seen.add(row.id);
+    }
+    for (const row of base[sheet].rows) {
+      if (rows.has(row.id) && !seen.has(row.id)) result.push({ sheet, rowId: row.id });
+    }
+  }
+  return result;
+}
+
 export function sheetDiffFor(diff: WorkbookDiff, sheet: ManagedSheetName): SheetDiff {
   return diff[sheet];
 }

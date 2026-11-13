@@ -95,3 +95,10 @@ export const useStagingStore = create<StagingState>()((set, get) => ({
 export function selectIsStaged(state: StagingState): boolean {
   return state.draft !== null;
 }
+
+/** A draft with real changes has finished running and needs review. */
+export function selectReviewPending(state: StagingState): boolean {
+  return (
+    state.draft !== null && !state.running && state.diff !== null && state.diff.summary.total > 0
+  );
+}

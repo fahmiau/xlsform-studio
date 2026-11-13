@@ -2,19 +2,44 @@
  * Floating Accept/Revert bar for staged Build Mode changes (Task 6.7, AD-11).
  * Accept applies the draft in one store call → one undo entry.
  */
-import { useEffect } from 'react';
-import { AlertTriangle, Check, Undo2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, Check, ChevronLeft, ChevronRight, Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { changedRows, type WorkbookDiff } from '@/core/ai/diff';
 import { isEditableTarget } from '@/lib/commands';
-import { useStagingStore } from '@/state/stagingStore';
+import { selectReviewPending, useStagingStore } from '@/state/stagingStore';
+import { useUiStore } from '@/state/uiStore';
 
 export function StagingBar() {
   const diff = useStagingStore((state) => state.diff);
   const lint = useStagingStore((state) => state.lint);
-  const staged = useStagingStore((state) => state.draft !== null);
+  const base = useStagingStore((state) => state.base);
+  const draft = useStagingStore((state) => state.draft);
+  const staged = useStagingStore(selectReviewPending);
   const accept = useStagingStore((state) => state.accept);
   const revert = useStagingStore((state) => state.revert);
+  const changes = useMemo(
+    () => (base && draft && diff ? changedRows(base, draft, diff) : []),
+    [base, diff, draft],
+  );
+  // The diff identity scopes the cursor, so a new run starts at the first change
+  // without a state-resetting effect.
+  const [nav, setNav] = useState<{ diff: WorkbookDiff | null; index: number }>({
+    diff: null,
+    index: 0,
+  });
+  const index = nav.diff === diff ? nav.index : 0;
+
+  const step = (delta: number) => {
+    if (changes.length === 0) return;
+    const current = Math.min(index, changes.length - 1);
+    const next = (current + delta + changes.length) % changes.length;
+    const target = changes[next];
+    if (!target) return;
+    setNav({ diff, index: next });
+    useUiStore.getState().requestReveal(target.sheet, target.rowId, { focus: false });
+  };
 
   useEffect(() => {
     if (!staged) return;
@@ -47,7 +72,7 @@ export function StagingBar() {
     >
       <div className="min-w-0">
         <p className="font-medium" data-testid="ai-staging-summary">
-          AI applied {diff.summary.text}
+          AI proposes {diff.summary.text}
         </p>
         {lint && lint.added.length > 0 ? (
           <p className="flex items-center gap-1 text-[11px] text-amber-700">
@@ -56,6 +81,29 @@ export function StagingBar() {
           </p>
         ) : null}
       </div>
+      {changes.length > 0 ? (
+        <div className="flex items-center gap-0.5" data-testid="ai-staging-nav">
+          <button
+            type="button"
+            className="hover:bg-accent rounded border p-1"
+            aria-label="Previous change"
+            onClick={() => step(-1)}
+          >
+            <ChevronLeft className="size-3" />
+          </button>
+          <span className="text-muted-foreground min-w-8 text-center text-[11px] tabular-nums">
+            {Math.min(index + 1, changes.length)}/{changes.length}
+          </span>
+          <button
+            type="button"
+            className="hover:bg-accent rounded border p-1"
+            aria-label="Next change"
+            onClick={() => step(1)}
+          >
+            <ChevronRight className="size-3" />
+          </button>
+        </div>
+      ) : null}
       <button
         type="button"
         className="flex items-center gap-1 rounded bg-emerald-600 px-2 py-1 font-medium text-white hover:bg-emerald-700"

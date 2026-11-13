@@ -39,7 +39,7 @@ import { applyCellEdits, type CellEditOutcome } from '@/features/grid/cellEditPi
 import { notifyCellEdits } from '@/features/shell/toasts';
 import { useDerivedStore } from '@/state/derivedStore';
 import { usePrefsStore } from '@/state/prefsStore';
-import { useStagingStore } from '@/state/stagingStore';
+import { selectReviewPending, useStagingStore } from '@/state/stagingStore';
 import { useUiStore } from '@/state/uiStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 import { useIsDark } from '@/lib/theme';
@@ -83,7 +83,13 @@ import {
   findRowIndex,
 } from './selection';
 import { mergedSheet } from './stagingView';
-import { buildGridTheme, GROUP_RAIL_COLORS, stagingCellTheme, stagingRowTheme } from './theme';
+import {
+  buildGridTheme,
+  GROUP_RAIL_COLORS,
+  stagingCellTheme,
+  stagingModifiedRowTheme,
+  stagingRowTheme,
+} from './theme';
 import { useClipboard } from './useClipboard';
 import {
   deleteSelectedRows,
@@ -135,6 +141,7 @@ export function SheetGrid({
   const stagedBase = useStagingStore((state) => state.base);
   const stagedDraft = useStagingStore((state) => state.draft);
   const stagedDiff = useStagingStore((state) => state.diff);
+  const reviewPending = useStagingStore(selectReviewPending);
   const data = stagedDraft ?? liveData;
   // Deleted rows stay visible at their original positions while staged.
   const sourceSheet = data[sheetName];
@@ -336,7 +343,7 @@ export function SheetGrid({
       0,
       4,
     );
-    gridRef.current?.focus();
+    if (reveal.focus !== false) gridRef.current?.focus();
   }, [
     reveal,
     sheetName,
@@ -381,6 +388,40 @@ export function SheetGrid({
     grid.updateCells([{ cell: [column, visible] }]);
   }, [cellPreview, display.keys, projection, sheet, sheetName]);
   const primaryLabelKey = useMemo(() => primaryLabelColumn(sheet, data), [sheet, data]);
+
+  // Columns touched by the staged draft, for the header underline.
+  const stagedChangedColumns = useMemo(() => {
+    const columns = new Set<ColumnKey>();
+    if (!stagedDiff) return columns;
+    const sheetDiff = stagedDiff[sheetName];
+    for (const cellKey of sheetDiff.cells) {
+      const column = cellKey.slice(cellKey.indexOf('\u0000') + 1);
+      if (column) columns.add(column);
+    }
+    for (const [rowId, kind] of sheetDiff.rows) {
+      if (kind === 'modified') continue;
+      const row = sheet.rows.find((candidate) => candidate.id === rowId);
+      if (!row) continue;
+      for (const [column, value] of Object.entries(row.cells)) {
+        if (value.trim()) columns.add(column);
+      }
+    }
+    return columns;
+  }, [sheet.rows, sheetName, stagedDiff]);
+
+  const drawStagedHeader = useCallback<NonNullable<DataEditorProps['drawHeader']>>(
+    (args, draw) => {
+      draw();
+      if (!stagedDiff) return;
+      const key = display.keys[args.columnIndex - 1];
+      if (!key || !stagedChangedColumns.has(key)) return;
+      args.ctx.save();
+      args.ctx.fillStyle = dark ? 'rgba(251, 191, 36, 0.95)' : 'rgba(217, 119, 6, 0.9)';
+      args.ctx.fillRect(args.rect.x, args.rect.y + args.rect.height - 2, args.rect.width, 2);
+      args.ctx.restore();
+    },
+    [dark, display.keys, stagedChangedColumns, stagedDiff],
+  );
 
   const getCellContent = useCallback(
     (cell: Item): GridCell => {
@@ -546,6 +587,7 @@ export function SheetGrid({
       if (change === 'inserted' || change === 'deleted') {
         return stagingRowTheme(gridTheme, dark, change);
       }
+      if (change === 'modified') return stagingModifiedRowTheme(dark);
       if (orphanRows.has(row.id)) style = 'orphan';
       else if (kind === 'begin_group') style = 'group';
       else if (kind === 'begin_repeat') style = 'repeat';
@@ -892,6 +934,11 @@ export function SheetGrid({
           <span className="font-medium">{sheetName}</span>
           <span>{sheet.rows.length} rows</span>
           <span>{sheet.columns.length} columns</span>
+          {reviewPending ? (
+            <span className="text-amber-700" data-testid="ai-staging-lock">
+              Staged AI changes — Accept or Revert below
+            </span>
+          ) : null}
           <div className="ml-auto flex items-center gap-1">
             {hidden && hidden.size > 0 ? (
               <button
@@ -927,6 +974,7 @@ export function SheetGrid({
           onCellsEdited={onCellsEdited}
           onItemHovered={handleDiagnosticHover}
           drawCell={drawDiagnosticMarker}
+          drawHeader={drawStagedHeader}
           onDelete={() => !locked}
           onPaste={onPaste}
           onFillPattern={onFillPattern}
@@ -1010,16 +1058,6 @@ export function SheetGrid({
                 {issue.message}
               </div>
             ))}
-          </div>
-        ) : null}
-        {locked ? (
-          <div
-            className="bg-background/60 absolute inset-0 z-30 flex items-start justify-center pt-4 backdrop-blur-[1px]"
-            data-testid="ai-staging-lock"
-          >
-            <p className="border-border bg-background rounded border px-3 py-1.5 text-xs shadow">
-              AI changes are staged — Accept or Revert below to continue editing.
-            </p>
           </div>
         ) : null}
       </div>
