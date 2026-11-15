@@ -15,7 +15,7 @@ import { create } from 'zustand';
 import { temporal } from 'zundo';
 
 import { createEmptyWorkbook } from '@/core/model/factory';
-import type { ManagedSheetName, RowId, WorkbookData } from '@/core/model/types';
+import type { ColumnKey, ManagedSheetName, RowId, WorkbookData } from '@/core/model/types';
 
 export type DataUpdate = (data: WorkbookData) => WorkbookData;
 
@@ -23,8 +23,14 @@ export interface ActionMeta {
   label: string;
   /** Sheet the action edited, for scroll-to-change after undo/redo. */
   sheet?: ManagedSheetName;
-  /** Rows the action touched, in the result. */
+  /** Rows the action touched, in the result (and redo reveal target). */
   rowIds?: RowId[];
+  /** Rows to reveal when undoing this action (e.g. deleted rows restored by undo). */
+  undoRowIds?: RowId[];
+  /** Columns the action touched, so undo/redo highlights the exact cell. */
+  columns?: ColumnKey[];
+  /** True when the action originated inside the Choices Drawer. */
+  inDrawer?: boolean;
 }
 
 /**

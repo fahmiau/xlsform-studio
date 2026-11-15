@@ -86,6 +86,7 @@ export function ChoicesDrawer() {
           {
             sheet: 'survey',
             rowIds: [row.id],
+            columns: [typeKey],
           },
         );
     };
@@ -113,7 +114,12 @@ export function ChoicesDrawer() {
         outcome = applyListMode(data, listName, mode, slugMaxLength);
         return outcome.data;
       },
-      { sheet: 'choices' },
+      {
+        sheet: 'choices',
+        rowIds: bound.rows.map((row) => row.id),
+        columns: [bound.nameKey],
+        inDrawer: true,
+      },
     );
     if (outcome) notifyCellEdits(outcome);
   };
@@ -133,7 +139,12 @@ export function ChoicesDrawer() {
         });
         return outcome.data;
       },
-      { sheet: 'choices', rowIds: edits.map((edit) => edit.rowId) },
+      {
+        sheet: 'choices',
+        rowIds: [...new Set(edits.map((edit) => edit.rowId))],
+        columns: [...new Set(edits.map((edit) => edit.column))],
+        inDrawer: true,
+      },
     );
     if (outcome) notifyCellEdits(outcome);
   };
@@ -148,6 +159,18 @@ export function ChoicesDrawer() {
       useUiStore.getState().setChoiceMode(listName, bound.mode);
     }
     let rowId: string | null = null;
+    const column = bound.labelKey ?? bound.nameKey;
+    const meta: {
+      sheet: 'choices';
+      rowIds: string[];
+      columns: string[];
+      inDrawer: true;
+    } = {
+      sheet: 'choices',
+      rowIds: [],
+      columns: [column],
+      inDrawer: true,
+    };
     useWorkbookStore.getState().apply(
       'Add choice',
       (data) => {
@@ -161,9 +184,10 @@ export function ChoicesDrawer() {
           },
         );
         rowId = result.rowId;
+        if (rowId) meta.rowIds = [rowId];
         return result.data;
       },
-      { sheet: 'choices' },
+      meta,
     );
     return rowId;
   };
@@ -180,6 +204,7 @@ export function ChoicesDrawer() {
     const fromReal = bound.rowIndexes[fromVisible];
     const toReal = bound.rowIndexes[toVisible];
     if (fromReal === undefined || toReal === undefined || fromVisible === toVisible) return;
+    const movedRowId = bound.rows[fromVisible]?.id;
     useWorkbookStore
       .getState()
       .apply(
@@ -192,19 +217,31 @@ export function ChoicesDrawer() {
             fromReal,
             toVisible > fromVisible ? toReal + 1 : toReal,
           ),
-        { sheet: 'choices' },
+        {
+          sheet: 'choices',
+          ...(movedRowId ? { rowIds: [movedRowId] } : {}),
+          columns: [bound.labelKey ?? bound.nameKey],
+          inDrawer: true,
+        },
       );
   };
 
   const deleteChoiceRows = () => {
     const selected = useUiStore.getState().selectedRowIds;
     if (selected.length === 0) return;
+    const remaining = bound.rows.find((row) => !selected.includes(row.id));
     useWorkbookStore
       .getState()
       .apply(
         `Delete ${selected.length} choice${selected.length === 1 ? '' : 's'}`,
         (data) => deleteRows(data, 'choices', selected),
-        { sheet: 'choices' },
+        {
+          sheet: 'choices',
+          rowIds: remaining ? [remaining.id] : [],
+          undoRowIds: selected,
+          columns: [bound.labelKey ?? bound.nameKey],
+          inDrawer: true,
+        },
       );
     useUiStore.getState().setSelectedRowIds([]);
   };

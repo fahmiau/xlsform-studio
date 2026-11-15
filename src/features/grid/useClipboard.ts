@@ -94,9 +94,8 @@ export function useClipboard(
           (data) => setCells(data, sheetName, edits),
           {
             sheet: sheetName,
-            rowIds: rowIndexes
-              .map((rowIndex) => sheet.rows[rowIndex]?.id)
-              .filter((id): id is RowId => id !== undefined),
+            rowIds: [...new Set(edits.map((edit) => edit.rowId))],
+            columns: [...new Set(edits.map((edit) => edit.column))],
           },
         );
     }
@@ -119,14 +118,24 @@ export function useClipboard(
 
       let result: ReturnType<typeof pasteMatrix> | undefined;
       const cellCount = matrix.reduce((total, row) => total + row.length, 0);
-      useWorkbookStore
-        .getState()
-        .apply(`Paste ${cellCount} cell${cellCount === 1 ? '' : 's'}`, (data) => {
+      const width = matrix[0]?.length ?? 0;
+      const columns = [...keys].slice(target.columnIndex, target.columnIndex + width);
+      const meta: { sheet: ManagedSheetName; rowIds: RowId[]; columns: ColumnKey[] } = {
+        sheet: sheetName,
+        rowIds: [],
+        columns,
+      };
+      useWorkbookStore.getState().apply(
+        `Paste ${cellCount} cell${cellCount === 1 ? '' : 's'}`,
+        (data) => {
           result = pasteMatrix(data, sheetName, target, matrix, [...keys], {
             ...(projection ? { rowIndexes: projection.realIndexes } : {}),
           });
+          meta.rowIds = result.rowIds;
           return result.data;
-        });
+        },
+        meta,
+      );
       if (result?.droppedColumns) {
         toast.warning(`Dropped ${result.droppedColumns} column(s) past the last column.`);
       }

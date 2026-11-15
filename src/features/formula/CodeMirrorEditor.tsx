@@ -43,6 +43,8 @@ export interface CodeMirrorEditorProps {
    * this off because Glide's overlay owns outside-click finishing.
    */
   commitOnBlur?: boolean;
+  /** Blur the editor after Enter/Escape (used by FormulaBar so Ctrl+Z reaches global shortcuts). */
+  blurOnCommit?: boolean;
   testId?: string;
   /** Typing triggers completions (Preferences → Editor). */
   autocomplete?: boolean;
@@ -66,6 +68,7 @@ export function CodeMirrorEditor({
   commitOnTab = false,
   onTabCommit,
   commitOnBlur = true,
+  blurOnCommit = false,
   testId,
   autocomplete = true,
   fontSize = 12,
@@ -73,16 +76,28 @@ export function CodeMirrorEditor({
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const syncing = useRef(false);
+  const skipNextBlur = useRef(false);
   const callbacks = useRef({
+    value,
     onChange,
     onCommit,
     onCancel,
     onTabCommit,
     completionData,
     lintIssues,
+    blurOnCommit,
   });
   useEffect(() => {
-    callbacks.current = { onChange, onCommit, onCancel, onTabCommit, completionData, lintIssues };
+    callbacks.current = {
+      value,
+      onChange,
+      onCommit,
+      onCancel,
+      onTabCommit,
+      completionData,
+      lintIssues,
+      blurOnCommit,
+    };
   });
   const diagnostics = useDerivedStore((state) => state.diagnostics);
 
@@ -97,7 +112,9 @@ export function CodeMirrorEditor({
       {
         key: 'Enter',
         run: (view) => {
+          if (callbacks.current.blurOnCommit) skipNextBlur.current = true;
           commit(view);
+          if (callbacks.current.blurOnCommit) view.contentDOM.blur();
           return true;
         },
       },
@@ -107,8 +124,24 @@ export function CodeMirrorEditor({
       },
       {
         key: 'Escape',
-        run: () => {
+        run: (view) => {
+          if (callbacks.current.blurOnCommit) {
+            skipNextBlur.current = true;
+            const original = callbacks.current.value;
+            if (view.state.doc.toString() !== original) {
+              syncing.current = true;
+              try {
+                view.dispatch({
+                  changes: { from: 0, to: view.state.doc.length, insert: original },
+                  selection: { anchor: original.length },
+                });
+              } finally {
+                syncing.current = false;
+              }
+            }
+          }
           callbacks.current.onCancel?.();
+          if (callbacks.current.blurOnCommit) view.contentDOM.blur();
           return true;
         },
       },
@@ -221,8 +254,12 @@ export function CodeMirrorEditor({
         }
       }}
       onBlur={(event) => {
-        if (!commitOnBlur) return;
         if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+        if (skipNextBlur.current) {
+          skipNextBlur.current = false;
+          return;
+        }
+        if (!commitOnBlur) return;
         callbacks.current.onCommit?.(viewRef.current?.state.doc.toString() ?? value);
       }}
     />

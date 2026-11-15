@@ -106,6 +106,14 @@ test('renaming a variable rewrites references in one undo step', async ({ page }
   await expect(page.getByTestId('formula-bar-editor')).toContainText('${q1_renamed} > 0');
 
   await page.keyboard.press('Control+z');
+  await expect(page.getByTestId('formula-bar-column')).toHaveText('[Column: name]');
+  await expect(formula).toHaveValue('q1');
+
+  await canvas.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByTestId('formula-bar-column')).toHaveText('[Column: relevant]');
   await expect(page.getByTestId('formula-bar-editor')).toContainText('${q1} > 0');
 });
 

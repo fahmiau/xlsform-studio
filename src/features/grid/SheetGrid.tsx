@@ -41,7 +41,7 @@ import { useDerivedStore } from '@/state/derivedStore';
 import { usePrefsStore } from '@/state/prefsStore';
 import { selectReviewPending, useStagingStore } from '@/state/stagingStore';
 import { useUiStore } from '@/state/uiStore';
-import { useWorkbookStore } from '@/state/workbookStore';
+import { useWorkbookStore, type ActionMeta } from '@/state/workbookStore';
 import { useIsDark } from '@/lib/theme';
 
 import { cellValue, editValueText, textCell } from './cells/cellContent';
@@ -57,6 +57,7 @@ import {
   type SheetGridConfig,
 } from './columns';
 import { pasteMatrix } from './clipboard';
+import { computeDiagnosticTooltipLayout } from './diagnosticTooltip';
 import { isCellEditable, structuralRowKind, type StructuralRowKind } from './editability';
 import { useEditorRouting } from './editors/useEditorRouting';
 import { tileFill } from './fill';
@@ -64,6 +65,7 @@ import { GRID_HEADER_HEIGHT, GRID_ROW_HEIGHT } from './geometry';
 import { buildGroupRails } from './groupRails';
 import { HeaderMenu, type HeaderMenuState } from './HeaderMenu';
 import { AddColumnDialog } from './AddColumnDialog';
+import { computeRevealScrollTarget } from './revealScroll';
 import {
   buildProjection,
   identityProjection,
@@ -100,7 +102,7 @@ import {
 } from './useRowCommands';
 import { deleteGroupRow, isBeginRow, unwrapGroupRow } from './useGroupCommands';
 
-const scrollMemory = new Map<string, { tx: number; ty: number }>();
+const scrollMemory = new Map<string, { col: number; row: number }>();
 
 export interface SheetGridProps {
   sheetName: ManagedSheetName;
@@ -162,7 +164,6 @@ export function SheetGrid({
   const collapsedGroupIds = useUiStore((state) => state.collapsedGroupIds);
   const flashRowId = useUiStore((state) => state.flashRowId);
   const reveal = useUiStore((state) => state.reveal);
-  const activeCell = useUiStore((state) => state.activeCell);
   const themeMode = usePrefsStore((state) => state.theme);
   const dark = useIsDark(themeMode);
   const gridTheme = useMemo(() => buildGridTheme(dark), [dark]);
@@ -177,8 +178,13 @@ export function SheetGrid({
   const [headerMenu, setHeaderMenu] = useState<HeaderMenuState | null>(null);
   const [addColumnOpen, setAddColumnOpen] = useState(false);
   const [diagnosticHover, setDiagnosticHover] = useState<{
-    x: number;
-    y: number;
+    style: {
+      maxWidth: number;
+      left?: number;
+      right?: number;
+      top?: number;
+      bottom?: number;
+    };
     issues: readonly DiagnosticIssue[];
   } | null>(null);
 
@@ -264,6 +270,13 @@ export function SheetGrid({
   const clipboard = useClipboard(sheetName, display.keys, gridSelection, projection);
   const cellCache = useRef(new WeakMap<object, Map<ColumnKey, GridCell>>());
   const handledReveal = useRef(0);
+  const pendingScrollRef = useRef<{
+    nonce: number;
+    rowId: RowId;
+    col: number;
+    row: number;
+  } | null>(null);
+  const restoredScrollRef = useRef(false);
 
   // Resize observer: Glide needs explicit pixel dimensions.
   useEffect(() => {
@@ -281,17 +294,35 @@ export function SheetGrid({
     return () => observer.disconnect();
   }, []);
 
-  // Restore the per-sheet scroll position once the canvas has a size.
+  // Restore the per-sheet scroll position once on mount after the canvas has a size.
   useEffect(() => {
-    if (size.width === 0) return;
+    if (size.width === 0 || restoredScrollRef.current) return;
+    restoredScrollRef.current = true;
+    if (pendingScrollRef.current || (reveal && reveal.sheet === sheetName)) return;
     const memory = scrollMemory.get(compact ? `${sheetName}:drawer` : sheetName);
     if (!memory) return;
-    gridRef.current?.scrollTo({ amount: memory.tx, unit: 'px' }, { amount: memory.ty, unit: 'px' });
-  }, [compact, sheetName, size.width]);
+    const targetCol = Math.min(memory.col, Math.max(0, display.columns.length - 1));
+    const targetRow = Math.min(memory.row, Math.max(0, rowCount - 1));
+    if (targetCol <= display.frozenCount && targetRow === 0) return;
+    gridRef.current?.scrollTo(targetCol, targetRow, 'both', 0, 0, {
+      hAlign: 'start',
+      vAlign: 'start',
+    });
+  }, [
+    compact,
+    display.columns.length,
+    display.frozenCount,
+    reveal,
+    rowCount,
+    sheetName,
+    size.width,
+  ]);
 
   // Restore the active cell when the columns change or the sheet mounts.
   const keySignature = display.keys.join('\u0000');
   useEffect(() => {
+    const pendingReveal = useUiStore.getState().reveal;
+    if (pendingReveal && pendingReveal.sheet === sheetName) return;
     const cell = useUiStore.getState().activeCells[sheetName];
     const rowIndex = cell ? visibleRowIndex(projection, findRowIndex(sheet, cell.rowId)) : -1;
     const columnIndex = cell ? display.keys.indexOf(cell.column) + 1 : -1;
@@ -304,10 +335,9 @@ export function SheetGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keySignature, sheetName, setGridSelection]);
 
-  // Reveal expands collapsed ancestors before scrolling to the row (Task 3.7).
+  // Reveal expands collapsed ancestors before selecting and scrolling to the cell (Task 3.7).
   useEffect(() => {
     if (!reveal || reveal.sheet !== sheetName || reveal.nonce === handledReveal.current) return;
-    handledReveal.current = reveal.nonce;
     const realIndex = findRowIndex(sheet, reveal.rowId);
     if (realIndex < 0) return;
 
@@ -325,35 +355,115 @@ export function SheetGrid({
         : projection;
     const visibleIndex = visibleRowIndex(expandedProjection, realIndex);
     if (visibleIndex < 0) return;
+    handledReveal.current = reveal.nonce;
     if (ancestors.some((id) => collapsedGroupIds.has(id))) {
       useUiStore.getState().expandGroups(ancestors);
     }
 
-    const columnIndex = Math.max(1, display.keys.indexOf(activeCell?.column ?? '') + 1);
+    const active = useUiStore.getState().activeCell;
+    const fallbackColumn = active?.sheet === sheetName ? active.column : '';
+    const requestedIdx = reveal.column ? display.keys.indexOf(reveal.column) : -1;
+    const fallbackIdx = fallbackColumn ? display.keys.indexOf(fallbackColumn) : -1;
+    const columnIndex =
+      requestedIdx >= 0
+        ? requestedIdx + 1
+        : fallbackIdx >= 0
+          ? fallbackIdx + 1
+          : Math.min(1, display.keys.length);
+    const resolvedColumn = display.keys[columnIndex - 1] ?? '';
+
     setGridSelection(gridSelectionForCell(columnIndex, visibleIndex));
-    useUiStore.getState().setActiveCell({
-      sheet: sheetName,
+    useUiStore.getState().setSelectedRowIds([reveal.rowId]);
+    if (resolvedColumn) {
+      const nextRef = { sheet: sheetName, rowId: reveal.rowId, column: resolvedColumn };
+      useUiStore.getState().setActiveCell(nextRef);
+      useUiStore.getState().setSelection({ sheet: sheetName, anchor: nextRef, focus: nextRef });
+    }
+    pendingScrollRef.current = {
+      nonce: reveal.nonce,
       rowId: reveal.rowId,
-      column: display.keys[columnIndex - 1] ?? '',
-    });
-    gridRef.current?.scrollTo(
-      { amount: 0, unit: 'px' },
-      { amount: visibleIndex, unit: 'cell' },
-      'vertical',
-      0,
-      4,
-    );
+      col: columnIndex,
+      row: visibleIndex,
+    };
     if (reveal.focus !== false) gridRef.current?.focus();
   }, [
     reveal,
     sheetName,
     sheet,
     display.keys,
-    activeCell?.column,
     collapsedGroupIds,
     groupsForDepth,
     projection,
     setGridSelection,
+  ]);
+
+  // Execute the reveal scroll after selection updates and Glide's scroller has settled.
+  // Calling `gridRef.current?.scrollTo` before `setGridSelection` commits triggers
+  // Glide's internal `useLayoutEffect` scrollTo on stale `cellYOffset`, doubling
+  // the scroll delta and overshooting when scrolled far away.
+  useEffect(() => {
+    const pending = pendingScrollRef.current;
+    if (!pending || size.width === 0 || size.height === 0) return;
+    if (pending.row >= rowCount || pending.col >= display.columns.length) return;
+    const real = realRowIndex(projection, pending.row);
+    if (real < 0 || sheet.rows[real]?.id !== pending.rowId) return;
+    const currentCell = gridSelection.current?.cell;
+    if (!currentCell || currentCell[0] !== pending.col || currentCell[1] !== pending.row) return;
+
+    let frameId = 0;
+    let attempts = 0;
+    const columnWidths = display.columns.map((column) =>
+      'width' in column && typeof column.width === 'number' ? column.width : 160,
+    );
+    const flush = () => {
+      if (pendingScrollRef.current?.nonce !== pending.nonce) return;
+      const scroller = hostRef.current?.querySelector('.dvn-scroller');
+      if (!(scroller instanceof HTMLElement) || scroller.clientHeight === 0) {
+        if (attempts < 10) {
+          attempts += 1;
+          frameId = requestAnimationFrame(flush);
+        } else {
+          pendingScrollRef.current = null;
+        }
+        return;
+      }
+      pendingScrollRef.current = null;
+      const target = computeRevealScrollTarget(
+        {
+          scrollLeft: scroller.scrollLeft,
+          scrollTop: scroller.scrollTop,
+          clientWidth: scroller.clientWidth,
+          clientHeight: scroller.clientHeight,
+          scrollWidth: scroller.scrollWidth,
+          scrollHeight: scroller.scrollHeight,
+        },
+        {
+          col: pending.col,
+          row: pending.row,
+          columnWidths,
+          frozenCount: display.frozenCount,
+          rowCount,
+          rowHeight: GRID_ROW_HEIGHT,
+          headerHeight: GRID_HEADER_HEIGHT,
+        },
+      );
+      if (target) {
+        scroller.scrollTo(target.left, target.top);
+      }
+    };
+
+    frameId = requestAnimationFrame(flush);
+    return () => cancelAnimationFrame(frameId);
+  }, [
+    display.columns,
+    display.frozenCount,
+    gridSelection,
+    projection,
+    reveal,
+    rowCount,
+    sheet.rows,
+    size.height,
+    size.width,
   ]);
 
   const groupByRowId = useMemo(
@@ -618,6 +728,7 @@ export function SheetGrid({
       if (locked) return;
       const edits: CellEdit[] = [];
       const rowIds = new Set<string>();
+      const columns = new Set<ColumnKey>();
       for (const { location, value } of items) {
         const [columnIndex, visibleRow] = location;
         if (columnIndex <= 0) continue;
@@ -630,6 +741,7 @@ export function SheetGrid({
         if ((row.cells[key] ?? '') === text) continue;
         edits.push({ rowId: row.id, column: key, value: text });
         rowIds.add(row.id);
+        columns.add(key);
       }
       if (edits.length === 0) return;
       if (onCommitEdits) {
@@ -650,7 +762,7 @@ export function SheetGrid({
           });
           return outcome.data;
         },
-        { sheet: sheetName, rowIds: [...rowIds] },
+        { sheet: sheetName, rowIds: [...rowIds], columns: [...columns] },
       );
       if (outcome) notifyCellEdits(outcome);
     },
@@ -675,6 +787,13 @@ export function SheetGrid({
         onPasteMatrix(target[1], matrix);
         return false;
       }
+      const colStart = Math.max(0, target[0] - 1);
+      const colCount = matrix[0]?.length ?? 0;
+      const pasteColumns = display.keys.slice(colStart, colStart + colCount);
+      const meta: Omit<ActionMeta, 'label'> = {
+        sheet: sheetName,
+        ...(pasteColumns.length > 0 ? { columns: pasteColumns } : {}),
+      };
       let result: ReturnType<typeof pasteMatrix> | undefined;
       const cellCount = matrix.reduce((total, row) => total + row.length, 0);
       useWorkbookStore.getState().apply(
@@ -683,14 +802,15 @@ export function SheetGrid({
           result = pasteMatrix(
             current,
             sheetName,
-            { rowIndex: target[1], columnIndex: Math.max(0, target[0] - 1) },
+            { rowIndex: target[1], columnIndex: colStart },
             matrix,
             display.keys,
             { rowIndexes: projection.realIndexes },
           );
+          if (result.rowIds.length > 0) meta.rowIds = result.rowIds;
           return result.data;
         },
-        { sheet: sheetName },
+        meta,
       );
       if (result?.droppedColumns) {
         toast.warning(`Dropped ${result.droppedColumns} column(s) past the last column.`);
@@ -711,6 +831,7 @@ export function SheetGrid({
       const source = event.patternSource;
       const destination = event.fillDestination;
       const sourceKeys = selectionColumnKeysForRange(display.keys, source);
+      const fillColumns = selectionColumnKeysForRange(display.keys, destination);
       const rowIndexes = Array.from({ length: source.height }, (_, offset) =>
         realRowIndex(projection, source.y + offset),
       );
@@ -718,6 +839,11 @@ export function SheetGrid({
         sourceKeys.map((key) => (real >= 0 ? (sheet.rows[real]?.cells[key] ?? '') : '')),
       );
       const matrix = tileFill(sourceMatrix, destination.height, destination.width);
+      const meta: Omit<ActionMeta, 'label'> = {
+        sheet: sheetName,
+        ...(fillColumns.length > 0 ? { columns: fillColumns } : {}),
+        ...(compact ? { inDrawer: true } : {}),
+      };
       let result: ReturnType<typeof pasteMatrix> | undefined;
       useWorkbookStore.getState().apply(
         `Fill ${destination.width}×${destination.height} cells`,
@@ -733,15 +859,16 @@ export function SheetGrid({
             display.keys,
             { rowIndexes: projection.realIndexes },
           );
+          if (result.rowIds.length > 0) meta.rowIds = result.rowIds;
           return result.data;
         },
-        { sheet: sheetName },
+        meta,
       );
       if (result?.skippedReadOnly) {
         toast.warning(`Skipped ${result.skippedReadOnly} read-only cell(s).`);
       }
     },
-    [display.keys, locked, projection, sheet.rows, sheetName],
+    [compact, display.keys, locked, projection, sheet.rows, sheetName],
   );
 
   const onRowAppended = useCallback<NonNullable<DataEditorProps['onRowAppended']>>(async () => {
@@ -751,6 +878,7 @@ export function SheetGrid({
       if (rowId) useUiStore.getState().setSelectedRowIds([rowId]);
       return 'bottom' as const;
     }
+    const meta: Omit<ActionMeta, 'label'> = { sheet: sheetName };
     let rowId: string | undefined;
     useWorkbookStore.getState().apply(
       'Add row',
@@ -759,9 +887,10 @@ export function SheetGrid({
           { cells: {} },
         ]);
         rowId = next[sheetName].rows.at(-1)?.id;
+        if (rowId) meta.rowIds = [rowId];
         return next;
       },
-      { sheet: sheetName },
+      meta,
     );
     if (rowId) useUiStore.getState().setSelectedRowIds([rowId]);
     return 'bottom' as const;
@@ -917,9 +1046,17 @@ export function SheetGrid({
       if (identity === hoverKey.current) return;
       hoverKey.current = identity;
       const issues = diagnosticIndex.byCell.get(identity);
-      setDiagnosticHover(
-        issues && issues.length > 0 ? { x: args.localEventX, y: args.localEventY, issues } : null,
-      );
+      if (!issues || issues.length === 0) {
+        setDiagnosticHover(null);
+        return;
+      }
+      const hostRect = hostRef.current?.getBoundingClientRect();
+      if (!hostRect || hostRect.width === 0 || hostRect.height === 0) {
+        setDiagnosticHover(null);
+        return;
+      }
+      const layout = computeDiagnosticTooltipLayout(args.bounds, hostRect, GRID_HEADER_HEIGHT);
+      setDiagnosticHover({ style: layout.style, issues });
     },
     [diagnosticIndex.byCell, display.keys, projection, sheet.rows],
   );
@@ -962,7 +1099,14 @@ export function SheetGrid({
         </div>
       )}
 
-      <div ref={hostRef} className="relative min-h-0 flex-1">
+      <div
+        ref={hostRef}
+        className="relative min-h-0 flex-1"
+        onMouseLeave={() => {
+          hoverKey.current = null;
+          setDiagnosticHover((current) => (current ? null : current));
+        }}
+      >
         <DataEditor
           ref={gridRef}
           width={size.width}
@@ -990,8 +1134,14 @@ export function SheetGrid({
             const target = event.target;
             return !(target instanceof Element && target.closest('.cm-tooltip') !== null);
           }}
-          onVisibleRegionChanged={(_range, tx, ty) => {
-            scrollMemory.set(compact ? `${sheetName}:drawer` : sheetName, { tx, ty });
+          onVisibleRegionChanged={(region) => {
+            hoverKey.current = null;
+            setDiagnosticHover((current) => (current ? null : current));
+            if (!restoredScrollRef.current) return;
+            scrollMemory.set(compact ? `${sheetName}:drawer` : sheetName, {
+              col: region.x,
+              row: region.y,
+            });
           }}
           onColumnResize={onColumnResize}
           onColumnResizeEnd={onColumnResizeEnd}
@@ -1037,21 +1187,25 @@ export function SheetGrid({
           cellActivationBehavior="second-click"
           fillHandle={true}
           getCellsForSelection={true}
-          keybindings={{ search: false }}
+          keybindings={{ search: false, delete: 'Backspace|Delete' }}
           smoothScrollX={true}
           smoothScrollY={true}
         />
         {diagnosticHover ? (
           <div
-            className="bg-popover text-popover-foreground border-border pointer-events-none absolute z-50 max-w-xs rounded border px-2 py-1 text-[11px] shadow-lg"
-            style={{ left: diagnosticHover.x + 12, top: diagnosticHover.y + 12 }}
+            className="bg-popover text-popover-foreground border-border pointer-events-none absolute z-50 w-max rounded border px-2.5 py-1.5 text-[11px] leading-snug whitespace-normal break-words shadow-lg"
+            style={diagnosticHover.style}
             data-testid="cell-diagnostic-tooltip"
             role="tooltip"
           >
             {diagnosticHover.issues.map((issue, index) => (
-              <div key={`${issue.ruleId}:${index}`} className="whitespace-nowrap">
+              <div key={`${issue.ruleId}:${index}`}>
                 <span
-                  className={issue.severity === 'error' ? 'text-destructive' : 'text-amber-600'}
+                  className={
+                    issue.severity === 'error'
+                      ? 'text-destructive font-medium'
+                      : 'font-medium text-amber-600'
+                  }
                 >
                   {issue.ruleId}
                 </span>{' '}

@@ -10,7 +10,7 @@ export function revealDiagnostic(issue: DiagnosticIssue): void {
   if (issue.column) {
     ui.setActiveCell({ sheet: issue.sheet, rowId: issue.rowId, column: issue.column });
   }
-  ui.requestReveal(issue.sheet, issue.rowId);
+  ui.requestReveal(issue.sheet, issue.rowId, issue.column ? { column: issue.column } : undefined);
   ui.flashRow(issue.rowId);
   if (flashTimer !== null) clearTimeout(flashTimer);
   flashTimer = setTimeout(() => {

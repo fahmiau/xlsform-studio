@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [1.0.0] — 2026-11-13
+## [1.0.0] — 2026-11-15
 
 ### Added
 
@@ -32,8 +32,8 @@ All notable changes to this project are documented here. The format follows
   `latest.json`, quality gates, a 15 MB binary-size budget, SHA-256 checksums,
   and manual **Preferences → Updates → Check for updates**.
 - **Documentation**: README (Windows install, unsigned SmartScreen note,
-  offline/privacy, BYOK/Ollama), CONTRIBUTING, SECURITY, RELEASING, changelog,
-  and issue templates.
+  offline/privacy, BYOK/Ollama), CONTRIBUTING, SECURITY, changelog, and issue
+  templates.
 
 ## [0.1.0] — 2026-10-21
 

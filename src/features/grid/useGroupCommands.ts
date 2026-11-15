@@ -50,37 +50,71 @@ export function wrapSelectedRows(kind: 'group' | 'repeat'): void {
   }
   const name = suggestGroupName(data, kind);
   let rowId: string | undefined;
+  const meta: { sheet: 'survey'; rowIds: string[]; undoRowIds: string[]; columns: string[] } = {
+    sheet: 'survey',
+    rowIds: selection.rowIds,
+    undoRowIds: selection.rowIds,
+    columns: ['name'],
+  };
   useWorkbookStore.getState().apply(
     kind === 'repeat' ? 'Wrap in repeat' : 'Wrap in group',
     (current) => {
       const result = wrapSelection(current, selection.start, selection.end, kind, { name });
       rowId = result.rowId;
+      if (rowId) meta.rowIds = [rowId];
       return result.data;
     },
-    { sheet: 'survey', rowIds: selection.rowIds },
+    meta,
   );
   if (!rowId) return;
   useUiStore.getState().setSelectedRowIds([rowId]);
   useUiStore.getState().setActiveCell({ sheet: 'survey', rowId, column: 'name' });
-  useUiStore.getState().requestReveal('survey', rowId);
+  useUiStore.getState().requestReveal('survey', rowId, { column: 'name' });
   toast.success(`Wrapped ${selection.end - selection.start + 1} rows in a ${kind}`, {
     description: `Name: ${name}. Edit it in the grid.`,
   });
 }
 
 export function unwrapGroupRow(rowId: string): void {
-  useWorkbookStore.getState().apply('Unwrap group', (data) => unwrapGroup(data, rowId), {
+  const before = useWorkbookStore.getState().data.survey;
+  const index = before.rows.findIndex((row) => row.id === rowId);
+  const meta: { sheet: 'survey'; rowIds: string[]; undoRowIds: string[]; columns: string[] } = {
     sheet: 'survey',
     rowIds: [rowId],
-  });
+    undoRowIds: [rowId],
+    columns: ['type'],
+  };
+  useWorkbookStore.getState().apply(
+    'Unwrap group',
+    (data) => {
+      const next = unwrapGroup(data, rowId);
+      const target = next.survey.rows[Math.min(Math.max(0, index), next.survey.rows.length - 1)];
+      meta.rowIds = target ? [target.id] : [];
+      return next;
+    },
+    meta,
+  );
 }
 
 export function deleteGroupRow(rowId: string): void {
-  useWorkbookStore
-    .getState()
-    .apply('Delete group and contents', (data) => deleteGroupWithContents(data, rowId), {
-      sheet: 'survey',
-    });
+  const before = useWorkbookStore.getState().data.survey;
+  const index = before.rows.findIndex((row) => row.id === rowId);
+  const meta: { sheet: 'survey'; rowIds: string[]; undoRowIds: string[]; columns: string[] } = {
+    sheet: 'survey',
+    rowIds: [],
+    undoRowIds: [rowId],
+    columns: ['name'],
+  };
+  useWorkbookStore.getState().apply(
+    'Delete group and contents',
+    (data) => {
+      const next = deleteGroupWithContents(data, rowId);
+      const target = next.survey.rows[Math.min(Math.max(0, index), next.survey.rows.length - 1)];
+      meta.rowIds = target ? [target.id] : [];
+      return next;
+    },
+    meta,
+  );
 }
 
 /** Delete-key path: a lone begin row prompts for unwrap vs delete-with-contents. */

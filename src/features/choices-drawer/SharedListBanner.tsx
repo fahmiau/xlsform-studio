@@ -34,7 +34,7 @@ export function SharedListBanner({
         newName = result.newListName;
         return result.data;
       },
-      { sheet: 'survey', rowIds: [surveyRowId] },
+      { sheet: 'survey', rowIds: [surveyRowId], columns: ['type'] },
     );
     if (newName !== listName) toast.success(`Forked "${listName}" to "${newName}"`);
   };

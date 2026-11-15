@@ -35,6 +35,37 @@ describe('uiStore', () => {
     });
   });
 
+  it('targets the requested column and respects switchSheet: false', () => {
+    useUiStore.getState().setActiveSheet('survey');
+    useUiStore.getState().setActiveCell({ sheet: 'survey', rowId: 'r3', column: 'relevant' });
+
+    useUiStore.getState().requestReveal('survey', 'r1', { column: 'name' });
+    expect(useUiStore.getState().activeCell).toEqual({
+      sheet: 'survey',
+      rowId: 'r1',
+      column: 'name',
+    });
+    expect(useUiStore.getState().reveal).toMatchObject({
+      sheet: 'survey',
+      rowId: 'r1',
+      column: 'name',
+    });
+
+    useUiStore.getState().requestReveal('choices', 'c1', { column: 'label', switchSheet: false });
+    expect(useUiStore.getState().activeSheet).toBe('survey');
+    expect(useUiStore.getState().activeCells.choices).toEqual({
+      sheet: 'choices',
+      rowId: 'c1',
+      column: 'label',
+    });
+    expect(useUiStore.getState().reveal).toMatchObject({
+      sheet: 'choices',
+      rowId: 'c1',
+      column: 'label',
+      switchSheet: false,
+    });
+  });
+
   it('tracks active sheet, cell, selection, panels, and language view', () => {
     const cell = { sheet: 'survey' as const, rowId: 'r1', column: 'label' };
     useUiStore.getState().setActiveSheet('choices');

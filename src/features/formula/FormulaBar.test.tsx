@@ -113,4 +113,43 @@ describe('FormulaBar XPath editor (Task 4.6)', () => {
 
     expect(useWorkbookStore.getState().data.survey.rows[1]?.cells.type).toBe('select_one q2_list');
   });
+
+  it('blurs the XPath editor on Enter and Escape without double-committing canceled text', () => {
+    loadForm('${q1} > 0');
+    render(<FormulaBar />);
+    const view = EditorView.findFromDOM(screen.getByTestId('formula-bar-editor'));
+    expect(view).not.toBeNull();
+
+    act(() => {
+      view!.focus();
+      view!.dispatch({ changes: { from: 0, to: view!.state.doc.length, insert: '' } });
+    });
+    fireEvent.keyDown(view!.contentDOM, { key: 'Enter', code: 'Enter' });
+    expect(cellValue()).toBe('');
+    expect(useWorkbookStore.temporal.getState().pastStates).toHaveLength(1);
+    expect(view!.contentDOM).not.toHaveFocus();
+
+    // Typing and pressing Escape must revert, blur, and not re-commit on blur.
+    act(() => {
+      view!.focus();
+      view!.dispatch({ changes: { from: 0, to: view!.state.doc.length, insert: '${q2}' } });
+    });
+    fireEvent.keyDown(view!.contentDOM, { key: 'Escape', code: 'Escape' });
+    expect(cellValue()).toBe('');
+    expect(useWorkbookStore.temporal.getState().pastStates).toHaveLength(1);
+    expect(view!.contentDOM).not.toHaveFocus();
+  });
+
+  it('reverts a plain formula input on Escape without committing on blur', () => {
+    useUiStore.getState().setActiveCell({ sheet: 'survey', rowId: 's1', column: 'label' });
+    render(<FormulaBar />);
+    const input = screen.getByTestId('formula-bar-input');
+    input.focus();
+    fireEvent.change(input, { target: { value: 'Changed' } });
+    fireEvent.keyDown(input, { key: 'Escape', code: 'Escape' });
+
+    expect(useWorkbookStore.getState().data.survey.rows[0]?.cells.label).toBe('Q1');
+    expect(useWorkbookStore.temporal.getState().pastStates).toHaveLength(0);
+    expect(input).not.toHaveFocus();
+  });
 });

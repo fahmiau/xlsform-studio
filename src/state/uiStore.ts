@@ -32,10 +32,14 @@ export type { LanguageViewMode, LanguageViewState } from '@/core/languages/viewM
 export interface RevealRequest {
   sheet: SheetTab;
   rowId: RowId;
+  /** Column to select/scroll into view; falls back to active column when omitted. */
+  column?: ColumnKey;
   /** Bumped so repeated reveals of the same row still fire. */
   nonce: number;
   /** Staged-change reveals must not steal focus from the chat input. */
   focus?: boolean;
+  /** False keeps activeSheet unchanged (used for Choices Drawer reveals on survey). */
+  switchSheet?: boolean;
 }
 
 /** Live edit preview while the formula bar has focus (UI-only, no undo). */
@@ -115,7 +119,11 @@ export interface UiState {
   setColumnOrder: (sheet: SheetTab, keys: readonly ColumnKey[]) => void;
   toggleColumnHidden: (sheet: SheetTab, column: ColumnKey) => void;
   showAllColumns: (sheet: SheetTab) => void;
-  requestReveal: (sheet: SheetTab, rowId: RowId, options?: { focus?: boolean }) => void;
+  requestReveal: (
+    sheet: SheetTab,
+    rowId: RowId,
+    options?: { focus?: boolean; column?: ColumnKey; switchSheet?: boolean },
+  ) => void;
   setCellPreview: (preview: CellPreview | null) => void;
 }
 
@@ -236,15 +244,23 @@ export const useUiStore = create<UiState>()((set) => ({
   showAllColumns: (sheet) =>
     set((state) => ({ hiddenColumns: { ...state.hiddenColumns, [sheet]: new Set() } })),
   requestReveal: (sheet, rowId, options) =>
-    set((state) => ({
-      activeSheet: sheet,
-      activeCell: state.activeCells[sheet] ?? null,
-      reveal: {
-        sheet,
-        rowId,
-        nonce: (revealNonce += 1),
-        ...(options?.focus === false ? { focus: false } : {}),
-      },
-    })),
+    set((state) => {
+      const switchSheet = options?.switchSheet !== false;
+      const column = options?.column ?? state.activeCells[sheet]?.column;
+      const nextCell = column ? { sheet, rowId, column } : (state.activeCells[sheet] ?? null);
+      return {
+        ...(switchSheet ? { activeSheet: sheet } : {}),
+        activeCell: nextCell,
+        ...(nextCell ? { activeCells: { ...state.activeCells, [sheet]: nextCell } } : {}),
+        reveal: {
+          sheet,
+          rowId,
+          ...(options?.column ? { column: options.column } : {}),
+          nonce: (revealNonce += 1),
+          ...(options?.focus === false ? { focus: false } : {}),
+          ...(options?.switchSheet === false ? { switchSheet: false } : {}),
+        },
+      };
+    }),
   setCellPreview: (cellPreview) => set({ cellPreview }),
 }));

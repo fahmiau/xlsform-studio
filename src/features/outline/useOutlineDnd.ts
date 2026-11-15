@@ -92,7 +92,7 @@ export function applyOutlineMove(plan: MovePlan): void {
     .apply(
       'Move outline block',
       (data) => moveBlock(data, 'survey', plan.sourceStart, plan.sourceEnd, plan.targetIndex),
-      { sheet: 'survey' },
+      { sheet: 'survey', rowIds: [plan.activeId] },
     );
   useUiStore.getState().requestReveal('survey', plan.activeId);
 }

@@ -3,25 +3,63 @@ import { Redo2, Undo2 } from 'lucide-react';
 import { useStore } from 'zustand';
 
 import { Button } from '@/components/ui/button';
+import { findColumnKey } from '@/core/indexes/columns';
+import { parseType } from '@/core/model/parseType';
+import { usePrefsStore } from '@/state/prefsStore';
 import { useUiStore } from '@/state/uiStore';
-import { getActionMeta, useWorkbookStore } from '@/state/workbookStore';
+import { getActionMeta, useWorkbookStore, type ActionMeta } from '@/state/workbookStore';
 
-function revealAction(): void {
-  const data = useWorkbookStore.getState().data;
-  const meta = getActionMeta(data);
+function revealMeta(meta: ActionMeta | undefined, direction: 'undo' | 'redo'): void {
   if (!meta?.sheet) return;
-  const rowId = meta.rowIds?.[0];
-  if (rowId) useUiStore.getState().requestReveal(meta.sheet, rowId);
+  const rowId =
+    direction === 'undo' ? (meta.undoRowIds?.[0] ?? meta.rowIds?.[0]) : meta.rowIds?.[0];
+  if (!rowId) return;
+
+  const column = meta.columns?.[0];
+  const ui = useUiStore.getState();
+  const prefs = usePrefsStore.getState();
+  const drawerVisible =
+    Boolean(meta.inDrawer) &&
+    ui.activeSheet === 'survey' &&
+    prefs.rightPanel &&
+    ui.rightTab === 'choices' &&
+    ui.choiceDrawer.open;
+  let switchSheet = !drawerVisible;
+  if (drawerVisible && meta.sheet === 'choices') {
+    const data = useWorkbookStore.getState().data;
+    const listKey = findColumnKey(data.choices, 'list_name') ?? 'list_name';
+    const choiceList = data.choices.rows.find((row) => row.id === rowId)?.cells[listKey]?.trim();
+    const surveyRowId = ui.choiceDrawer.rowId ?? ui.activeCells.survey?.rowId ?? null;
+    const surveyRow = surveyRowId
+      ? data.survey.rows.find((row) => row.id === surveyRowId)
+      : undefined;
+    const typeKey = findColumnKey(data.survey, 'type') ?? 'type';
+    const activeList = surveyRow ? parseType(surveyRow.cells[typeKey] ?? '').listName : undefined;
+    if (!choiceList || choiceList !== activeList) {
+      switchSheet = true;
+    }
+  }
+
+  ui.requestReveal(meta.sheet, rowId, {
+    ...(column ? { column } : {}),
+    ...(switchSheet ? {} : { switchSheet: false }),
+  });
 }
 
 export function undoWithReveal(): void {
+  const before = useWorkbookStore.getState().data;
   useWorkbookStore.temporal.getState().undo();
-  revealAction();
+  const after = useWorkbookStore.getState().data;
+  if (after === before) return;
+  revealMeta(getActionMeta(before), 'undo');
 }
 
 export function redoWithReveal(): void {
+  const before = useWorkbookStore.getState().data;
   useWorkbookStore.temporal.getState().redo();
-  revealAction();
+  const after = useWorkbookStore.getState().data;
+  if (after === before) return;
+  revealMeta(getActionMeta(after), 'redo');
 }
 
 export function UndoRedoButtons() {

@@ -6,7 +6,7 @@
  * CodeMirror editor, and `Esc` reverts. Edits preview live in the grid through
  * `uiStore.cellPreview` and only enter undo history on commit.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import { findColumnKey } from '@/core/indexes/columns';
 import { resolveColumn } from '@/core/model/columns';
@@ -62,7 +62,7 @@ export function FormulaBar() {
         });
         return outcome.data;
       },
-      { sheet: activeCell.sheet, rowIds: [activeCell.rowId] },
+      { sheet: activeCell.sheet, rowIds: [activeCell.rowId], columns: [activeCell.column] },
     );
     if (outcome) notifyCellEdits(outcome);
   };
@@ -142,6 +142,7 @@ function XPathFormulaInput({
       ariaLabel="Formula bar"
       className="border-input bg-background h-8 min-w-0 flex-1 overflow-hidden rounded border"
       lineWrapping={false}
+      blurOnCommit
       testId="formula-bar-editor"
       onChange={onChange}
       onCommit={onCommit}
@@ -176,6 +177,7 @@ function PlainFormulaInput({
   onCommit: (value: string) => void;
 }) {
   const [draft, setDraft] = useState(value);
+  const skipNextBlur = useRef(false);
 
   return (
     <input
@@ -186,13 +188,21 @@ function PlainFormulaInput({
       disabled={!enabled || !editable}
       placeholder={enabled ? '' : 'Select a cell'}
       onChange={(event) => setDraft(event.target.value)}
-      onBlur={() => onCommit(draft)}
+      onBlur={() => {
+        if (skipNextBlur.current) {
+          skipNextBlur.current = false;
+          return;
+        }
+        onCommit(draft);
+      }}
       onKeyDown={(event) => {
         if (event.key === 'Enter') {
+          skipNextBlur.current = true;
           onCommit(draft);
           event.currentTarget.blur();
         }
         if (event.key === 'Escape') {
+          skipNextBlur.current = true;
           setDraft(value);
           event.currentTarget.blur();
         }

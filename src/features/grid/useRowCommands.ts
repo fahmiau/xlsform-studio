@@ -39,7 +39,7 @@ function focusRows(sheet: SheetTab, rowIds: readonly RowId[]): void {
   if (!column) return;
   useUiStore.getState().setSelectedRowIds([...rowIds]);
   useUiStore.getState().setActiveCell({ sheet, rowId: first, column });
-  useUiStore.getState().requestReveal(sheet, first);
+  useUiStore.getState().requestReveal(sheet, first, { column });
 }
 
 export function insertRowsAtSelection(position: 'above' | 'below', count = 1): RowId[] {
@@ -49,14 +49,26 @@ export function insertRowsAtSelection(position: 'above' | 'below', count = 1): R
   const index = rows.length > 0 ? selectionIndex(sheet, rows) : 0;
   const rowCount = useWorkbookStore.getState().data[sheet].rows.length;
   const at = clampIndex(position === 'above' ? index : index + 1, rowCount);
+  const data = useWorkbookStore.getState().data;
+  const column = findColumnKey(data[sheet], 'name') ?? data[sheet].columns[0];
   let inserted: RowId[] = [];
-  const meta: { sheet: ManagedSheetName; rowIds: RowId[] } = { sheet, rowIds: [] };
+  const meta: {
+    sheet: ManagedSheetName;
+    rowIds: RowId[];
+    undoRowIds?: RowId[];
+    columns?: string[];
+  } = {
+    sheet,
+    rowIds: [],
+    ...(rows.length > 0 ? { undoRowIds: rows } : {}),
+    ...(column ? { columns: [column] } : {}),
+  };
 
   useWorkbookStore.getState().apply(
     `Insert ${count} row${count === 1 ? '' : 's'} ${position}`,
-    (data) => {
+    (current) => {
       const next = insertRows(
-        data,
+        current,
         sheet,
         at,
         Array.from({ length: count }, () => ({ cells: {} })),
@@ -77,9 +89,21 @@ export function duplicateSelectedRows(): RowId[] {
   if (sheet === 'settings') return [];
   const selected = selectedRowIds();
   if (selected.length === 0) return [];
-  const before = new Set(useWorkbookStore.getState().data[sheet].rows.map((row) => row.id));
+  const beforeData = useWorkbookStore.getState().data;
+  const before = new Set(beforeData[sheet].rows.map((row) => row.id));
+  const column = findColumnKey(beforeData[sheet], 'name') ?? beforeData[sheet].columns[0];
   let created: RowId[] = [];
-  const meta: { sheet: ManagedSheetName; rowIds: RowId[] } = { sheet, rowIds: [] };
+  const meta: {
+    sheet: ManagedSheetName;
+    rowIds: RowId[];
+    undoRowIds: RowId[];
+    columns?: string[];
+  } = {
+    sheet,
+    rowIds: [],
+    undoRowIds: selected,
+    ...(column ? { columns: [column] } : {}),
+  };
 
   useWorkbookStore.getState().apply(
     `Duplicate ${selected.length} row${selected.length === 1 ? '' : 's'}`,
@@ -101,12 +125,30 @@ export function deleteSelectedRows(sheet: SheetTab = currentSheet()): RowId[] {
   const selected = selectedRowIds(sheet);
   if (selected.length === 0) return [];
   const index = selectionIndex(sheet, selected);
-  const meta: { sheet: ManagedSheetName; rowIds: RowId[] } = { sheet, rowIds: [] };
+  const ui = useUiStore.getState();
+  const data = useWorkbookStore.getState().data;
+  const column =
+    ui.activeCell?.sheet === sheet
+      ? ui.activeCell.column
+      : (findColumnKey(data[sheet], 'name') ?? data[sheet].columns[0]);
+  const meta: {
+    sheet: ManagedSheetName;
+    rowIds: RowId[];
+    undoRowIds: RowId[];
+    columns?: string[];
+    inDrawer?: boolean;
+  } = {
+    sheet,
+    rowIds: [],
+    undoRowIds: selected,
+    ...(column ? { columns: [column] } : {}),
+    ...(sheet === 'choices' && ui.activeSheet === 'survey' ? { inDrawer: true } : {}),
+  };
 
   useWorkbookStore.getState().apply(
     `Delete ${selected.length} row${selected.length === 1 ? '' : 's'}`,
-    (data) => {
-      const next = deleteRows(data, sheet, selected);
+    (current) => {
+      const next = deleteRows(current, sheet, selected);
       const target = next[sheet].rows[Math.min(index, next[sheet].rows.length - 1)];
       meta.rowIds = target ? [target.id] : [];
       return next;
@@ -126,15 +168,28 @@ export function deleteSelectedRows(sheet: SheetTab = currentSheet()): RowId[] {
 export function insertRowsAt(index: number, count: number): RowId[] {
   const sheet = currentSheet();
   if (sheet === 'settings') return [];
-  const rowCount = useWorkbookStore.getState().data[sheet].rows.length;
+  const data = useWorkbookStore.getState().data;
+  const rowCount = data[sheet].rows.length;
   const at = clampIndex(index, rowCount);
+  const rows = selectedRowIds();
+  const column = findColumnKey(data[sheet], 'name') ?? data[sheet].columns[0];
   let inserted: RowId[] = [];
-  const meta: { sheet: ManagedSheetName; rowIds: RowId[] } = { sheet, rowIds: [] };
+  const meta: {
+    sheet: ManagedSheetName;
+    rowIds: RowId[];
+    undoRowIds?: RowId[];
+    columns?: string[];
+  } = {
+    sheet,
+    rowIds: [],
+    ...(rows.length > 0 ? { undoRowIds: rows } : {}),
+    ...(column ? { columns: [column] } : {}),
+  };
   useWorkbookStore.getState().apply(
     `Insert ${count} row${count === 1 ? '' : 's'}`,
-    (data) => {
+    (current) => {
       const next = insertRows(
-        data,
+        current,
         sheet,
         at,
         Array.from({ length: count }, () => ({ cells: {} })),

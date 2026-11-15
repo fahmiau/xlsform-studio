@@ -17,14 +17,26 @@ export function useDrawerPaste(
     (matrix) => {
       if (!listName || matrix.length === 0) return false;
       let rowIds: string[] = [];
+      const meta: {
+        sheet: 'choices';
+        rowIds: string[];
+        columns: ColumnKey[];
+        inDrawer: true;
+      } = {
+        sheet: 'choices',
+        rowIds: [],
+        columns: [...keys],
+        inDrawer: true,
+      };
       useWorkbookStore.getState().apply(
         `Paste ${matrix.length} choice${matrix.length === 1 ? '' : 's'}`,
         (data) => {
           const result = bulkInsertChoices(data, listName, matrix, keys, { mode });
           rowIds = result.rowIds;
+          meta.rowIds = rowIds;
           return result.data;
         },
-        { sheet: 'choices' },
+        meta,
       );
       if (rowIds.length > 0) {
         useUiStore.getState().setSelectedRowIds(rowIds);

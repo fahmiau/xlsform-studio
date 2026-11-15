@@ -74,6 +74,8 @@ export const choiceNameRenderer: CustomRenderer<ChoiceNameCell> = {
       .apply('Unlock choice name', (data) => unlockChoiceName(data, cell.data.rowId), {
         sheet: 'choices',
         rowIds: [cell.data.rowId],
+        columns: ['name'],
+        inDrawer: true,
       });
     return cell;
   },

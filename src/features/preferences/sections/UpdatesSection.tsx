@@ -13,9 +13,31 @@ import { check } from '@tauri-apps/plugin-updater';
 type Phase = 'idle' | 'checking' | 'downloading';
 
 function describe(error: unknown): string {
-  if (error instanceof Error && error.message) return error.message;
-  if (typeof error === 'string' && error) return error;
-  return 'The update server could not be reached.';
+  const raw =
+    error instanceof Error && error.message
+      ? error.message
+      : typeof error === 'string' && error
+        ? error
+        : '';
+  if (!raw) return 'The update server could not be reached.';
+  const lower = raw.toLowerCase();
+  if (lower.includes('valid release json') || /\b404\b/.test(lower)) {
+    return 'No published update was found yet. Check back later or verify your connection.';
+  }
+  if (
+    lower.includes('error sending request') ||
+    lower.includes('failed to fetch') ||
+    lower.includes('network') ||
+    lower.includes('dns') ||
+    lower.includes('timed out') ||
+    lower.includes('timeout') ||
+    lower.includes('offline') ||
+    lower.includes('connection') ||
+    lower.includes('connect')
+  ) {
+    return 'Could not reach the update server. Check your internet connection and try again.';
+  }
+  return raw;
 }
 
 export function UpdatesSection() {
@@ -65,9 +87,11 @@ export function UpdatesSection() {
           {status}
         </p>
       ) : null}
-      <p className="text-muted-foreground">
-        Installed builds only — the dev server has no update feed to check.
-      </p>
+      {!import.meta.env.PROD ? (
+        <p className="text-muted-foreground" data-testid="updates-dev-note">
+          Installed builds only — the dev server has no update feed to check.
+        </p>
+      ) : null}
     </section>
   );
 }
