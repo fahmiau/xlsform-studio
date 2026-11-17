@@ -28,7 +28,10 @@ export function ShortcutsSheet() {
         </DialogHeader>
         <table className="w-full text-xs">
           <tbody>
-            {PRD_SHORTCUTS.map((entry) => {
+            {PRD_SHORTCUTS.filter((entry) => {
+              const when = getCommand(entry.id)?.when;
+              return !when || when();
+            }).map((entry) => {
               const command = getCommand(entry.id);
               return (
                 <tr key={entry.id} className="border-b last:border-0" data-testid="shortcut-row">

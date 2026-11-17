@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import { toast } from 'sonner';
 
+import { isTauriRuntime } from '@/features/shell/StatusBar';
 import { commands } from '@/ipc/bindings';
 import { usePrefsStore } from '@/state/prefsStore';
 import { selectIsDirty, useWorkbookStore } from '@/state/workbookStore';
@@ -9,10 +10,7 @@ import { selectIsDirty, useWorkbookStore } from '@/state/workbookStore';
 import { serializeSnapshot } from './snapshot';
 
 export const AUTOSAVE_INTERVAL_MS = 30_000;
-
-function isTauriRuntime(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-}
+export const WEB_RECOVERY_KEY = 'xlsform-studio:recovery:v1';
 
 let appVersion = 'unknown';
 let warned = false;
@@ -30,20 +28,28 @@ async function resolveVersion(): Promise<string> {
 /** Write a snapshot if the document is dirty. Returns false when skipped. */
 export async function writeRecoverySnapshot(): Promise<boolean> {
   const state = useWorkbookStore.getState();
-  if (!isTauriRuntime() || !selectIsDirty(state)) return false;
+  if (!selectIsDirty(state)) return false;
+  const tauri = isTauriRuntime();
   const json = serializeSnapshot(state.data, {
     filePath: state.filePath,
-    appVersion: await resolveVersion(),
+    appVersion: tauri ? await resolveVersion() : 'web',
   });
-  await commands.recoveryWrite(json);
+  if (tauri) {
+    await commands.recoveryWrite(json);
+  } else {
+    localStorage.setItem(WEB_RECOVERY_KEY, json);
+  }
   return true;
 }
 
 /** Clear the snapshot after save, New, Open, or a clean discard. */
 export async function clearRecoverySnapshot(): Promise<void> {
-  if (!isTauriRuntime()) return;
   try {
-    await commands.recoveryClear();
+    if (isTauriRuntime()) {
+      await commands.recoveryClear();
+    } else {
+      localStorage.removeItem(WEB_RECOVERY_KEY);
+    }
   } catch {
     // Recovery is best effort; never block file operations.
   }
@@ -52,7 +58,7 @@ export async function clearRecoverySnapshot(): Promise<void> {
 export function useAutosave(): void {
   const autosave = usePrefsStore((state) => state.autosave);
   useEffect(() => {
-    if (!isTauriRuntime() || !autosave) return;
+    if (!autosave) return;
     const timer = window.setInterval(() => {
       void writeRecoverySnapshot().catch((error: unknown) => {
         if (warned) return;

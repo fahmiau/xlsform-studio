@@ -22,6 +22,7 @@ import { buildListName } from '@/core/ops/choices';
 import type { SlugStyle } from '@/core/slug/slugify';
 import { AiSection } from '@/features/preferences/sections/AiSection';
 import { UpdatesSection } from '@/features/preferences/sections/UpdatesSection';
+import { isTauriRuntime } from '@/features/shell/StatusBar';
 import { ZOOM_LEVELS, formatZoom } from '@/lib/zoom';
 import { usePrefsStore } from '@/state/prefsStore';
 
@@ -206,9 +207,13 @@ export function PreferencesDialog({
             </Row>
           </section>
 
-          <AiSection />
+          {isTauriRuntime() ? (
+            <>
+              <AiSection />
 
-          <UpdatesSection />
+              <UpdatesSection />
+            </>
+          ) : null}
         </div>
       </DialogContent>
     </Dialog>

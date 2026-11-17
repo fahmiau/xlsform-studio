@@ -13,7 +13,14 @@ import { clearRecoverySnapshot } from './useAutosave';
  */
 export function useCloseGuard(): void {
   useEffect(() => {
-    if (!isTauriRuntime()) return;
+    if (!isTauriRuntime()) {
+      const onBeforeUnload = (event: BeforeUnloadEvent) => {
+        if (!selectIsDirty(useWorkbookStore.getState())) return;
+        event.preventDefault();
+      };
+      window.addEventListener('beforeunload', onBeforeUnload);
+      return () => window.removeEventListener('beforeunload', onBeforeUnload);
+    }
     let unlisten: (() => void) | undefined;
     let closing = false;
 

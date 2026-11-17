@@ -4,8 +4,11 @@ import { toast } from 'sonner';
 import { commands } from '@/ipc/bindings';
 import { base64ToBytes, bytesToBase64 } from '@/lib/base64';
 import { appErrorMessage } from '@/lib/errors';
+import { readSettings } from '@/core/model/settings';
+import { slugify } from '@/core/slug/slugify';
 import { readWorkbook } from '@/core/xlsx/read';
 import { writeWorkbook } from '@/core/xlsx/write';
+import { isTauriRuntime } from '@/features/shell/StatusBar';
 import { selectIsDirty, useWorkbookStore } from '@/state/workbookStore';
 
 import { requestUnsavedChoice } from './unsavedGuard';
@@ -42,7 +45,65 @@ async function writeTo(path: string): Promise<boolean> {
   }
 }
 
+function pickXlsxFile(): Promise<File | null> {
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xlsx';
+    input.style.display = 'none';
+    let settled = false;
+    const finish = (file: File | null) => {
+      if (settled) return;
+      settled = true;
+      input.remove();
+      resolve(file);
+    };
+    input.addEventListener('change', () => finish(input.files?.[0] ?? null));
+    input.addEventListener('cancel', () => finish(null));
+    document.body.appendChild(input);
+    input.click();
+  });
+}
+
+async function saveWeb(): Promise<boolean> {
+  const state = useWorkbookStore.getState();
+  try {
+    const bytes = await writeWorkbook(state.data, {
+      sourceHandle: state.sourceHandle ?? undefined,
+    });
+    const title = readSettings(state.data.settings).formTitle || 'untitled';
+    const fileName = state.filePath
+      ? ensureXlsxExtension(basename(state.filePath))
+      : `${slugify(title) || 'untitled'}.xlsx`;
+    const blob = new Blob([new Uint8Array(bytes)], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    try {
+      link.click();
+    } finally {
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+    useWorkbookStore.getState().markSaved(fileName);
+    await clearRecoverySnapshot();
+    toast.success(`Saved ${fileName}`);
+    return true;
+  } catch (error) {
+    toast.error('Could not save the workbook', {
+      description: appErrorMessage(error),
+    });
+    return false;
+  }
+}
+
 async function saveFileAs(): Promise<boolean> {
+  if (!isTauriRuntime()) return saveWeb();
   const state = useWorkbookStore.getState();
   try {
     const selected = await save({
@@ -59,6 +120,7 @@ async function saveFileAs(): Promise<boolean> {
 }
 
 async function saveFile(): Promise<boolean> {
+  if (!isTauriRuntime()) return saveWeb();
   const path = useWorkbookStore.getState().filePath;
   if (!path) return saveFileAs();
   return writeTo(path);
@@ -74,20 +136,30 @@ async function confirmDiscard(): Promise<boolean> {
   return true;
 }
 
-async function openFile(): Promise<void> {
-  if (!(await confirmDiscard())) return;
+async function openFile(): Promise<boolean> {
+  if (!(await confirmDiscard())) return false;
   try {
-    const selected = await open({
-      title: 'Open XLSForm workbook',
-      multiple: false,
-      directory: false,
-      filters: XLSX_FILTER,
-    });
-    if (!selected || Array.isArray(selected)) return;
-    const encoded = await commands.readWorkbook(selected);
-    const result = await readWorkbook(base64ToBytes(encoded));
+    let bytes: Uint8Array;
+    let filePath: string;
+    if (isTauriRuntime()) {
+      const selected = await open({
+        title: 'Open XLSForm workbook',
+        multiple: false,
+        directory: false,
+        filters: XLSX_FILTER,
+      });
+      if (!selected || Array.isArray(selected)) return false;
+      bytes = base64ToBytes(await commands.readWorkbook(selected));
+      filePath = selected;
+    } else {
+      const file = await pickXlsxFile();
+      if (!file) return false;
+      bytes = new Uint8Array(await file.arrayBuffer());
+      filePath = file.name;
+    }
+    const result = await readWorkbook(bytes);
     useWorkbookStore.getState().load(result.data, {
-      filePath: selected,
+      filePath,
       sourceHandle: result.sourceHandle,
       warnings: result.warnings,
     });
@@ -97,10 +169,12 @@ async function openFile(): Promise<void> {
         description: result.warnings[0],
       });
     } else {
-      toast.success(`Opened ${basename(selected)}`);
+      toast.success(`Opened ${basename(filePath)}`);
     }
+    return true;
   } catch (error) {
     toast.error('Could not open the workbook', { description: appErrorMessage(error) });
+    return false;
   }
 }
 

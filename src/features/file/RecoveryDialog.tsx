@@ -12,31 +12,31 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { readWorkbook } from '@/core/xlsx/read';
+import { isTauriRuntime } from '@/features/shell/StatusBar';
 import { commands } from '@/ipc/bindings';
 import { base64ToBytes } from '@/lib/base64';
 import { useWorkbookStore } from '@/state/workbookStore';
 
 import { basename } from './fileActions';
 import { describeSnapshot, parseSnapshot, type RecoverySnapshot } from './snapshot';
-import { clearRecoverySnapshot } from './useAutosave';
-
-function isTauriRuntime(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-}
+import { WEB_RECOVERY_KEY, clearRecoverySnapshot } from './useAutosave';
 
 export function RecoveryDialog() {
   const [snapshot, setSnapshot] = useState<RecoverySnapshot | null>(null);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!isTauriRuntime()) return;
     let cancelled = false;
-    void commands
-      .recoveryRead()
-      .then((result) => {
-        if (cancelled || !result) return;
+    const readRaw = async (): Promise<string | null> =>
+      isTauriRuntime()
+        ? ((await commands.recoveryRead())?.json ?? null)
+        : localStorage.getItem(WEB_RECOVERY_KEY);
+
+    void readRaw()
+      .then((raw) => {
+        if (cancelled || !raw) return;
         try {
-          setSnapshot(parseSnapshot(result.json));
+          setSnapshot(parseSnapshot(raw));
         } catch {
           setSnapshot(null);
         }
@@ -52,7 +52,7 @@ export function RecoveryDialog() {
     setBusy(true);
     const warnings: string[] = [];
     let sourceHandle: Awaited<ReturnType<typeof readWorkbook>>['sourceHandle'] | undefined;
-    if (snapshot.filePath) {
+    if (snapshot.filePath && isTauriRuntime()) {
       try {
         const encoded = await commands.readWorkbook(snapshot.filePath);
         const reread = await readWorkbook(base64ToBytes(encoded));

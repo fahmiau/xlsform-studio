@@ -23,7 +23,7 @@ import { SettingsForm } from '@/features/settings-sheet/SettingsForm';
 
 import { FormulaBarSlot } from './FormulaBarSlot';
 import { SheetTabs } from './SheetTabs';
-import { StatusBar } from './StatusBar';
+import { StatusBar, isTauriRuntime } from './StatusBar';
 import { TopBar } from './TopBar';
 
 /**
@@ -64,27 +64,30 @@ function LeftPanel() {
 function RightPanel() {
   const tab = useUiStore((state) => state.rightTab);
   const setRightTab = useUiStore((state) => state.setRightTab);
+  const tauri = isTauriRuntime();
 
   return (
     <section className="flex h-full flex-col" data-testid="right-panel">
-      <div className="flex gap-1 border-b px-2 py-1" role="tablist">
-        {(['choices', 'ai'] as const).map((name) => (
-          <button
-            key={name}
-            type="button"
-            role="tab"
-            aria-selected={tab === name}
-            className={`rounded px-2 py-0.5 text-xs capitalize ${
-              tab === name ? 'bg-accent font-medium' : 'text-muted-foreground'
-            }`}
-            onClick={() => setRightTab(name)}
-          >
-            {name === 'ai' ? 'AI Assistant' : 'Choices'}
-          </button>
-        ))}
-      </div>
+      {tauri ? (
+        <div className="flex gap-1 border-b px-2 py-1" role="tablist">
+          {(['choices', 'ai'] as const).map((name) => (
+            <button
+              key={name}
+              type="button"
+              role="tab"
+              aria-selected={tab === name}
+              className={`rounded px-2 py-0.5 text-xs capitalize ${
+                tab === name ? 'bg-accent font-medium' : 'text-muted-foreground'
+              }`}
+              onClick={() => setRightTab(name)}
+            >
+              {name === 'ai' ? 'AI Assistant' : 'Choices'}
+            </button>
+          ))}
+        </div>
+      ) : null}
       <div className="min-h-0 flex-1 overflow-hidden">
-        {tab === 'choices' ? <ChoicesDrawer /> : <AiDrawer />}
+        {!tauri || tab === 'choices' ? <ChoicesDrawer /> : <AiDrawer />}
       </div>
     </section>
   );
@@ -114,7 +117,7 @@ function CenterPane({ sheet }: { sheet: SheetTab }) {
           <SettingsForm />
         )}
       </div>
-      <StagingBar />
+      {isTauriRuntime() ? <StagingBar /> : null}
     </div>
   );
 }

@@ -6,6 +6,7 @@
  */
 import { fileActions } from '@/features/file/fileActions';
 import { nextProblem } from '@/features/lint-panel/navigate';
+import { isTauriRuntime } from '@/features/shell/StatusBar';
 import { redoWithReveal, undoWithReveal } from '@/features/shell/UndoRedoButtons';
 import { usePrefsStore } from '@/state/prefsStore';
 import { useUiStore } from '@/state/uiStore';
@@ -91,6 +92,7 @@ export function appCommands(): AppCommand[] {
       id: 'ai.toggle',
       title: 'Toggle AI assistant',
       shortcut: { code: 'KeyJ', ctrlOrMeta: true },
+      when: () => isTauriRuntime(),
       run: () => {
         const ui = useUiStore.getState();
         const prefs = usePrefsStore.getState();
