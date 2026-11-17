@@ -290,9 +290,12 @@ export function SheetGrid({
   const clipboard = useClipboard(sheetName, display.keys, gridSelection, projection);
   const cellCache = useRef(new WeakMap<object, Map<ColumnKey, GridCell>>());
   const handledReveal = useRef(0);
-  const visibleRegionObjRef = useRef<{ x: number; y: number; width: number; height: number } | null>(
-    null,
-  );
+  const visibleRegionObjRef = useRef<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const restoreRegionRef = useRef<(() => void) | null>(null);
   const editingCellRef = useRef<Item | null>(null);
   const pendingScrollRef = useRef<{
@@ -348,23 +351,22 @@ export function SheetGrid({
   useEffect(() => {
     const pendingReveal = useUiStore.getState().reveal;
     if (pendingReveal && pendingReveal.sheet === sheetName) return;
-    if (compact) {
-      if (rowCount > 0 && !drawerGridSelection) {
-        setGridSelection(gridSelectionForCell(Math.min(1, display.keys.length), 0));
-      }
-      return;
-    }
+    if (compact) return;
     const cell = useUiStore.getState().activeCells[sheetName];
     const rowIndex = cell ? visibleRowIndex(projection, findRowIndex(sheet, cell.rowId)) : -1;
     const columnIndex = cell ? display.keys.indexOf(cell.column) + 1 : -1;
     if (rowIndex >= 0 && columnIndex > 0) {
-      setGridSelection(gridSelectionForCell(columnIndex, rowIndex));
+      useUiStore
+        .getState()
+        .setGridSelection(sheetName, gridSelectionForCell(columnIndex, rowIndex));
     } else if (rowCount > 0) {
-      setGridSelection(gridSelectionForCell(Math.min(1, display.keys.length), 0));
+      useUiStore
+        .getState()
+        .setGridSelection(sheetName, gridSelectionForCell(Math.min(1, display.keys.length), 0));
     }
     // Only react to a changed column signature; edits must not reset selection.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [keySignature, sheetName, setGridSelection]);
+  }, [compact, keySignature, sheetName]);
 
   // Reveal expands collapsed ancestors before selecting and scrolling to the cell (Task 3.7).
   useEffect(() => {
@@ -403,7 +405,12 @@ export function SheetGrid({
           : Math.min(1, display.keys.length);
     const resolvedColumn = display.keys[columnIndex - 1] ?? '';
 
-    setGridSelection(gridSelectionForCell(columnIndex, visibleIndex));
+    const nextGridSelection = gridSelectionForCell(columnIndex, visibleIndex);
+    if (compact) {
+      queueMicrotask(() => setDrawerGridSelection(nextGridSelection));
+    } else {
+      useUiStore.getState().setGridSelection(sheetName, nextGridSelection);
+    }
     useUiStore.getState().setSelectedRowIds([reveal.rowId]);
     if (resolvedColumn) {
       const nextRef = { sheet: sheetName, rowId: reveal.rowId, column: resolvedColumn };
@@ -647,9 +654,7 @@ export function SheetGrid({
 
       if (sheetName === 'choices' && columnBase === 'custom' && !locked) {
         const rowListName = (row.cells[listNameKey ?? 'list_name'] ?? '').trim();
-        const parentListName = rowListName
-          ? resolveFilterParentList(data, rowListName, key)
-          : null;
+        const parentListName = rowListName ? resolveFilterParentList(data, rowListName, key) : null;
         if (parentListName) {
           return makeEnumCell({
             column: 'filter',
@@ -714,6 +719,7 @@ export function SheetGrid({
       display.keys,
       groupByRowId,
       indexes.choices.byList,
+      listNameKey,
       locked,
       groupsForDepth.depthByRowIndex,
       onCommitEdits,
