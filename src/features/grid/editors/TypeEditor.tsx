@@ -2,7 +2,7 @@
  * `type` column editor (Task 3.1). Two steps: fuzzy question type, then a
  * choice list (existing lists, new list from the question name, `or_other`).
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Command } from 'cmdk';
 import type { ProvideEditorComponent } from '@glideapps/glide-data-grid';
 
@@ -17,6 +17,12 @@ import { usePrefsStore } from '@/state/prefsStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 
 import { makeEnumCell, type EnumCell } from '../cells/EnumCell';
+import {
+  actionMovement,
+  useConsumeDirectType,
+  useDirectTypeInitialState,
+  useFocusInputOnMount,
+} from './directTypeBuffer';
 import { filterByFuzzy } from './fuzzy';
 
 type EditorProps = Parameters<ProvideEditorComponent<EnumCell>>[0];
@@ -103,16 +109,16 @@ export function TypeEditor({
   forceEditMode,
 }: EditorProps) {
   const parsed = useMemo(() => parseType(value.data.value), [value.data.value]);
-  const hasInitial = initialValue !== undefined && initialValue !== '';
+  const isDirectType = initialValue !== undefined;
+  const hasInitial = isDirectType && initialValue !== '';
   const [step, setStep] = useState<'type' | 'list'>(() =>
     !hasInitial && SELECT_BASES.has(parsed.base) && parsed.listName ? 'list' : 'type',
   );
   const [pendingBase, setPendingBase] = useState(SELECT_BASES.has(parsed.base) ? parsed.base : '');
-  const [query, setQuery] = useState(initialValue ?? '');
+  const [query, setQuery] = useDirectTypeInitialState(initialValue, '');
   const [activeIndex, setActiveIndex] = useState(0);
   const [orOther, setOrOther] = useState(parsed.orOther === true);
   const inputRef = useRef<HTMLInputElement>(null);
-  const seededInitialRef = useRef(hasInitial);
 
   const types = useMemo(
     () =>
@@ -133,18 +139,30 @@ export function TypeEditor({
   const canCreate = step === 'list';
   const itemCount = step === 'type' ? types.length : visibleLists.length + (canCreate ? 1 : 0);
 
-  useEffect(() => {
-    const input = inputRef.current;
-    if (!input) return;
-    input.focus();
-    if (seededInitialRef.current) {
-      seededInitialRef.current = false;
-      const len = input.value.length;
-      input.setSelectionRange(len, len);
-    } else {
-      input.select();
+  useFocusInputOnMount(inputRef, step === 'type' && isDirectType, step);
+
+  useConsumeDirectType((pending) => {
+    if (!pending?.trailingAction) return;
+    const movement = actionMovement(pending.trailingAction);
+    if (!movement) {
+      onFinishedEditing(undefined, [0, 0]);
+      return;
     }
-  }, [step]);
+    const matched = filterByFuzzy(
+      pending.text,
+      QUESTION_TYPES,
+      (type) => `${type.name} ${TYPE_HINTS[type.name] ?? ''} ${CATEGORY_LABEL[type.category]}`,
+    )[0];
+    if (matched) {
+      if (SELECT_BASES.has(matched.name)) {
+        queueMicrotask(() => commitType(matched.name, movement));
+      } else {
+        finish(matched.name, movement);
+      }
+    } else if (pending.text.trim()) {
+      finish(pending.text.trim(), movement);
+    }
+  });
 
   function finish(nextValue: string, movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) {
     const cell = makeEnumCell({

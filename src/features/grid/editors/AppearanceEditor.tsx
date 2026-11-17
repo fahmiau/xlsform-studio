@@ -1,11 +1,17 @@
 /** `appearance` editor filtered by the row's base type (Task 3.1). */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Command } from 'cmdk';
 import type { ProvideEditorComponent } from '@glideapps/glide-data-grid';
 
 import { appearanceSuggestions } from '@/core/model/appearances';
 
 import { makeEnumCell, type EnumCell } from '../cells/EnumCell';
+import {
+  actionMovement,
+  useConsumeDirectType,
+  useDirectTypeInitialState,
+  useFocusInputOnMount,
+} from './directTypeBuffer';
 import { filterByFuzzy } from './fuzzy';
 
 type EditorProps = Parameters<ProvideEditorComponent<EnumCell>>[0];
@@ -16,23 +22,28 @@ export function AppearanceEditor({
   onChange,
   onFinishedEditing,
 }: EditorProps) {
-  const [query, setQuery] = useState(initialValue ?? '');
+  const isDirectType = initialValue !== undefined;
+  const [query, setQuery] = useDirectTypeInitialState(initialValue, '');
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const input = inputRef.current;
-    if (!input) return;
-    input.focus();
-    if (initialValue !== undefined) {
-      const len = input.value.length;
-      input.setSelectionRange(len, len);
-    } else {
-      input.select();
+  useFocusInputOnMount(inputRef, isDirectType);
+
+  useConsumeDirectType((pending) => {
+    if (!pending?.trailingAction) return;
+    const movement = actionMovement(pending.trailingAction);
+    if (!movement) {
+      onFinishedEditing(undefined, [0, 0]);
+      return;
     }
-    // Only position cursor on mount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const items = filterByFuzzy(
+      pending.text,
+      appearanceSuggestions(value.data.baseType ?? ''),
+      (entry) => `${entry.name} ${entry.description}`,
+    );
+    const chosen = items[0]?.name ?? pending.text.trim();
+    if (chosen) finish(chosen, movement);
+  });
 
   const suggestions = useMemo(
     () => appearanceSuggestions(value.data.baseType ?? ''),

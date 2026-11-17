@@ -2,56 +2,47 @@
  * In-cell text editor (Step 3). Commits on Enter with `[0, 0]` movement so
  * focus stays on the edited cell instead of walking onto the trailing ghost row.
  */
-import { useEffect, useRef, useState } from 'react';
-import { GridCellKind, type ProvideEditorComponent, type TextCell } from '@glideapps/glide-data-grid';
+import { useRef } from 'react';
+import {
+  GridCellKind,
+  type ProvideEditorComponent,
+  type TextCell,
+} from '@glideapps/glide-data-grid';
+
+import {
+  actionMovement,
+  useConsumeDirectType,
+  useDirectTypeInitialState,
+  useFocusInputOnMount,
+} from './directTypeBuffer';
 
 type EditorProps = Parameters<ProvideEditorComponent<TextCell>>[0];
 
-export function TextCellEditor({
-  value,
-  initialValue,
-  onChange,
-  onFinishedEditing,
-}: EditorProps) {
-  const startValue = initialValue ?? value.data ?? '';
-  const [draft, setDraft] = useState(startValue);
+export function TextCellEditor({ value, initialValue, onChange, onFinishedEditing }: EditorProps) {
+  const isDirectType = initialValue !== undefined;
+  const [draft, setDraft] = useDirectTypeInitialState(initialValue, value.data ?? '');
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const seeded = useRef(false);
-
-  // Seed Glide's overlay tempValue once on direct typing so outside clicks
-  // commit the typed character instead of reverting to the previous text.
-  useEffect(() => {
-    if (seeded.current) return;
-    seeded.current = true;
-    if (initialValue !== undefined) {
-      onChange({
-        ...value,
-        kind: GridCellKind.Text,
-        data: initialValue,
-        displayData: initialValue,
-      });
-    }
-  }, [initialValue, onChange, value]);
-
-  useEffect(() => {
-    const el = inputRef.current;
-    if (!el) return;
-    el.focus();
-    if (initialValue !== undefined) {
-      const len = el.value.length;
-      el.setSelectionRange(len, len);
-    } else {
-      el.select();
-    }
-    // Only position cursor on initial mount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const userEdited = useRef(false);
 
   const makeCell = (text: string): TextCell => ({
     ...value,
     kind: GridCellKind.Text,
     data: text,
     displayData: text,
+  });
+
+  useFocusInputOnMount(inputRef, isDirectType);
+
+  // Seed Glide's overlay tempValue once on direct typing so outside clicks
+  // commit the typed character instead of reverting to the previous text.
+  useConsumeDirectType((pending) => {
+    const initialText = pending?.text ?? initialValue;
+    if (initialText !== undefined && !userEdited.current) {
+      onChange(makeCell(initialText));
+    }
+    if (!pending?.trailingAction) return;
+    const movement = actionMovement(pending.trailingAction);
+    onFinishedEditing(movement ? makeCell(pending.text) : undefined, movement ?? [0, 0]);
   });
 
   const commit = (movement: readonly [-1 | 0 | 1, -1 | 0 | 1] = [0, 0]) => {
@@ -65,11 +56,13 @@ export function TextCellEditor({
   return (
     <textarea
       ref={inputRef}
+      autoFocus
       rows={rows}
       className="bg-background text-foreground block h-full min-h-[32px] w-full resize-none border-0 px-2 py-1.5 text-[13px] leading-snug outline-none"
       data-testid="text-cell-editor"
       value={draft}
       onChange={(event) => {
+        userEdited.current = true;
         const next = event.target.value;
         setDraft(next);
         onChange(makeCell(next));

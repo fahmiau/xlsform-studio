@@ -17,7 +17,13 @@ pnpm tauri dev
 
 ## Before opening a PR
 
-Run the gates that match your change:
+Run the full CI gate locally before pushing:
+
+```bash
+pnpm verify          # runs all .github/workflows/ci.yml gates (stop pnpm dev first)
+```
+
+Or run the individual gates that match your change:
 
 ```bash
 pnpm lint

@@ -60,6 +60,7 @@ import {
 import { pasteMatrix } from './clipboard';
 import { computeDiagnosticTooltipLayout } from './diagnosticTooltip';
 import { isCellEditable, structuralRowKind, type StructuralRowKind } from './editability';
+import { createDirectTypeController, DirectTypeProvider } from './editors/directTypeBuffer';
 import { useEditorRouting } from './editors/useEditorRouting';
 import { tileFill } from './fill';
 import { GRID_HEADER_HEIGHT, GRID_ROW_HEIGHT } from './geometry';
@@ -169,6 +170,9 @@ export function SheetGrid({
   const dark = useIsDark(themeMode);
   const gridTheme = useMemo(() => buildGridTheme(dark), [dark]);
   const provideEditor = useEditorRouting();
+  const [directType] = useState(() => createDirectTypeController());
+
+  useEffect(() => () => directType.clear(), [directType]);
 
   const hostRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<DataEditorRef>(null);
@@ -425,6 +429,7 @@ export function SheetGrid({
     };
     if (reveal.focus !== false) gridRef.current?.focus();
   }, [
+    compact,
     reveal,
     sheetName,
     sheet,
@@ -432,7 +437,6 @@ export function SheetGrid({
     collapsedGroupIds,
     groupsForDepth,
     projection,
-    setGridSelection,
   ]);
 
   // Execute the reveal scroll after selection updates and Glide's scroller has settled.
@@ -997,6 +1001,7 @@ export function SheetGrid({
 
   const handleSelectionChange = useCallback(
     (selection: GridSelection) => {
+      directType.clear();
       setGridSelection(selection);
       const bounds = selectionBounds(selection);
       if (bounds) {
@@ -1017,7 +1022,7 @@ export function SheetGrid({
       }
       useUiStore.getState().setSelectedRowIds(selectionToRowIds(sheet, selection, projection));
     },
-    [display.keys, onActiveRowChange, projection, setGridSelection, sheet, sheetName],
+    [directType, display.keys, onActiveRowChange, projection, setGridSelection, sheet, sheetName],
   );
 
   const openRowMenu = useCallback(
@@ -1157,130 +1162,185 @@ export function SheetGrid({
       <div
         ref={hostRef}
         className="relative min-h-0 flex-1"
+        onMouseDown={() => directType.clear()}
+        onBlur={(event) => {
+          const next = event.relatedTarget;
+          if (!next || !(next instanceof Element && next.closest('#portal') !== null)) {
+            directType.clear();
+          }
+        }}
         onMouseLeave={() => {
           hoverKey.current = null;
           setDiagnosticHover((current) => (current ? null : current));
         }}
       >
-        <DataEditor
-          ref={gridRef}
-          width={size.width}
-          height={size.height}
-          rows={rowCount}
-          columns={display.columns}
-          getCellContent={getCellContent}
-          getRowThemeOverride={getRowThemeOverride}
-          onCellsEdited={onCellsEdited}
-          onItemHovered={handleDiagnosticHover}
-          drawCell={drawDiagnosticMarker}
-          drawHeader={drawStagedHeader}
-          onDelete={() => !locked}
-          onPaste={onPaste}
-          onFillPattern={onFillPattern}
-          onRowAppended={onRowAppended}
-          onRowMoved={compact ? onMoveRow : undefined}
-          onGridSelectionChange={handleSelectionChange}
-          gridSelection={gridSelection}
-          provideEditor={provideEditor}
-          onCellActivated={(cell) => {
-            editingCellRef.current = cell;
-          }}
-          onKeyDown={(event) => {
-            editingCellRef.current = gridSelection.current?.cell ?? null;
-            if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
-              const activeCol = gridSelection.current?.cell[0] ?? 0;
-              const region = visibleRegionObjRef.current;
-              if (region && region.x > 0 && activeCol > 0 && activeCol < display.frozenCount) {
-                const origX = region.x;
-                const origWidth = region.width;
-                region.x = 0;
-                region.width = origX + origWidth;
-                const restore = () => {
-                  if (restoreRegionRef.current !== restore) return;
-                  restoreRegionRef.current = null;
-                  region.x = origX;
-                  region.width = origWidth;
-                };
-                restoreRegionRef.current = restore;
-                queueMicrotask(restore);
-              }
-            }
-          }}
-          onFinishedEditing={(_newValue, movement) => {
-            const baseCell = editingCellRef.current ?? gridSelection.current?.cell;
-            editingCellRef.current = null;
-            if (!baseCell || rowCount === 0 || display.columns.length <= 1) return;
-            const maxCol = display.columns.length - 1;
-            const maxRow = rowCount - 1;
-            const targetCol = Math.min(maxCol, Math.max(1, baseCell[0] + movement[0]));
-            const targetRow = Math.min(maxRow, Math.max(0, baseCell[1] + movement[1]));
-            handleSelectionChange(gridSelectionForCell(targetCol, targetRow));
-          }}
-          // The completion tooltip is mounted in `document.body`, outside this
-          // overlay; without the veto Glide would treat a click on a completion
-          // item as an outside click and close the in-cell editor first.
-          isOutsideClick={(event) => {
-            const target = event.target;
-            return !(target instanceof Element && target.closest('.cm-tooltip') !== null);
-          }}
-          onVisibleRegionChanged={(region) => {
-            visibleRegionObjRef.current = region;
-            hoverKey.current = null;
-            setDiagnosticHover((current) => (current ? null : current));
-            if (!restoredScrollRef.current) return;
-            scrollMemory.set(compact ? `${sheetName}:drawer` : sheetName, {
-              col: region.x,
-              row: region.y,
-            });
-          }}
-          onColumnResize={onColumnResize}
-          onColumnResizeEnd={onColumnResizeEnd}
-          onColumnMoved={columnKeys ? undefined : onColumnMoved}
-          onHeaderContextMenu={(columnIndex, event) => {
-            if (compact) return;
-            const key = display.keys[columnIndex - 1];
-            if (!key) return;
-            event.preventDefault();
-            const point = contextMenuPoint(event.bounds, event.localEventX, event.localEventY);
-            setHeaderMenu({ x: point.x, y: point.y, column: key });
-          }}
-          onCellContextMenu={(item, event) => {
-            if (item[1] < 0) return;
-            event.preventDefault();
-            const point = contextMenuPoint(event.bounds, event.localEventX, event.localEventY);
-            openRowMenu(item[0] <= 0 ? [1, item[1]] : item, point.x, point.y);
-          }}
-          trailingRowOptions={
-            locked
-              ? undefined
-              : {
-                  tint: true,
-                  // Zero-width space, not '': Glide only always-draws the plus
-                  // glyph when the hint is non-empty (new-row-cell.js).
-                  hint: '\u200B',
-                  sticky: false,
-                  targetColumn: Math.min(1, display.keys.length),
+        <DirectTypeProvider controller={directType}>
+          <DataEditor
+            ref={gridRef}
+            width={size.width}
+            height={size.height}
+            rows={rowCount}
+            columns={display.columns}
+            getCellContent={getCellContent}
+            getRowThemeOverride={getRowThemeOverride}
+            onCellsEdited={onCellsEdited}
+            onItemHovered={handleDiagnosticHover}
+            drawCell={drawDiagnosticMarker}
+            drawHeader={drawStagedHeader}
+            onDelete={() => !locked}
+            onPaste={onPaste}
+            onFillPattern={onFillPattern}
+            onRowAppended={onRowAppended}
+            onRowMoved={compact ? onMoveRow : undefined}
+            onGridSelectionChange={handleSelectionChange}
+            gridSelection={gridSelection}
+            provideEditor={provideEditor}
+            onCellActivated={(cell) => {
+              directType.clear();
+              editingCellRef.current = cell;
+            }}
+            onKeyDown={(event) => {
+              const activeCell = gridSelection.current?.cell;
+              editingCellRef.current = activeCell ?? null;
+
+              if (directType.isActive()) {
+                if (activeCell && directType.isActiveFor(activeCell) && directType.pushKey(event)) {
+                  event.cancel();
+                  event.preventDefault();
+                  event.stopPropagation();
+                  return;
                 }
-          }
-          freezeColumns={display.frozenCount}
-          rowMarkers={compact ? 'number' : 'none'}
-          rowHeight={GRID_ROW_HEIGHT}
-          headerHeight={GRID_HEADER_HEIGHT}
-          theme={gridTheme}
-          customRenderers={[
-            gutterRenderer,
-            enumRenderer,
-            choiceNameRenderer,
-            collapsedPillRenderer,
-            xpathRenderer,
-          ]}
-          cellActivationBehavior="second-click"
-          fillHandle={true}
-          getCellsForSelection={true}
-          keybindings={{ search: false, delete: 'Backspace|Delete' }}
-          smoothScrollX={true}
-          smoothScrollY={true}
-        />
+                directType.clear();
+              }
+
+              if (
+                event.key.length === 1 &&
+                event.key !== ' ' &&
+                /[!-~]/.test(event.key) &&
+                !event.ctrlKey &&
+                !event.metaKey &&
+                !event.altKey
+              ) {
+                const activeCol = activeCell?.[0] ?? 0;
+                const activeRow = activeCell?.[1] ?? -1;
+                const region = visibleRegionObjRef.current;
+                if (region && region.x > 0 && activeCol > 0 && activeCol < display.frozenCount) {
+                  const origX = region.x;
+                  const origWidth = region.width;
+                  region.x = 0;
+                  region.width = origX + origWidth;
+                  const restore = () => {
+                    if (restoreRegionRef.current !== restore) return;
+                    restoreRegionRef.current = null;
+                    region.x = origX;
+                    region.width = origWidth;
+                  };
+                  restoreRegionRef.current = restore;
+                  queueMicrotask(restore);
+                }
+                if (
+                  !locked &&
+                  event.bounds !== undefined &&
+                  activeCell &&
+                  activeCol > 0 &&
+                  activeRow >= 0 &&
+                  activeRow < rowCount
+                ) {
+                  const mangledCol = activeCol + (compact ? 1 : 0);
+                  const vr = visibleRegionObjRef.current;
+                  const inVisibleRegion = vr
+                    ? activeRow >= vr.y &&
+                      activeRow <= vr.y + vr.height &&
+                      mangledCol >= vr.x &&
+                      mangledCol <= vr.x + vr.width
+                    : activeRow <= 1 && mangledCol <= 1;
+                  if (inVisibleRegion) {
+                    const cell = getCellContent(activeCell);
+                    const readonly = 'readonly' in cell && cell.readonly === true;
+                    if (cell.allowOverlay === true && !readonly) {
+                      directType.start(activeCell, event.key);
+                    }
+                  }
+                }
+              }
+            }}
+            onFinishedEditing={(_newValue, movement) => {
+              directType.clear();
+              const baseCell = editingCellRef.current ?? gridSelection.current?.cell;
+              editingCellRef.current = null;
+              if (!baseCell || rowCount === 0 || display.columns.length <= 1) return;
+              const maxCol = display.columns.length - 1;
+              const maxRow = rowCount - 1;
+              const targetCol = Math.min(maxCol, Math.max(1, baseCell[0] + movement[0]));
+              const targetRow = Math.min(maxRow, Math.max(0, baseCell[1] + movement[1]));
+              handleSelectionChange(gridSelectionForCell(targetCol, targetRow));
+            }}
+            // The completion tooltip is mounted in `document.body`, outside this
+            // overlay; without the veto Glide would treat a click on a completion
+            // item as an outside click and close the in-cell editor first.
+            isOutsideClick={(event) => {
+              const target = event.target;
+              return !(target instanceof Element && target.closest('.cm-tooltip') !== null);
+            }}
+            onVisibleRegionChanged={(region) => {
+              visibleRegionObjRef.current = region;
+              hoverKey.current = null;
+              setDiagnosticHover((current) => (current ? null : current));
+              if (!restoredScrollRef.current) return;
+              scrollMemory.set(compact ? `${sheetName}:drawer` : sheetName, {
+                col: region.x,
+                row: region.y,
+              });
+            }}
+            onColumnResize={onColumnResize}
+            onColumnResizeEnd={onColumnResizeEnd}
+            onColumnMoved={columnKeys ? undefined : onColumnMoved}
+            onHeaderContextMenu={(columnIndex, event) => {
+              if (compact) return;
+              const key = display.keys[columnIndex - 1];
+              if (!key) return;
+              event.preventDefault();
+              const point = contextMenuPoint(event.bounds, event.localEventX, event.localEventY);
+              setHeaderMenu({ x: point.x, y: point.y, column: key });
+            }}
+            onCellContextMenu={(item, event) => {
+              if (item[1] < 0) return;
+              event.preventDefault();
+              const point = contextMenuPoint(event.bounds, event.localEventX, event.localEventY);
+              openRowMenu(item[0] <= 0 ? [1, item[1]] : item, point.x, point.y);
+            }}
+            trailingRowOptions={
+              locked
+                ? undefined
+                : {
+                    tint: true,
+                    // Zero-width space, not '': Glide only always-draws the plus
+                    // glyph when the hint is non-empty (new-row-cell.js).
+                    hint: '\u200B',
+                    sticky: false,
+                    targetColumn: Math.min(1, display.keys.length),
+                  }
+            }
+            freezeColumns={display.frozenCount}
+            rowMarkers={compact ? 'number' : 'none'}
+            rowHeight={GRID_ROW_HEIGHT}
+            headerHeight={GRID_HEADER_HEIGHT}
+            theme={gridTheme}
+            customRenderers={[
+              gutterRenderer,
+              enumRenderer,
+              choiceNameRenderer,
+              collapsedPillRenderer,
+              xpathRenderer,
+            ]}
+            cellActivationBehavior="second-click"
+            fillHandle={true}
+            getCellsForSelection={true}
+            keybindings={{ search: false, delete: 'Backspace|Delete' }}
+            smoothScrollX={true}
+            smoothScrollY={true}
+          />
+        </DirectTypeProvider>
         {diagnosticHover ? (
           <div
             className="bg-popover text-popover-foreground border-border pointer-events-none absolute z-50 w-max rounded border px-2.5 py-1.5 text-[11px] leading-snug whitespace-normal break-words shadow-lg"

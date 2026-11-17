@@ -1,5 +1,5 @@
 /** In-cell CodeMirror formula editor (Task 4.6). */
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 import type { ProvideEditorComponent } from '@glideapps/glide-data-grid';
 
 import { diagnosticCellKey } from '@/core/lint/diagnostics';
@@ -11,6 +11,11 @@ import { useWorkbookStore } from '@/state/workbookStore';
 import { CodeMirrorEditor } from '../../formula/CodeMirrorEditor';
 import { completionDataFor } from '../../formula/completions';
 import { makeXPathCell, type XPathCell } from '../cells/XPathCell';
+import {
+  actionMovement,
+  useConsumeDirectType,
+  useDirectTypeInitialState,
+} from './directTypeBuffer';
 
 type EditorProps = Parameters<ProvideEditorComponent<XPathCell>>[0];
 
@@ -25,26 +30,27 @@ export function CellFormulaEditor({
   const fontSize = usePrefsStore((state) => state.formulaFontSize);
   const dark = useIsDark(theme);
   const cell = { sheet: 'survey' as const, rowId: value.data.rowId, column: value.data.column };
-  const startDoc = initialValue ?? value.data.value;
-  const seeded = useRef(false);
+  const [startDoc] = useDirectTypeInitialState(initialValue, value.data.value);
+  const userEdited = useRef(false);
+
+  const update = (next: string) => makeXPathCell({ ...value.data, value: next });
+  const finish = (next: string, movement: readonly [-1 | 0 | 1, -1 | 0 | 1] = [0, 0]) => {
+    onFinishedEditing(update(next), movement);
+  };
 
   // Glide commits its own overlay `tempValue` on outside click; a typed "$"
   // arrives as `initialValue` without touching the cell, so seed the overlay
-  // once or clicking outside would commit the old value. The ref stops
-  // StrictMode's double effect from looping on value changes.
-  useEffect(() => {
-    if (seeded.current) return;
-    seeded.current = true;
-    onChange(makeXPathCell({ ...value.data, value: startDoc }));
-  }, [onChange, startDoc, value.data]);
-
-  const update = (next: string) => makeXPathCell({ ...value.data, value: next });
-  const finish = (
-    next: string,
-    movement: readonly [-1 | 0 | 1, -1 | 0 | 1] = [0, 0],
-  ) => {
-    onFinishedEditing(update(next), movement);
-  };
+  // once or clicking outside would commit the old value.
+  useConsumeDirectType((pending) => {
+    const initialDoc = pending?.text ?? startDoc;
+    if (!userEdited.current) {
+      onChange(update(initialDoc));
+    }
+    if (!pending?.trailingAction) return;
+    const movement = actionMovement(pending.trailingAction);
+    if (!movement) onFinishedEditing(undefined);
+    else finish(initialDoc, movement);
+  });
 
   return (
     <div className="bg-background min-h-[72px] w-[min(560px,80vw)] overflow-hidden">
@@ -60,7 +66,10 @@ export function CellFormulaEditor({
         ariaLabel="Formula cell editor"
         className="max-h-[220px] min-h-[72px] overflow-auto"
         testId="cell-formula-editor"
-        onChange={(next) => onChange(update(next))}
+        onChange={(next) => {
+          userEdited.current = true;
+          onChange(update(next));
+        }}
         onCommit={(next) => finish(next)}
         onCancel={() => onFinishedEditing(undefined)}
         onTabCommit={(next) => finish(next, [1, 0])}

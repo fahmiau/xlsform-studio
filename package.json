@@ -29,7 +29,8 @@
     "bindings:check": "pnpm bindings && git diff --exit-code -- src/ipc/bindings.ts",
     "bump-version": "node scripts/bump-version.mjs",
     "fixtures": "tsx tests/fixtures/generate-reference.ts",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "verify": "node scripts/ci.mjs"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "2.0.110",

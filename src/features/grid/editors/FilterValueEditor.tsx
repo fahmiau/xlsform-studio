@@ -1,5 +1,5 @@
 /** Cascading-filter parent choice picker for custom filter columns. */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Command } from 'cmdk';
 import type { ProvideEditorComponent } from '@glideapps/glide-data-grid';
 
@@ -9,6 +9,12 @@ import { useDerivedStore } from '@/state/derivedStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 
 import { makeEnumCell, type EnumCell } from '../cells/EnumCell';
+import {
+  actionMovement,
+  useConsumeDirectType,
+  useDirectTypeInitialState,
+  useFocusInputOnMount,
+} from './directTypeBuffer';
 import { filterByFuzzy } from './fuzzy';
 
 type EditorProps = Parameters<ProvideEditorComponent<EnumCell>>[0];
@@ -49,11 +55,12 @@ export function FilterValueEditor({
   onChange,
   onFinishedEditing,
 }: EditorProps) {
+  const isDirectType = initialValue !== undefined;
   const parentListName = value.data.parentListName ?? '';
   const options = useMemo(() => loadParentChoices(parentListName), [parentListName]);
-  const [query, setQuery] = useState(initialValue ?? '');
+  const [query, setQuery] = useDirectTypeInitialState(initialValue, '');
   const [activeIndex, setActiveIndex] = useState(() => {
-    if (initialValue) return 0;
+    if (isDirectType) return 0;
     const idx = options.findIndex((opt) => opt.name === value.data.value);
     return idx >= 0 ? idx : 0;
   });
@@ -72,13 +79,18 @@ export function FilterValueEditor({
     return items;
   }, [filteredChoices, query, value.data.value]);
 
-  useEffect(() => {
-    const input = inputRef.current;
-    if (!input) return;
-    input.focus();
-    const len = input.value.length;
-    input.setSelectionRange(len, len);
-  }, []);
+  useFocusInputOnMount(inputRef, true);
+
+  useConsumeDirectType((pending) => {
+    if (!pending?.trailingAction) return;
+    const movement = actionMovement(pending.trailingAction);
+    if (!movement) {
+      onFinishedEditing(undefined, [0, 0]);
+      return;
+    }
+    const matched = filterByFuzzy(pending.text, options, (opt) => `${opt.name} ${opt.label}`)[0];
+    finish(matched?.name ?? pending.text.trim(), movement);
+  });
 
   function finish(nextValue: string, movement: readonly [-1 | 0 | 1, -1 | 0 | 1] = [0, 0]) {
     const cell = makeEnumCell({ ...value.data, value: nextValue });

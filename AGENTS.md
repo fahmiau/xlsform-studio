@@ -41,6 +41,7 @@ IPC bridge. If you claim a behavior works, it was checked in `pnpm tauri dev`.
 | `pnpm bench:indexes`        | index rebuild, ≤ 5 ms target                           |
 | `pnpm bench:grid`           | grid projection benchmark                              |
 | `pnpm test:e2e`             | Playwright on `pnpm dev`, Tauri IPC mocked per test    |
+| `pnpm verify`               | Run all `.github/workflows/ci.yml` gates locally       |
 | `pnpm bindings:check`       | regenerate Specta bindings and fail on drift           |
 | `pnpm fixtures`             | rebuild the synthetic corpus + reference form          |
 | `pnpm bump-version <x.y.z>` | sync `package.json` / `tauri.conf.json` / `Cargo.toml` |

@@ -1,8 +1,14 @@
 /** Manual choice-name editor (Task 3.4); committing marks the row locked. */
-import { useEffect, useRef, useState } from 'react';
+import { useRef } from 'react';
 import type { ProvideEditorComponent } from '@glideapps/glide-data-grid';
 
 import { makeChoiceNameCell, type ChoiceNameCell } from '../cells/ChoiceNameCell';
+import {
+  actionMovement,
+  useConsumeDirectType,
+  useDirectTypeInitialState,
+  useFocusInputOnMount,
+} from './directTypeBuffer';
 
 type EditorProps = Parameters<ProvideEditorComponent<ChoiceNameCell>>[0];
 
@@ -12,40 +18,28 @@ export function ChoiceNameEditor({
   onChange,
   onFinishedEditing,
 }: EditorProps) {
-  const [draft, setDraft] = useState(initialValue ?? value.data.value);
+  const isDirectType = initialValue !== undefined;
+  const [draft, setDraft] = useDirectTypeInitialState(initialValue, value.data.value);
   const inputRef = useRef<HTMLInputElement>(null);
-  const seeded = useRef(false);
+  const userEdited = useRef(false);
 
-  useEffect(() => {
-    if (seeded.current) return;
-    seeded.current = true;
-    if (initialValue !== undefined) {
-      onChange(
-        makeChoiceNameCell({
-          ...value.data,
-          value: initialValue,
-          locked: initialValue.trim() !== '',
-        }),
-      );
-    }
-  }, [initialValue, onChange, value.data]);
+  const makeCell = (text: string) =>
+    makeChoiceNameCell({ ...value.data, value: text, locked: text.trim() !== '' });
 
-  useEffect(() => {
-    const input = inputRef.current;
-    if (!input) return;
-    input.focus();
-    if (initialValue !== undefined) {
-      const len = input.value.length;
-      input.setSelectionRange(len, len);
-    } else {
-      input.select();
+  useFocusInputOnMount(inputRef, isDirectType);
+
+  useConsumeDirectType((pending) => {
+    const initialText = pending?.text ?? initialValue;
+    if (initialText !== undefined && !userEdited.current) {
+      onChange(makeCell(initialText));
     }
-    // Only position cursor on mount.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (!pending?.trailingAction) return;
+    const movement = actionMovement(pending.trailingAction);
+    onFinishedEditing(movement ? makeCell(pending.text) : undefined, movement ?? [0, 0]);
+  });
 
   const commit = (movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) => {
-    const cell = makeChoiceNameCell({ ...value.data, value: draft, locked: draft.trim() !== '' });
+    const cell = makeCell(draft);
     onChange(cell);
     onFinishedEditing(cell, movement ?? [0, 0]);
   };
@@ -53,13 +47,15 @@ export function ChoiceNameEditor({
   return (
     <input
       ref={inputRef}
+      autoFocus
       className="bg-background text-foreground h-full w-full min-w-40 border px-1 font-mono text-sm outline-none"
       data-testid="choice-name-editor"
       value={draft}
       onChange={(event) => {
+        userEdited.current = true;
         const next = event.target.value;
         setDraft(next);
-        onChange(makeChoiceNameCell({ ...value.data, value: next, locked: next.trim() !== '' }));
+        onChange(makeCell(next));
       }}
       onKeyDown={(event) => {
         event.stopPropagation();

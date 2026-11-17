@@ -1,5 +1,5 @@
 /** React host shared by the formula bar and the in-cell XPath editor. */
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import { autocompletion, startCompletion } from '@codemirror/autocomplete';
 import { forceLinting } from '@codemirror/lint';
 import { EditorState, type Extension } from '@codemirror/state';
@@ -101,7 +101,7 @@ export function CodeMirrorEditor({
   });
   const diagnostics = useDerivedStore((state) => state.diagnostics);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const host = hostRef.current;
     if (!host) return;
 
