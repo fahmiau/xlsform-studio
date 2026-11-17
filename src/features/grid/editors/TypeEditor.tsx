@@ -95,16 +95,24 @@ function listOptions(): ListOption[] {
     .sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function TypeEditor({ value, onChange, onFinishedEditing, forceEditMode }: EditorProps) {
+export function TypeEditor({
+  value,
+  initialValue,
+  onChange,
+  onFinishedEditing,
+  forceEditMode,
+}: EditorProps) {
   const parsed = useMemo(() => parseType(value.data.value), [value.data.value]);
+  const hasInitial = initialValue !== undefined && initialValue !== '';
   const [step, setStep] = useState<'type' | 'list'>(() =>
-    SELECT_BASES.has(parsed.base) && parsed.listName ? 'list' : 'type',
+    !hasInitial && SELECT_BASES.has(parsed.base) && parsed.listName ? 'list' : 'type',
   );
   const [pendingBase, setPendingBase] = useState(SELECT_BASES.has(parsed.base) ? parsed.base : '');
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialValue ?? '');
   const [activeIndex, setActiveIndex] = useState(0);
   const [orOther, setOrOther] = useState(parsed.orOther === true);
   const inputRef = useRef<HTMLInputElement>(null);
+  const seededInitialRef = useRef(hasInitial);
 
   const types = useMemo(
     () =>
@@ -126,8 +134,16 @@ export function TypeEditor({ value, onChange, onFinishedEditing, forceEditMode }
   const itemCount = step === 'type' ? types.length : visibleLists.length + (canCreate ? 1 : 0);
 
   useEffect(() => {
-    inputRef.current?.focus();
-    inputRef.current?.select();
+    const input = inputRef.current;
+    if (!input) return;
+    input.focus();
+    if (seededInitialRef.current) {
+      seededInitialRef.current = false;
+      const len = input.value.length;
+      input.setSelectionRange(len, len);
+    } else {
+      input.select();
+    }
   }, [step]);
 
   function finish(nextValue: string, movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) {
@@ -138,7 +154,7 @@ export function TypeEditor({ value, onChange, onFinishedEditing, forceEditMode }
       baseType: parseType(nextValue).base,
     });
     onChange(cell);
-    onFinishedEditing(cell, movement);
+    onFinishedEditing(cell, movement ?? [0, 0]);
   }
 
   function commitType(typeName: string, movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) {
@@ -188,12 +204,12 @@ export function TypeEditor({ value, onChange, onFinishedEditing, forceEditMode }
     if (step === 'type') {
       const type = types[activeIndex];
       if (type) commitType(type.name, movement);
-      else if (query.trim()) finish(query.trim());
+      else if (query.trim()) finish(query.trim(), movement);
       return;
     }
     const list = visibleLists[activeIndex];
-    if (list) commitList(list.name);
-    else if (canCreate) createList();
+    if (list) commitList(list.name, movement);
+    else if (canCreate) createList(movement);
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
@@ -209,19 +225,19 @@ export function TypeEditor({ value, onChange, onFinishedEditing, forceEditMode }
     if (event.key === 'Enter') {
       event.preventDefault();
       event.stopPropagation();
-      commitActive();
+      commitActive([0, 0]);
       return;
     }
     if (event.key === 'Tab') {
       event.preventDefault();
       event.stopPropagation();
-      commitActive([1, 0]);
+      commitActive([event.shiftKey ? -1 : 1, 0]);
       return;
     }
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
-      onFinishedEditing(undefined);
+      onFinishedEditing(undefined, [0, 0]);
       return;
     }
     if (event.key === ' ' && (event.ctrlKey || event.metaKey)) {
@@ -280,7 +296,9 @@ export function TypeEditor({ value, onChange, onFinishedEditing, forceEditMode }
               >
                 <span className="font-mono">{type.name}</span>
                 <span className="text-muted-foreground truncate text-[11px]">
-                  {TYPE_HINTS[type.name] ?? CATEGORY_LABEL[type.category]}
+                  {TYPE_HINTS[type.name]
+                    ? `${CATEGORY_LABEL[type.category]} · ${TYPE_HINTS[type.name]}`
+                    : CATEGORY_LABEL[type.category]}
                 </span>
               </Command.Item>
             ))

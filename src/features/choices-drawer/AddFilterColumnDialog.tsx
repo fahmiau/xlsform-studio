@@ -12,25 +12,49 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { findColumnKey } from '@/core/indexes/columns';
+import { primaryLabelColumn } from '@/core/languages/discover';
 import { parseType } from '@/core/model/parseType';
 import type { RowId } from '@/core/model/types';
 import { addFilterColumn } from '@/core/ops/choices';
 import { useWorkbookStore } from '@/state/workbookStore';
 
-function suggestedParent(surveyRowId: RowId | null): string {
-  if (!surveyRowId) return '';
-  const sheet = useWorkbookStore.getState().data.survey;
+interface ParentQuestionOption {
+  name: string;
+  listName: string;
+  label: string;
+}
+
+function parentQuestions(surveyRowId: RowId | null): ParentQuestionOption[] {
+  const data = useWorkbookStore.getState().data;
+  const sheet = data.survey;
   const typeKey = findColumnKey(sheet, 'type') ?? 'type';
   const nameKey = findColumnKey(sheet, 'name') ?? 'name';
-  const index = sheet.rows.findIndex((row) => row.id === surveyRowId);
-  for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
-    const row = sheet.rows[cursor];
-    if (!row) continue;
+  const labelKey = primaryLabelColumn(sheet, data);
+  const index = surveyRowId ? sheet.rows.findIndex((row) => row.id === surveyRowId) : -1;
+
+  const toOption = (rowIndex: number): ParentQuestionOption | null => {
+    const row = sheet.rows[rowIndex];
+    if (!row || row.id === surveyRowId) return null;
     const parsed = parseType(row.cells[typeKey] ?? '');
     const name = (row.cells[nameKey] ?? '').trim();
-    if (parsed.listName && name) return name;
+    if (!parsed.listName || !name) return null;
+    const label = labelKey ? (row.cells[labelKey] ?? '').trim() : '';
+    return { name, listName: parsed.listName, label };
+  };
+
+  const options: ParentQuestionOption[] = [];
+  const start = index >= 0 ? index - 1 : sheet.rows.length - 1;
+  for (let cursor = start; cursor >= 0; cursor -= 1) {
+    const option = toOption(cursor);
+    if (option) options.push(option);
   }
-  return '';
+  if (index >= 0) {
+    for (let cursor = index + 1; cursor < sheet.rows.length; cursor += 1) {
+      const option = toOption(cursor);
+      if (option) options.push(option);
+    }
+  }
+  return options;
 }
 
 function existingFilterFor(surveyRowId: RowId | null): string {
@@ -43,17 +67,20 @@ function existingFilterFor(surveyRowId: RowId | null): string {
 function FilterForm({
   listName,
   surveyRowId,
-  parent,
+  parents,
   existingFilter,
   onDone,
 }: {
   listName: string;
   surveyRowId: RowId | null;
-  parent: string;
+  parents: ParentQuestionOption[];
   existingFilter: string;
   onDone: () => void;
 }) {
-  const [column, setColumn] = useState(parent);
+  const initialParent = parents[0]?.name ?? '';
+  const [selectedParent, setSelectedParent] = useState(initialParent);
+  const [column, setColumn] = useState(initialParent);
+  const [columnEdited, setColumnEdited] = useState(false);
   const [scaffold, setScaffold] = useState(true);
   const [append, setAppend] = useState(false);
 
@@ -65,7 +92,7 @@ function FilterForm({
       (data) =>
         addFilterColumn(data, trimmed, {
           ...(surveyRowId ? { surveyRowId } : {}),
-          ...(parent ? { parentName: parent } : {}),
+          ...(scaffold && selectedParent ? { parentName: selectedParent } : {}),
           append,
         }).data,
       { sheet: 'choices', ...(surveyRowId ? { rowIds: [surveyRowId] } : {}) },
@@ -76,18 +103,45 @@ function FilterForm({
 
   return (
     <>
+      {parents.length > 0 ? (
+        <label className="flex flex-col gap-1 text-xs">
+          Parent select question
+          <select
+            className="border-input bg-background rounded border px-2 py-1 text-sm"
+            value={selectedParent}
+            onChange={(event) => {
+              const nextParent = event.target.value;
+              const prevParent = selectedParent;
+              setSelectedParent(nextParent);
+              if (!columnEdited || column === prevParent) {
+                setColumn(nextParent);
+              }
+            }}
+            data-testid="parent-question-select"
+          >
+            {parents.map((opt) => (
+              <option key={opt.name} value={opt.name}>
+                {opt.name} ({opt.listName}){opt.label ? ` — ${opt.label}` : ''}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       <label className="flex flex-col gap-1 text-xs">
         Column name
         <input
           className="border-input bg-background rounded border px-2 py-1 font-mono text-sm"
           value={column}
-          onChange={(event) => setColumn(event.target.value)}
+          onChange={(event) => {
+            setColumnEdited(true);
+            setColumn(event.target.value);
+          }}
           placeholder="province_id"
           data-testid="filter-column-name"
           autoFocus
         />
       </label>
-      {parent ? (
+      {selectedParent ? (
         <label className="flex items-center gap-2 text-xs">
           <input
             type="checkbox"
@@ -97,12 +151,12 @@ function FilterForm({
           />
           Scaffold{' '}
           <code>
-            {column || 'column'} = ${`{${parent}}`}
+            {column || 'column'} = ${`{${selectedParent}}`}
           </code>{' '}
           on the active question
         </label>
       ) : null}
-      {scaffold && existingFilter ? (
+      {scaffold && selectedParent && existingFilter ? (
         <label className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-300">
           <input
             type="checkbox"
@@ -136,8 +190,11 @@ export function AddFilterColumnDialog({
   listName: string;
   surveyRowId: RowId | null;
 }) {
-  const parent = useMemo(() => suggestedParent(surveyRowId), [surveyRowId]);
-  const existingFilter = useMemo(() => existingFilterFor(surveyRowId), [surveyRowId]);
+  const parents = useMemo(() => (open ? parentQuestions(surveyRowId) : []), [open, surveyRowId]);
+  const existingFilter = useMemo(
+    () => (open ? existingFilterFor(surveyRowId) : ''),
+    [open, surveyRowId],
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -149,10 +206,10 @@ export function AddFilterColumnDialog({
           </DialogDescription>
         </DialogHeader>
         <FilterForm
-          key={`${surveyRowId ?? 'none'}:${parent}:${existingFilter}`}
+          key={`${surveyRowId ?? 'none'}:${parents[0]?.name ?? ''}:${existingFilter}`}
           listName={listName}
           surveyRowId={surveyRowId}
-          parent={parent}
+          parents={parents}
           existingFilter={existingFilter}
           onDone={() => onOpenChange(false)}
         />

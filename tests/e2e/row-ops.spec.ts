@@ -644,3 +644,28 @@ test('lint hover tooltip appears next to the hovered cell and wraps long text cl
   const overflow = await tooltip.evaluate((el) => el.scrollWidth - el.clientWidth);
   expect(overflow).toBeLessThanOrEqual(1);
 });
+
+test('direct typing on frozen columns opens editor and Enter keeps focus on edited cell', async ({
+  page,
+}) => {
+  await mockTauri(page);
+  await openFixture(page);
+
+  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await canvas.waitFor();
+  await canvas.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByTestId('formula-bar-column')).toHaveText('[Column: name]');
+  await expect(page.getByTestId('formula-bar-input')).toHaveValue('respondent_age');
+
+  await page.keyboard.type('age_direct');
+  const editor = page.getByTestId('text-cell-editor');
+  await expect(editor).toBeVisible();
+  await expect(editor).toHaveValue('age_direct');
+
+  await page.keyboard.press('Enter');
+  await expect(editor).toHaveCount(0);
+  await expect(page.getByTestId('formula-bar-column')).toHaveText('[Column: name]');
+  await expect(page.getByTestId('formula-bar-input')).toHaveValue('age_direct');
+});

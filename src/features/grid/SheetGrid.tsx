@@ -33,6 +33,7 @@ import { parseType } from '@/core/model/parseType';
 import type { ColumnKey, ManagedSheetName, RowId } from '@/core/model/types';
 import type { CellEdit } from '@/core/ops/cells';
 import { groupHiddenQuestionCount } from '@/core/ops/groups';
+import { resolveFilterParentList } from '@/core/ops/choices';
 import { insertRows } from '@/core/ops/rows';
 import { modeFromStyle } from '@/core/slug/slugify';
 import { applyCellEdits, type CellEditOutcome } from '@/features/grid/cellEditPipeline';
@@ -172,7 +173,11 @@ export function SheetGrid({
   const hostRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<DataEditorRef>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
-  const storedGridSelection = useUiStore((state) => state.gridSelections[sheetName]);
+  const uiGridSelection = useUiStore((state) => state.gridSelections[sheetName]);
+  const [drawerGridSelection, setDrawerGridSelection] = useState<GridSelection | undefined>(
+    undefined,
+  );
+  const storedGridSelection = compact ? drawerGridSelection : uiGridSelection;
   const fallbackGridSelection = useMemo(() => gridSelectionForCell(1, 0), []);
   const [rowMenu, setRowMenu] = useState<RowContextMenuState | null>(null);
   const [headerMenu, setHeaderMenu] = useState<HeaderMenuState | null>(null);
@@ -246,17 +251,32 @@ export function SheetGrid({
     [groupsForDepth, railPalette, sheet, sheetName],
   );
   const gridSelection = useMemo(() => {
-    if (!storedGridSelection || rowCount === 0) return fallbackGridSelection;
-    const range = storedGridSelection.current?.range;
-    if (range && (range.y >= rowCount || range.x >= display.columns.length)) {
+    if (!storedGridSelection || rowCount === 0 || display.columns.length <= 1) {
       return fallbackGridSelection;
+    }
+    const range = storedGridSelection.current?.range;
+    const cell = storedGridSelection.current?.cell;
+    if (
+      range &&
+      cell &&
+      (range.y >= rowCount ||
+        range.x >= display.columns.length ||
+        cell[1] >= rowCount ||
+        cell[0] >= display.columns.length)
+    ) {
+      const clampedCol = Math.min(Math.max(1, cell[0]), display.columns.length - 1);
+      const clampedRow = Math.min(Math.max(0, cell[1]), rowCount - 1);
+      return gridSelectionForCell(clampedCol, clampedRow);
     }
     return storedGridSelection;
   }, [display.columns.length, fallbackGridSelection, rowCount, storedGridSelection]);
 
   const setGridSelection = useCallback(
-    (selection: GridSelection) => useUiStore.getState().setGridSelection(sheetName, selection),
-    [sheetName],
+    (selection: GridSelection) => {
+      if (compact) setDrawerGridSelection(selection);
+      else useUiStore.getState().setGridSelection(sheetName, selection);
+    },
+    [compact, sheetName],
   );
   const typeKey = findColumnKey(sheet, 'type') ?? 'type';
   const listNameKey =
@@ -270,6 +290,11 @@ export function SheetGrid({
   const clipboard = useClipboard(sheetName, display.keys, gridSelection, projection);
   const cellCache = useRef(new WeakMap<object, Map<ColumnKey, GridCell>>());
   const handledReveal = useRef(0);
+  const visibleRegionObjRef = useRef<{ x: number; y: number; width: number; height: number } | null>(
+    null,
+  );
+  const restoreRegionRef = useRef<(() => void) | null>(null);
+  const editingCellRef = useRef<Item | null>(null);
   const pendingScrollRef = useRef<{
     nonce: number;
     rowId: RowId;
@@ -323,6 +348,12 @@ export function SheetGrid({
   useEffect(() => {
     const pendingReveal = useUiStore.getState().reveal;
     if (pendingReveal && pendingReveal.sheet === sheetName) return;
+    if (compact) {
+      if (rowCount > 0 && !drawerGridSelection) {
+        setGridSelection(gridSelectionForCell(Math.min(1, display.keys.length), 0));
+      }
+      return;
+    }
     const cell = useUiStore.getState().activeCells[sheetName];
     const rowIndex = cell ? visibleRowIndex(projection, findRowIndex(sheet, cell.rowId)) : -1;
     const columnIndex = cell ? display.keys.indexOf(cell.column) + 1 : -1;
@@ -614,6 +645,21 @@ export function SheetGrid({
         });
       }
 
+      if (sheetName === 'choices' && columnBase === 'custom' && !locked) {
+        const rowListName = (row.cells[listNameKey ?? 'list_name'] ?? '').trim();
+        const parentListName = rowListName
+          ? resolveFilterParentList(data, rowListName, key)
+          : null;
+        if (parentListName) {
+          return makeEnumCell({
+            column: 'filter',
+            value: row.cells[key] ?? '',
+            rowId: row.id,
+            parentListName,
+          });
+        }
+      }
+
       if (resolveColumn(key).isXPath) {
         const structural = structuralRowKind(typeValue);
         return makeXPathCell({
@@ -663,6 +709,7 @@ export function SheetGrid({
       collapsedGroupIds,
       compact,
       dark,
+      data,
       diagnosticIndex,
       display.keys,
       groupByRowId,
@@ -684,6 +731,7 @@ export function SheetGrid({
 
   const getRowThemeOverride = useCallback(
     (visibleRow: number): Partial<Theme> | undefined => {
+      restoreRegionRef.current?.();
       const real = realRowIndex(projection, visibleRow);
       const row = real >= 0 ? sheet.rows[real] : undefined;
       if (!row) return undefined;
@@ -771,6 +819,7 @@ export function SheetGrid({
 
   const onCellsEdited = useCallback<NonNullable<DataEditorProps['onCellsEdited']>>(
     (items) => {
+      if (items[0]) editingCellRef.current = items[0].location;
       commitEdits(items);
       return true;
     },
@@ -1127,6 +1176,40 @@ export function SheetGrid({
           onGridSelectionChange={handleSelectionChange}
           gridSelection={gridSelection}
           provideEditor={provideEditor}
+          onCellActivated={(cell) => {
+            editingCellRef.current = cell;
+          }}
+          onKeyDown={(event) => {
+            editingCellRef.current = gridSelection.current?.cell ?? null;
+            if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
+              const activeCol = gridSelection.current?.cell[0] ?? 0;
+              const region = visibleRegionObjRef.current;
+              if (region && region.x > 0 && activeCol > 0 && activeCol < display.frozenCount) {
+                const origX = region.x;
+                const origWidth = region.width;
+                region.x = 0;
+                region.width = origX + origWidth;
+                const restore = () => {
+                  if (restoreRegionRef.current !== restore) return;
+                  restoreRegionRef.current = null;
+                  region.x = origX;
+                  region.width = origWidth;
+                };
+                restoreRegionRef.current = restore;
+                queueMicrotask(restore);
+              }
+            }
+          }}
+          onFinishedEditing={(_newValue, movement) => {
+            const baseCell = editingCellRef.current ?? gridSelection.current?.cell;
+            editingCellRef.current = null;
+            if (!baseCell || rowCount === 0 || display.columns.length <= 1) return;
+            const maxCol = display.columns.length - 1;
+            const maxRow = rowCount - 1;
+            const targetCol = Math.min(maxCol, Math.max(1, baseCell[0] + movement[0]));
+            const targetRow = Math.min(maxRow, Math.max(0, baseCell[1] + movement[1]));
+            handleSelectionChange(gridSelectionForCell(targetCol, targetRow));
+          }}
           // The completion tooltip is mounted in `document.body`, outside this
           // overlay; without the veto Glide would treat a click on a completion
           // item as an outside click and close the in-cell editor first.
@@ -1135,6 +1218,7 @@ export function SheetGrid({
             return !(target instanceof Element && target.closest('.cm-tooltip') !== null);
           }}
           onVisibleRegionChanged={(region) => {
+            visibleRegionObjRef.current = region;
             hoverKey.current = null;
             setDiagnosticHover((current) => (current ? null : current));
             if (!restoredScrollRef.current) return;

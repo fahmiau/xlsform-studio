@@ -13,20 +13,34 @@ import { XPATH_CELL_KIND } from '../cells/XPathCell';
 import { AppearanceEditor } from './AppearanceEditor';
 import { CellFormulaEditor } from './CellFormulaEditor';
 import { ChoiceNameEditor } from './ChoiceNameEditor';
+import { FilterValueEditor } from './FilterValueEditor';
+import { TextCellEditor } from './TextCellEditor';
 import { TypeEditor } from './TypeEditor';
 
 export function useEditorRouting(): ProvideEditorCallback<GridCell> {
   return useCallback((cell: GridCell) => {
+    if (cell.kind === GridCellKind.Text) {
+      if (cell.readonly) return undefined;
+      return {
+        editor: TextCellEditor as unknown as ProvideEditorComponent<GridCell>,
+        disablePadding: true,
+      };
+    }
     if (cell.kind !== GridCellKind.Custom) return undefined;
     const kind = (cell.data as { kind?: string }).kind;
     if (kind === ENUM_CELL_KIND) {
       const data = (cell as EnumCell).data;
-      return {
-        editor: (data.column === 'type'
+      const editor =
+        data.column === 'type'
           ? TypeEditor
-          : AppearanceEditor) as unknown as ProvideEditorComponent<GridCell>,
+          : data.column === 'filter'
+            ? FilterValueEditor
+            : AppearanceEditor;
+      const minWidth = data.column === 'type' ? 340 : data.column === 'filter' ? 280 : 320;
+      return {
+        editor: editor as unknown as ProvideEditorComponent<GridCell>,
         disablePadding: true,
-        styleOverride: { minWidth: data.column === 'type' ? 340 : 320 },
+        styleOverride: { minWidth },
       };
     }
     if (kind === CHOICE_NAME_CELL_KIND) {

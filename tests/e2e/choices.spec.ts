@@ -101,7 +101,7 @@ test('choices drawer follows a select row and lists its choices', async ({ page 
   await page.keyboard.press('ArrowDown');
   await expect(page.getByTestId('formula-bar-input')).toHaveValue('select_one yes_no');
 
-  await page.keyboard.press('Control+Enter');
+  await page.keyboard.press('Control+Shift+Enter');
   await expect(page.getByTestId('choices-drawer')).toBeVisible();
   await expect(page.getByTestId('drawer-list-name')).toHaveText('yes_no');
   await expect(page.getByTestId('choice-count')).toHaveText('2 choices');
@@ -199,7 +199,7 @@ test('plain Delete clears a choice label in the drawer and keeps the row', async
   await canvas.focus();
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('Control+Enter');
+  await page.keyboard.press('Control+Shift+Enter');
   await expect(page.getByTestId('choices-drawer')).toBeVisible();
 
   const drawerCanvas = page.getByTestId('drawer-grid').locator('canvas').first();
@@ -226,7 +226,7 @@ test('Shift+Delete deletes the selected choice row in the drawer', async ({ page
   await canvas.focus();
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
-  await page.keyboard.press('Control+Enter');
+  await page.keyboard.press('Control+Shift+Enter');
   await expect(page.getByTestId('choices-drawer')).toBeVisible();
 
   const drawerCanvas = page.getByTestId('drawer-grid').locator('canvas').first();
@@ -252,7 +252,7 @@ test('dragging a drawer row marker reorders the list in one undo step', async ({
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
   await expect(page.getByTestId('formula-bar-input')).toHaveValue('select_one yes_no');
-  await page.keyboard.press('Control+Enter');
+  await page.keyboard.press('Control+Shift+Enter');
   await expect(page.getByTestId('choices-drawer')).toBeVisible();
 
   const drawerCanvas = page.getByTestId('drawer-grid').locator('canvas').first();
@@ -313,7 +313,7 @@ test('a name typed on the choices tab survives a later label edit', async ({ pag
   await page.keyboard.press('ArrowDown');
   await page.keyboard.press('ArrowDown');
   await expect(page.getByTestId('formula-bar-input')).toHaveValue('select_one yes_no');
-  await page.keyboard.press('Control+Enter');
+  await page.keyboard.press('Control+Shift+Enter');
   await expect(page.getByTestId('choices-drawer')).toBeVisible();
 
   const drawerCanvas = page.getByTestId('drawer-grid').locator('canvas').first();
@@ -335,4 +335,27 @@ test('a name typed on the choices tab survives a later label edit', async ({ pag
   await page.mouse.click(box.x + 88 + 140 + 40, box.y + 34 + 17);
   await expect(page.getByTestId('formula-bar-column')).toHaveText('[Column: name]');
   await expect(page.getByTestId('formula-bar-input')).toHaveValue('manual_code');
+});
+
+test('Ctrl+Enter inserts a choice inside the focused ChoicesDrawer', async ({ page }) => {
+  await openFixture(page);
+  const canvas = page.getByTestId('sheet-grid-survey').locator('canvas').first();
+  await canvas.waitFor();
+  await canvas.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByTestId('formula-bar-input')).toHaveValue('select_one yes_no');
+
+  await page.keyboard.press('Control+Shift+Enter');
+  await expect(page.getByTestId('choices-drawer')).toBeVisible();
+  await expect(page.getByTestId('choice-count')).toHaveText('2 choices');
+
+  const drawerCanvas = page.getByTestId('drawer-grid').locator('canvas').first();
+  await drawerCanvas.waitFor();
+  await drawerCanvas.focus();
+  await page.keyboard.press('ArrowDown');
+  await page.keyboard.press('Control+Enter');
+
+  await expect(page.getByTestId('choice-count')).toHaveText('3 choices');
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (3)');
 });

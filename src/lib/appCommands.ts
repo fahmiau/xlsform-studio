@@ -73,7 +73,7 @@ export function appCommands(): AppCommand[] {
     {
       id: 'drawer.open',
       title: 'Open choices drawer',
-      shortcut: { code: 'Enter', ctrlOrMeta: true },
+      shortcut: { code: 'Enter', ctrlOrMeta: true, shift: true },
       run: () => {
         const ui = useUiStore.getState();
         const rowId = ui.activeCell?.sheet === 'survey' ? ui.activeCell.rowId : null;
@@ -198,13 +198,14 @@ export const PRD_SHORTCUTS: ReadonlyArray<{
   { id: 'file.save', keys: 'Ctrl+S', label: 'Save .xlsx' },
   { id: 'edit.undo', keys: 'Ctrl+Z', label: 'Undo' },
   { id: 'edit.redo', keys: 'Ctrl+Y', label: 'Redo' },
-  { id: 'drawer.open', keys: 'Ctrl+Enter', label: 'Open/focus Smart Choices Drawer' },
+  { id: 'drawer.open', keys: 'Ctrl+Shift+Enter', label: 'Open/focus Smart Choices Drawer' },
   { id: 'formula.autocomplete', keys: 'Ctrl+Space', label: 'Trigger autocomplete' },
   { id: 'grid.group.wrap', keys: 'Ctrl+G', label: 'Wrap rows in a group' },
   { id: 'grid.group.wrapRepeat', keys: 'Ctrl+Shift+G', label: 'Wrap rows in a repeat' },
   { id: 'grid.group.collapse', keys: 'Ctrl+[', label: 'Collapse active block' },
   { id: 'grid.group.expand', keys: 'Ctrl+]', label: 'Expand active block' },
-  { id: 'grid.row.insertBelow', keys: 'Ctrl+I', label: 'Insert row below' },
+  { id: 'grid.row.insertBelow', keys: 'Ctrl+Enter', label: 'Insert row below' },
+  { id: 'grid.row.insertBelowAlt', keys: 'Ctrl+I', label: 'Insert row below' },
   { id: 'grid.row.insertAbove', keys: 'Ctrl+Shift+I', label: 'Insert row above' },
   { id: 'grid.row.delete', keys: 'Shift+Delete', label: 'Delete selected rows' },
   { id: 'grid.row.deleteCtrl', keys: 'Ctrl+Delete', label: 'Delete selected rows' },

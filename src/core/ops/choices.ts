@@ -21,6 +21,7 @@ import {
 import { setCells, type CellEdit } from './cells';
 import { addColumn } from './columns';
 import { insertRows } from './rows';
+import { tokenize } from '../xpath/tokenize';
 
 export const SELECT_BASES: ReadonlySet<string> = new Set(['select_one', 'select_multiple', 'rank']);
 
@@ -634,4 +635,94 @@ export function listUsageDetails(
       name: (row.cells[nameKeyValue] ?? '').trim(),
       label: (row.cells[labelKey] ?? '').trim(),
     }));
+}
+
+/**
+ * Resolve the parent choice `list_name` for a cascading filter column on a
+ * child choice list (used by the grid dropdown helper).
+ */
+export function resolveFilterParentList(
+  data: WorkbookData,
+  childListName: string,
+  filterColumn: ColumnKey,
+): string | null {
+  const trimmedList = childListName.trim();
+  const trimmedCol = filterColumn.trim();
+  if (!trimmedList || !trimmedCol) return null;
+
+  const typeKey = columnKey(data.survey, 'type');
+  const nameKey = columnKey(data.survey, 'name');
+  const filterKey = columnKey(data.survey, 'choice_filter');
+
+  const selectListByVar = new Map<string, string>();
+  const selectListByList = new Set<string>();
+  for (const row of data.survey.rows) {
+    const parsed = parseType(row.cells[typeKey] ?? '');
+    if (!parsed.listName) continue;
+    selectListByList.add(parsed.listName);
+    const varName = (row.cells[nameKey] ?? '').trim();
+    if (varName) selectListByVar.set(varName, parsed.listName);
+  }
+
+  const customColumns = data.choices.columns.filter((col) => resolveColumn(col).base === 'custom');
+
+  for (const row of data.survey.rows) {
+    const parsed = parseType(row.cells[typeKey] ?? '');
+    if (parsed.listName !== trimmedList) continue;
+    const expr = (row.cells[filterKey] ?? '').trim();
+    if (!expr) continue;
+
+    const sig = tokenize(expr).filter((token) => token.kind !== 'ws');
+    for (let i = 0; i + 2 < sig.length; i += 1) {
+      const left = sig[i];
+      const op = sig[i + 1];
+      const right = sig[i + 2];
+      if (!left || !op || !right) continue;
+      if (op.kind !== 'op' || (op.text !== '=' && op.text !== '!=')) continue;
+      if (left.kind === 'ident' && left.text === trimmedCol && right.kind === 'varRef' && right.name) {
+        const list = selectListByVar.get(right.name);
+        if (list) return list;
+      }
+      if (right.kind === 'ident' && right.text === trimmedCol && left.kind === 'varRef' && left.name) {
+        const list = selectListByVar.get(left.name);
+        if (list) return list;
+      }
+    }
+
+    for (let i = 0; i + 5 < sig.length; i += 1) {
+      const fn = sig[i];
+      const open = sig[i + 1];
+      const variable = sig[i + 2];
+      const comma = sig[i + 3];
+      const ident = sig[i + 4];
+      if (
+        fn?.kind === 'func' &&
+        fn.text === 'selected' &&
+        open?.kind === 'paren' &&
+        open.text === '(' &&
+        variable?.kind === 'varRef' &&
+        variable.name &&
+        comma?.kind === 'comma' &&
+        ident?.kind === 'ident' &&
+        ident.text === trimmedCol
+      ) {
+        const list = selectListByVar.get(variable.name);
+        if (list) return list;
+      }
+    }
+
+    if (customColumns.length === 1 && customColumns[0] === filterColumn) {
+      const varRefs = sig.filter((token) => token.kind === 'varRef' && Boolean(token.name));
+      if (varRefs.length === 1 && varRefs[0]?.name) {
+        const list = selectListByVar.get(varRefs[0].name);
+        if (list) return list;
+      }
+    }
+  }
+
+  const byVar = selectListByVar.get(trimmedCol);
+  if (byVar && byVar !== trimmedList) return byVar;
+  if (selectListByList.has(trimmedCol) && trimmedCol !== trimmedList) return trimmedCol;
+
+  return null;
 }

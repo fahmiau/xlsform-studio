@@ -15,6 +15,7 @@ import {
   listReferencedInFormulas,
   listUsageDetails,
   renumberList,
+  resolveFilterParentList,
   suggestListName,
 } from './choices';
 
@@ -370,5 +371,40 @@ describe('shared lists and filters (Task 3.6)', () => {
       'consent',
       'again',
     ]);
+  });
+
+  it('resolves parent choice list for cascading filter columns', () => {
+    const data = createEmptyWorkbook();
+    data.survey.columns.push('choice_filter');
+    data.survey.rows.push(
+      createRow({ type: 'select_one provinces', name: 'prov_q', label: 'Province' }),
+      createRow({
+        type: 'select_one districts',
+        name: 'dist_q',
+        label: 'District',
+        choice_filter: 'prov_col = ${prov_q}',
+      }),
+      createRow({
+        type: 'select_one wards',
+        name: 'ward_q',
+        label: 'Ward',
+        choice_filter: '${dist_q} = dist_col',
+      }),
+      createRow({
+        type: 'select_one tags',
+        name: 'tag_q',
+        label: 'Tag',
+        choice_filter: 'selected(${prov_q}, tag_col)',
+      }),
+    );
+    data.choices.columns.push('prov_col', 'dist_col', 'tag_col', 'prov_q', 'districts');
+
+    expect(resolveFilterParentList(data, 'districts', 'prov_col')).toBe('provinces');
+    expect(resolveFilterParentList(data, 'wards', 'dist_col')).toBe('districts');
+    expect(resolveFilterParentList(data, 'tags', 'tag_col')).toBe('provinces');
+    expect(resolveFilterParentList(data, 'wards', 'prov_q')).toBe('provinces');
+    expect(resolveFilterParentList(data, 'tags', 'districts')).toBe('districts');
+    expect(resolveFilterParentList(data, 'provinces', 'prov_q')).toBeNull();
+    expect(resolveFilterParentList(data, '', 'prov_col')).toBeNull();
   });
 });

@@ -66,8 +66,20 @@ describe('question type catalog', () => {
   });
 
   it('marks metadata and calculated rows as invisible without a label', () => {
-    for (const name of ['calculate', 'hidden', 'start', 'end', 'today', 'deviceid', 'audit']) {
+    for (const name of [
+      'calculate',
+      'hidden',
+      'start',
+      'end',
+      'today',
+      'deviceid',
+      'phonenumber',
+      'username',
+      'email',
+      'audit',
+    ]) {
       const type = QUESTION_TYPE_MAP.get(name);
+      expect(type?.category, name).toBe('metadata');
       expect(type?.isVisible, name).toBe(false);
       expect(type?.hasLabel, name).toBe(false);
     }
@@ -94,6 +106,8 @@ describe('question type catalog', () => {
     expect(isSelectType('rank list')).toBe(true);
     expect(isSelectType('integer')).toBe(false);
     expect(isMetadataType('calculate')).toBe(true);
+    expect(isMetadataType('phonenumber')).toBe(true);
+    expect(isMetadataType('email')).toBe(true);
     expect(isMetadataType('text')).toBe(false);
     expect(getQuestionType('select_multiple l')).toBe(QUESTION_TYPE_MAP.get('select_multiple'));
     expect(getQuestionType('nope')).toBeUndefined();

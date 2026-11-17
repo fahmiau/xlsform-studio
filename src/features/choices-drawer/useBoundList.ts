@@ -26,12 +26,14 @@ export interface BoundList {
 export function useBoundList(): BoundList {
   const data = useWorkbookStore((state) => state.data);
   const activeCell = useUiStore((state) => state.activeCell);
+  const activeSurveyRowId = useUiStore((state) => state.activeCells.survey?.rowId ?? null);
   const drawer = useUiStore((state) => state.choiceDrawer);
   const modes = useUiStore((state) => state.choiceModes);
   const defaultSlugMode = usePrefsStore((state) => state.defaultSlugMode);
 
   return useMemo(() => {
-    const surveyRowId = drawer.rowId ?? (activeCell?.sheet === 'survey' ? activeCell.rowId : null);
+    const surveyRowId =
+      drawer.rowId ?? (activeCell?.sheet === 'survey' ? activeCell.rowId : activeSurveyRowId);
     const survey = data.survey;
     const typeKey = findColumnKey(survey, 'type') ?? 'type';
     const surveyRow = surveyRowId ? survey.rows.find((row) => row.id === surveyRowId) : undefined;
@@ -81,5 +83,5 @@ export function useBoundList(): BoundList {
       nameKey,
       columns,
     };
-  }, [activeCell, data, defaultSlugMode, drawer.rowId, modes]);
+  }, [activeCell, activeSurveyRowId, data, defaultSlugMode, drawer.rowId, modes]);
 }

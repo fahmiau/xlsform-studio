@@ -1,5 +1,5 @@
 /** `appearance` editor filtered by the row's base type (Task 3.1). */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Command } from 'cmdk';
 import type { ProvideEditorComponent } from '@glideapps/glide-data-grid';
 
@@ -10,10 +10,29 @@ import { filterByFuzzy } from './fuzzy';
 
 type EditorProps = Parameters<ProvideEditorComponent<EnumCell>>[0];
 
-export function AppearanceEditor({ value, onChange, onFinishedEditing }: EditorProps) {
-  const [query, setQuery] = useState('');
+export function AppearanceEditor({
+  value,
+  initialValue,
+  onChange,
+  onFinishedEditing,
+}: EditorProps) {
+  const [query, setQuery] = useState(initialValue ?? '');
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.focus();
+    if (initialValue !== undefined) {
+      const len = input.value.length;
+      input.setSelectionRange(len, len);
+    } else {
+      input.select();
+    }
+    // Only position cursor on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const suggestions = useMemo(
     () => appearanceSuggestions(value.data.baseType ?? ''),
@@ -27,7 +46,7 @@ export function AppearanceEditor({ value, onChange, onFinishedEditing }: EditorP
   function finish(appearance: string, movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) {
     const cell = makeEnumCell({ ...value.data, value: appearance });
     onChange(cell);
-    onFinishedEditing(cell, movement);
+    onFinishedEditing(cell, movement ?? [0, 0]);
   }
 
   function commitActive(movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) {
@@ -51,19 +70,19 @@ export function AppearanceEditor({ value, onChange, onFinishedEditing }: EditorP
     if (event.key === 'Enter') {
       event.preventDefault();
       event.stopPropagation();
-      commitActive();
+      commitActive([0, 0]);
       return;
     }
     if (event.key === 'Tab') {
       event.preventDefault();
       event.stopPropagation();
-      commitActive([1, 0]);
+      commitActive([event.shiftKey ? -1 : 1, 0]);
       return;
     }
     if (event.key === 'Escape') {
       event.preventDefault();
       event.stopPropagation();
-      onFinishedEditing(undefined);
+      onFinishedEditing(undefined, [0, 0]);
       return;
     }
     if (event.key === ' ' && (event.ctrlKey || event.metaKey)) {

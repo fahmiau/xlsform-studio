@@ -20,13 +20,15 @@ export const ENUM_CELL_KIND = 'xlsform-enum';
 
 export interface EnumCellData {
   kind: typeof ENUM_CELL_KIND;
-  column: 'type' | 'appearance';
+  column: 'type' | 'appearance' | 'filter';
   value: string;
   rowId: RowId;
   /** Base type for appearance filtering. */
   baseType?: string;
   /** Present on select questions whose list exists. */
   choiceCount?: number;
+  /** Parent choice list name for cascading filter columns. */
+  parentListName?: string;
 }
 
 export type EnumCell = CustomCell<EnumCellData>;

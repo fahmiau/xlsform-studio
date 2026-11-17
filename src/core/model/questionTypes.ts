@@ -24,7 +24,9 @@ const METADATA = [
   'end',
   'today',
   'deviceid',
+  'phonenumber',
   'username',
+  'email',
   'audit',
   'calculate',
   'hidden',
@@ -74,9 +76,9 @@ export const QUESTION_TYPES: readonly QuestionType[] = [
   entry('end', 'metadata', { hasLabel: false, requiresName: false, isVisible: false }),
   entry('today', 'metadata', { hasLabel: false, requiresName: true, isVisible: false }),
   entry('deviceid', 'metadata', { hasLabel: false, requiresName: true, isVisible: false }),
-  entry('phonenumber', 'input', { hasLabel: true, requiresName: true, isVisible: true }),
+  entry('phonenumber', 'metadata', { hasLabel: false, requiresName: true, isVisible: false }),
   entry('username', 'metadata', { hasLabel: false, requiresName: true, isVisible: false }),
-  entry('email', 'input', { hasLabel: true, requiresName: true, isVisible: true }),
+  entry('email', 'metadata', { hasLabel: false, requiresName: true, isVisible: false }),
   entry('audit', 'metadata', { hasLabel: false, requiresName: false, isVisible: false }),
 ];
 

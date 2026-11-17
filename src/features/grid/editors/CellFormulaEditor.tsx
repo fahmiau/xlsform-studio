@@ -39,7 +39,10 @@ export function CellFormulaEditor({
   }, [onChange, startDoc, value.data]);
 
   const update = (next: string) => makeXPathCell({ ...value.data, value: next });
-  const finish = (next: string, movement?: readonly [-1 | 0 | 1, -1 | 0 | 1]) => {
+  const finish = (
+    next: string,
+    movement: readonly [-1 | 0 | 1, -1 | 0 | 1] = [0, 0],
+  ) => {
     onFinishedEditing(update(next), movement);
   };
 

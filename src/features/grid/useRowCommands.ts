@@ -3,10 +3,14 @@
  * user action is one store `apply`, hence one undo step (AD-2).
  */
 import { findColumnKey } from '@/core/indexes/columns';
+import { primaryLabelColumn } from '@/core/languages/discover';
+import { parseType } from '@/core/model/parseType';
 import type { ManagedSheetName, RowId } from '@/core/model/types';
-import { deleteRows, duplicateRows, insertRows } from '@/core/ops/rows';
-import { clampIndex } from '@/core/ops/rows';
+import { insertChoiceRow } from '@/core/ops/choices';
+import { clampIndex, deleteRows, duplicateRows, insertRows } from '@/core/ops/rows';
+import { detectListMode, modeFromStyle } from '@/core/slug/slugify';
 import type { AppCommand } from '@/lib/commands';
+import { usePrefsStore } from '@/state/prefsStore';
 import { useUiStore, type SheetTab } from '@/state/uiStore';
 import { useWorkbookStore } from '@/state/workbookStore';
 
@@ -42,15 +46,144 @@ function focusRows(sheet: SheetTab, rowIds: readonly RowId[]): void {
   useUiStore.getState().requestReveal(sheet, first, { column });
 }
 
+function isDrawerContext(): boolean {
+  if (currentSheet() !== 'survey') return false;
+  const prefs = usePrefsStore.getState();
+  const ui = useUiStore.getState();
+  if (!prefs.rightPanel || ui.rightTab !== 'choices') return false;
+  if (typeof document !== 'undefined') {
+    const activeEl = document.activeElement;
+    if (activeEl instanceof Element && activeEl.closest('[data-testid="choices-drawer"]') !== null) {
+      return true;
+    }
+  }
+  return ui.activeCell?.sheet === 'choices';
+}
+
+function insertDrawerChoices(position: 'above' | 'below', count: number): RowId[] {
+  const ui = useUiStore.getState();
+  const prefs = usePrefsStore.getState();
+  const data = useWorkbookStore.getState().data;
+  const surveyRowId =
+    ui.choiceDrawer.rowId ??
+    (ui.activeCell?.sheet === 'survey' ? ui.activeCell.rowId : ui.activeCells.survey?.rowId ?? null);
+  if (!surveyRowId) return [];
+  const typeKey = findColumnKey(data.survey, 'type') ?? 'type';
+  const surveyRow = data.survey.rows.find((row) => row.id === surveyRowId);
+  const listName = parseType(surveyRow?.cells[typeKey] ?? '').listName;
+  if (!listName) return [];
+
+  const listKey = findColumnKey(data.choices, 'list_name') ?? 'list_name';
+  const nameKey = findColumnKey(data.choices, 'name') ?? 'name';
+  const labelKey = primaryLabelColumn(data.choices, data);
+  const focusColumn = labelKey ?? nameKey;
+
+  const listRows = data.choices.rows.filter((row) => (row.cells[listKey] ?? '').trim() === listName);
+  const listRowIds = new Set(listRows.map((row) => row.id));
+  const selectedInList = ui.selectedRowIds.filter((id) => listRowIds.has(id));
+  if (
+    selectedInList.length === 0 &&
+    ui.activeCell?.sheet === 'choices' &&
+    listRowIds.has(ui.activeCell.rowId)
+  ) {
+    selectedInList.push(ui.activeCell.rowId);
+  }
+
+  const fallbackMode = modeFromStyle(prefs.defaultSlugMode);
+  const inferred = detectListMode(
+    listRows.map((row) => row.cells[nameKey] ?? ''),
+    fallbackMode,
+  );
+  const mode = ui.choiceModes[listName] ?? inferred;
+  if (!ui.choiceModes[listName]) {
+    ui.setChoiceMode(listName, mode);
+  }
+
+  const anchorIndex = selectedInList.length > 0 ? selectionIndex('choices', selectedInList) : -1;
+  const targetAt =
+    anchorIndex >= 0
+      ? clampIndex(position === 'above' ? anchorIndex : anchorIndex + 1, data.choices.rows.length)
+      : null;
+
+  let inserted: RowId[] = [];
+  const meta: {
+    sheet: ManagedSheetName;
+    rowIds: RowId[];
+    undoRowIds?: RowId[];
+    columns: string[];
+    inDrawer: true;
+  } = {
+    sheet: 'choices',
+    rowIds: [],
+    ...(selectedInList.length > 0 ? { undoRowIds: selectedInList } : {}),
+    columns: [focusColumn],
+    inDrawer: true,
+  };
+
+  useWorkbookStore.getState().apply(
+    `Add ${count} choice${count === 1 ? '' : 's'}`,
+    (current) => {
+      let working = current;
+      const createdIds: RowId[] = [];
+      for (let i = 0; i < count; i += 1) {
+        const result = insertChoiceRow(
+          working,
+          listName,
+          {},
+          { mode, fallbackMode, maxLength: prefs.slugMaxLength },
+        );
+        working = result.data;
+        createdIds.push(result.rowId);
+      }
+      if (targetAt !== null && createdIds.length > 0) {
+        const rows = [...working.choices.rows];
+        const firstNewIndex = rows.findIndex((row) => row.id === createdIds[0]);
+        if (firstNewIndex >= 0 && firstNewIndex !== targetAt) {
+          const moved = rows.splice(firstNewIndex, createdIds.length);
+          const adjustedAt = Math.min(rows.length, targetAt > firstNewIndex ? targetAt - createdIds.length : targetAt);
+          rows.splice(adjustedAt, 0, ...moved);
+          working = { ...working, choices: { ...working.choices, rows } };
+        }
+      }
+      inserted = createdIds;
+      meta.rowIds = inserted;
+      return working;
+    },
+    meta,
+  );
+
+  const first = inserted[0];
+  if (first) {
+    useUiStore.getState().setSelectedRowIds(inserted);
+    useUiStore.getState().setActiveCell({ sheet: 'choices', rowId: first, column: focusColumn });
+    useUiStore.getState().requestReveal('choices', first, {
+      column: focusColumn,
+      switchSheet: false,
+    });
+  }
+  return inserted;
+}
+
 export function insertRowsAtSelection(position: 'above' | 'below', count = 1): RowId[] {
+  if (isDrawerContext()) return insertDrawerChoices(position, count);
   const sheet = currentSheet();
   if (sheet === 'settings') return [];
   const rows = selectedRowIds();
   const index = rows.length > 0 ? selectionIndex(sheet, rows) : 0;
-  const rowCount = useWorkbookStore.getState().data[sheet].rows.length;
-  const at = clampIndex(position === 'above' ? index : index + 1, rowCount);
   const data = useWorkbookStore.getState().data;
+  const rowCount = data[sheet].rows.length;
+  const at = clampIndex(position === 'above' ? index : index + 1, rowCount);
   const column = findColumnKey(data[sheet], 'name') ?? data[sheet].columns[0];
+  const seedCells: Record<string, string> = {};
+  if (sheet === 'choices' && data.choices.rows.length > 0) {
+    const listKey = findColumnKey(data.choices, 'list_name') ?? 'list_name';
+    const refId = position === 'above' ? rows[0] : rows[rows.length - 1];
+    const refRow =
+      (refId ? data.choices.rows.find((row) => row.id === refId) : undefined) ??
+      data.choices.rows[Math.max(0, Math.min(data.choices.rows.length - 1, at - 1))];
+    const listName = (refRow?.cells[listKey] ?? '').trim();
+    if (listName) seedCells[listKey] = listName;
+  }
   let inserted: RowId[] = [];
   const meta: {
     sheet: ManagedSheetName;
@@ -71,7 +204,7 @@ export function insertRowsAtSelection(position: 'above' | 'below', count = 1): R
         current,
         sheet,
         at,
-        Array.from({ length: count }, () => ({ cells: {} })),
+        Array.from({ length: count }, () => ({ cells: { ...seedCells } })),
       );
       inserted = next[sheet].rows.slice(at, at + count).map((row) => row.id);
       meta.rowIds = inserted;
@@ -213,6 +346,15 @@ export function rowCommands(): AppCommand[] {
   return [
     {
       id: 'grid.row.insertBelow',
+      title: 'Insert row below',
+      shortcut: { code: 'Enter', ctrlOrMeta: true },
+      when: () => currentSheet() !== 'settings',
+      run: () => {
+        insertRowsAtSelection('below');
+      },
+    },
+    {
+      id: 'grid.row.insertBelowAlt',
       title: 'Insert row below',
       shortcut: { code: 'KeyI', ctrlOrMeta: true },
       when: () => currentSheet() !== 'settings',

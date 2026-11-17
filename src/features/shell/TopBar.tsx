@@ -2,6 +2,7 @@
 import {
   FilePlus2,
   FolderOpen,
+  Keyboard,
   PanelLeft,
   PanelRight,
   Save,
@@ -28,6 +29,7 @@ export function TopBar() {
   const setPanelVisible = usePrefsStore((state) => state.setPanelVisible);
   const preferencesOpen = useUiStore((state) => state.preferencesOpen);
   const setPreferencesOpen = useUiStore((state) => state.setPreferencesOpen);
+  const setShortcutsOpen = useUiStore((state) => state.setShortcutsOpen);
 
   return (
     <header className="flex items-center gap-2 border-b px-3 py-1.5" data-testid="top-bar">
@@ -99,6 +101,16 @@ export function TopBar() {
           data-testid="toggle-right-panel"
         >
           <PanelRight aria-hidden />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setShortcutsOpen(true)}
+          title="Keyboard shortcuts (?)"
+          aria-label="Keyboard shortcuts"
+          data-testid="open-shortcuts"
+        >
+          <Keyboard aria-hidden />
         </Button>
         <Button
           variant="ghost"
