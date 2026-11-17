@@ -7,7 +7,7 @@ import { createEmptyWorkbook, createRow } from '@/core/model/factory';
 import { insertRows } from '@/core/ops/rows';
 import { writeWorkbook } from '@/core/xlsx/write';
 import { ShortcutsSheet } from '@/features/command-palette/ShortcutsSheet';
-import { appCommands } from '@/lib/appCommands';
+import { appCommands, PRD_SHORTCUTS } from '@/lib/appCommands';
 import { __clearCommandsForTests, registerCommands } from '@/lib/commands';
 import { foldingCommands } from '@/features/grid/useFolding';
 import { groupCommands } from '@/features/grid/useGroupCommands';
@@ -199,13 +199,13 @@ describe('web runtime file & AI gates', () => {
     ]);
     useUiStore.setState({ shortcutsOpen: true });
     const { rerender } = render(createElement(ShortcutsSheet));
-    expect(screen.getAllByTestId('shortcut-row')).toHaveLength(20);
+    expect(screen.getAllByTestId('shortcut-row')).toHaveLength(PRD_SHORTCUTS.length - 1);
     expect(screen.queryByText('Toggle AI assistant')).not.toBeInTheDocument();
 
     Object.defineProperty(window, '__TAURI_INTERNALS__', { value: {}, configurable: true });
     expect(toggleAi?.when?.()).toBe(true);
     rerender(createElement(ShortcutsSheet));
-    expect(screen.getAllByTestId('shortcut-row')).toHaveLength(21);
+    expect(screen.getAllByTestId('shortcut-row')).toHaveLength(PRD_SHORTCUTS.length);
     expect(screen.getByText('Toggle AI assistant')).toBeInTheDocument();
   });
 
