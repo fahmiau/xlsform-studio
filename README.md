@@ -1,9 +1,9 @@
 # xlsform-studio
 
-A fast, offline desktop editor for [XLSForm](https://xlsform.org/) (`.xlsx`)
-surveys — built for researchers, M&E teams, and data managers who author forms
-in Excel for **ODK Collect / Central**, **KoboToolbox**, **SurveyCTO**, or
-**CommCare**.
+A fast, offline-first desktop and web IDE for [XLSForm](https://xlsform.org/)
+(`.xlsx`) surveys — built for researchers, M&E teams, and data managers who
+author forms in Excel for **ODK Collect / Central**, **KoboToolbox**,
+**SurveyCTO**, or **CommCare**.
 
 ---
 
@@ -25,8 +25,37 @@ tired of Excel's blind spots:
 | Losing track inside nested `begin_group` / `begin_repeat` | Outline sidebar (`Ctrl+F` to search), collapsible blocks (`Ctrl+[` / `Ctrl+]`), and wrap shortcuts (`Ctrl+G` / `Ctrl+Shift+G`) |
 | Messing up existing `.xlsx` files                         | Opens and saves `.xlsx` directly while preserving custom columns, unmanaged sheets, header text, and styling                   |
 
-> Works completely **offline** — no Excel license, no account, and no cloud
-> server required.
+> Works **100% locally** — no Excel license, no account, and no cloud server
+> required, whether you run the native Windows app offline or open the web
+> editor in your browser.
+
+---
+
+## Web App vs. Desktop App
+
+| Capability                                                                       | Web App (Browser)                          | Desktop App (Windows)                                                    |
+| -------------------------------------------------------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------ |
+| Platform support                                                                 | Any modern browser (Windows, macOS, Linux) | Windows 10 / 11 (64-bit) native Tauri v2 app                             |
+| Grid, `Ctrl+Space` autocomplete, `XLS-001…011` linter, Choices drawer, languages | Full client-side support                   | Full offline support                                                     |
+| File open & save                                                                 | Browser file picker & `.xlsx` download     | Native OS dialogs, file associations, atomic saves & lock detection      |
+| Autosave / crash recovery                                                        | `localStorage` snapshot                    | On-disk recovery snapshot                                                |
+| Optional AI Assistant (`Ctrl+J`)                                                 | Omitted (no keys stored in browser)        | Included (BYOK in Windows Credential Manager + local Ollama / LM Studio) |
+
+---
+
+## Use on the Web (Browser)
+
+1. Open the hosted web app (or build/preview it locally with `pnpm build` /
+   `pnpm preview`).
+   - `/` shows the landing page with an interactive IDE showcase; click **Launch
+     Web Editor** (or visit `/app` / `/?app=1`) to jump straight into the editor.
+2. Open any `.xlsx` form or start from a blank workbook. All parsing, linting,
+   refactoring, and `.xlsx` export runs **100% client-side in browser memory** —
+   your survey files are never uploaded to a server.
+
+> Note: On the web version, **AI Assistant (`Ctrl+J`)** is intentionally omitted
+> so API keys are never persisted in browser storage. Use the Windows desktop
+> app if you want the BYOK or local Ollama / LM Studio assistant.
 
 ---
 
@@ -80,10 +109,11 @@ tired of Excel's blind spots:
 
 ---
 
-## Optional AI assistant (BYOK or local)
+## Optional AI assistant (Desktop only — BYOK or local)
 
-The editor works 100% without AI. If you want an assistant that understands your
-current XLSForm, press `Ctrl+J`:
+The core IDE works 100% without AI in both the browser and desktop editions. In
+the **Windows desktop app**, press `Ctrl+J` if you want an assistant that
+understands your current XLSForm:
 
 1. **Use your own API key (BYOK):** Paste a key and click **Save** — the app
    auto-detects the provider from the key prefix (`AIza…` Google Gemini,
@@ -112,13 +142,16 @@ current XLSForm, press `Ctrl+J`:
 
 ## Offline & privacy
 
-- **Zero telemetry and no background requests:** With Wi-Fi off, editing,
-  validation, refactoring, and local AI models all work. The only network calls
-  happen when _you_ send an AI prompt or click **Check for updates**.
-- **Keys stay in your OS credential store:** API keys are saved in Windows
-  Credential Manager (macOS Keychain / Linux Secret Service on source builds),
-  never in preferences files, crash recovery snapshots, logs, or frontend UI
-  state.
+- **Zero telemetry and no background requests:** In the desktop app with Wi-Fi
+  off, editing, validation, refactoring, and local AI models all work; the only
+  network calls happen when _you_ send an AI prompt or click **Check for
+  updates**. In the web app, `.xlsx` files are processed strictly in memory and
+  never leave your browser.
+- **Keys stay in your OS credential store:** Desktop BYOK API keys are saved in
+  Windows Credential Manager (macOS Keychain / Linux Secret Service on source
+  builds), never in preferences files, crash recovery snapshots, logs, or
+  frontend UI state. The web app omits AI altogether so keys are never stored
+  in browser storage.
 - **Scoped Rust proxy & WebView CSP:** The UI cannot make arbitrary external
   fetch requests; Rust injects the stored key only when calling the saved
   provider endpoint and refuses HTTP redirects.
@@ -144,20 +177,20 @@ pnpm tauri build    # installers under src-tauri/target/release/bundle
 
 ### Commands
 
-| Command                                      | Purpose                                          |
-| -------------------------------------------- | ------------------------------------------------ |
-| `pnpm dev`                                   | Vite dev server (browser preview; no native IPC) |
-| `pnpm tauri dev`                             | Native desktop app                               |
-| `pnpm build`                                 | Typecheck and build web assets                   |
-| `pnpm lint` / `pnpm typecheck` / `pnpm test` | Quality gates                                    |
-| `pnpm coverage`                              | Unit tests with the `src/core` ≥ 90% line gate   |
-| `pnpm format:check`                          | Prettier formatting check                        |
-| `pnpm bench:lint`                            | Linter benchmark (≤ 15 ms local median)          |
-| `pnpm bench:grid` / `pnpm bench:indexes`     | Grid projection / index benchmarks               |
-| `pnpm test:e2e`                              | Playwright flows with mocked Tauri IPC           |
-| `pnpm bindings` / `pnpm bindings:check`      | Regenerate / verify Specta bindings              |
-| `pnpm bump-version <x.y.z>`                  | Sync package / Tauri / Cargo versions            |
-| `pnpm fixtures`                              | Regenerate synthetic corpus and reference form   |
+| Command                                      | Purpose                                                           |
+| -------------------------------------------- | ----------------------------------------------------------------- |
+| `pnpm dev`                                   | Vite dev server (serves web landing page + `/app`; no native IPC) |
+| `pnpm tauri dev`                             | Native desktop app                                                |
+| `pnpm build`                                 | Typecheck and build deployable static web assets (`dist/`)        |
+| `pnpm lint` / `pnpm typecheck` / `pnpm test` | Quality gates                                                     |
+| `pnpm coverage`                              | Unit tests with the `src/core` ≥ 90% line gate                    |
+| `pnpm format:check`                          | Prettier formatting check                                         |
+| `pnpm bench:lint`                            | Linter benchmark (≤ 15 ms local median)                           |
+| `pnpm bench:grid` / `pnpm bench:indexes`     | Grid projection / index benchmarks                                |
+| `pnpm test:e2e`                              | Playwright flows with mocked Tauri IPC                            |
+| `pnpm bindings` / `pnpm bindings:check`      | Regenerate / verify Specta bindings                               |
+| `pnpm bump-version <x.y.z>`                  | Sync package / Tauri / Cargo versions                             |
+| `pnpm fixtures`                              | Regenerate synthetic corpus and reference form                    |
 
 Rust gates: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
 and `cargo test` (all with `--manifest-path src-tauri/Cargo.toml`).

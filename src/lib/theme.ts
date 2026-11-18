@@ -13,10 +13,30 @@ export function resolveDark(mode: ThemeMode): boolean {
   return mode === 'dark' || (mode === 'system' && systemPrefersDark());
 }
 
-/** Toggle Tailwind's `dark` class on the document root. */
+/** Toggle Tailwind's `dark` class on the document root without transition smear. */
 export function applyTheme(mode: ThemeMode): void {
   if (typeof document === 'undefined') return;
-  document.documentElement.classList.toggle('dark', resolveDark(mode));
+  const root = document.documentElement;
+  const nextDark = resolveDark(mode);
+  const changed = root.classList.contains('dark') !== nextDark;
+  if (!changed) return;
+
+  let style: HTMLStyleElement | null = null;
+  if (document.head && typeof requestAnimationFrame === 'function') {
+    style = document.createElement('style');
+    style.append(document.createTextNode('*,*::before,*::after{transition:none !important}'));
+    document.head.append(style);
+  }
+
+  root.classList.toggle('dark', nextDark);
+
+  if (style) {
+    void document.body?.offsetHeight;
+    const node = style;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => node.remove());
+    });
+  }
 }
 
 /** Reactive dark-mode flag, including system changes while the app runs. */

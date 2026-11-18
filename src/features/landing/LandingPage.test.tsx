@@ -57,14 +57,77 @@ describe('LandingPage', () => {
 
     await user.click(screen.getByTestId('showcase-step-3'));
     expect(screen.queryByTestId('showcase-autocomplete')).not.toBeInTheDocument();
-    expect(screen.getByTestId('showcase-active-cell')).toHaveTextContent("${water_source} = 'other'");
+    expect(screen.getByTestId('showcase-active-cell')).toHaveTextContent(
+      "${water_source} = 'other'",
+    );
     expect(screen.getByTestId('showcase-lint-pill')).toHaveTextContent(/0 Problems \(4 ms\)/);
 
     await user.click(screen.getByTestId('showcase-step-0'));
-    expect(within(screen.getByTestId('showcase-autocomplete')).getByText('water_source')).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId('showcase-autocomplete')).getByText('water_source'),
+    ).toBeInTheDocument();
 
     await user.click(screen.getByTestId('showcase-play-pause'));
     expect(screen.getByTestId('showcase-play-pause')).toHaveTextContent(/Pause/i);
+  });
+
+  it('catches XLS-004 typo on step 1, supports arrow-key tabs, and binds choice drawer clicks', async () => {
+    const user = userEvent.setup();
+    render(<LandingPage onLaunchApp={vi.fn()} />);
+
+    const tab0 = screen.getByTestId('showcase-step-0');
+    const tab1 = screen.getByTestId('showcase-step-1');
+    const tab3 = screen.getByTestId('showcase-step-3');
+
+    tab0.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(tab1).toHaveFocus();
+    expect(tab1).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByTestId('showcase-active-cell')).toHaveTextContent(
+      "${water_source} = 'othr'",
+    );
+    expect(screen.getByTestId('showcase-diagnostic')).toHaveTextContent(/XLS-004/);
+
+    await user.keyboard('{End}');
+    expect(tab3).toHaveFocus();
+    expect(screen.getByTestId('showcase-lint-pill')).toHaveTextContent(/0 Problems \(4 ms\)/);
+
+    await user.click(screen.getByTestId('showcase-choice-borehole'));
+    expect(screen.getByTestId('showcase-active-cell')).toHaveTextContent(
+      "${water_source} = 'borehole'",
+    );
+    expect(screen.getByTestId('showcase-lint-pill')).toHaveTextContent(/0 Problems \(4 ms\)/);
+  });
+
+  it('starts paused when prefers-reduced-motion is reduce and exposes a skip link', () => {
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: query === '(prefers-reduced-motion: reduce)',
+        media: query,
+        onchange: null,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+
+    try {
+      render(<LandingPage onLaunchApp={vi.fn()} />);
+      expect(screen.getByTestId('showcase-play-pause')).toHaveTextContent(/Play/i);
+      expect(screen.getByRole('link', { name: 'Skip to content' })).toHaveAttribute(
+        'href',
+        '#main-content',
+      );
+    } finally {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        value: originalMatchMedia,
+      });
+    }
   });
 
   it('invokes onLaunchApp from both header and hero CTA buttons', async () => {
