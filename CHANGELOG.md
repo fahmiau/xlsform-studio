@@ -4,9 +4,18 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
-## [1.0.0] — 2026-11-15
+## [1.0.0] — 2026-11-19
 
 ### Added
+
+- **Web App & Interactive Landing Page:** Hosted browser edition
+  (`xlsform-studio.pages.dev`) with client-side `.xlsx` open/save,
+  `localStorage` autosave and crash recovery, interactive IDE showcase on `/`,
+  and direct editor launch on `/app`.
+- **Cascading Choice Filter Picker & Direct Cell Typing:** Parent choice-list
+  resolution in `AddFilterColumnDialog`, inline parent-choice picker in
+  cascading filter cells, and type-to-start editing directly on selected grid
+  cells.
 
 - **AI BYOK assistant (Stage 6).** Provider registry as data (Gemini,
   Anthropic, OpenRouter, OpenAI, Groq, xAI, DeepSeek, Mistral, Ollama, LM

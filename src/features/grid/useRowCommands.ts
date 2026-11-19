@@ -53,7 +53,10 @@ function isDrawerContext(): boolean {
   if (!prefs.rightPanel || ui.rightTab !== 'choices') return false;
   if (typeof document !== 'undefined') {
     const activeEl = document.activeElement;
-    if (activeEl instanceof Element && activeEl.closest('[data-testid="choices-drawer"]') !== null) {
+    if (
+      activeEl instanceof Element &&
+      activeEl.closest('[data-testid="choices-drawer"]') !== null
+    ) {
       return true;
     }
   }
@@ -66,7 +69,9 @@ function insertDrawerChoices(position: 'above' | 'below', count: number): RowId[
   const data = useWorkbookStore.getState().data;
   const surveyRowId =
     ui.choiceDrawer.rowId ??
-    (ui.activeCell?.sheet === 'survey' ? ui.activeCell.rowId : ui.activeCells.survey?.rowId ?? null);
+    (ui.activeCell?.sheet === 'survey'
+      ? ui.activeCell.rowId
+      : (ui.activeCells.survey?.rowId ?? null));
   if (!surveyRowId) return [];
   const typeKey = findColumnKey(data.survey, 'type') ?? 'type';
   const surveyRow = data.survey.rows.find((row) => row.id === surveyRowId);
@@ -78,7 +83,9 @@ function insertDrawerChoices(position: 'above' | 'below', count: number): RowId[
   const labelKey = primaryLabelColumn(data.choices, data);
   const focusColumn = labelKey ?? nameKey;
 
-  const listRows = data.choices.rows.filter((row) => (row.cells[listKey] ?? '').trim() === listName);
+  const listRows = data.choices.rows.filter(
+    (row) => (row.cells[listKey] ?? '').trim() === listName,
+  );
   const listRowIds = new Set(listRows.map((row) => row.id));
   const selectedInList = ui.selectedRowIds.filter((id) => listRowIds.has(id));
   if (
@@ -140,7 +147,10 @@ function insertDrawerChoices(position: 'above' | 'below', count: number): RowId[
         const firstNewIndex = rows.findIndex((row) => row.id === createdIds[0]);
         if (firstNewIndex >= 0 && firstNewIndex !== targetAt) {
           const moved = rows.splice(firstNewIndex, createdIds.length);
-          const adjustedAt = Math.min(rows.length, targetAt > firstNewIndex ? targetAt - createdIds.length : targetAt);
+          const adjustedAt = Math.min(
+            rows.length,
+            targetAt > firstNewIndex ? targetAt - createdIds.length : targetAt,
+          );
           rows.splice(adjustedAt, 0, ...moved);
           working = { ...working, choices: { ...working.choices, rows } };
         }

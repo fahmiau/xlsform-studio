@@ -3,14 +3,111 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>xlsform-studio — Offline-First XLSForm IDE &amp; Validator</title>
+    <meta
+      name="description"
+      content="Author complex XLSForm (.xlsx) surveys for ODK, KoboToolbox, SurveyCTO, and CommCare with ${variable} autocomplete, <15ms XLS-001…011 validation, Choices drawer, and lossless Excel round-trip. Runs locally in your browser or offline on Windows."
+    />
+    <meta
+      name="keywords"
+      content="XLSForm, XLSForm IDE, XLSForm editor, XLSForm validator, XLSForm linter, ODK Collect, ODK Central, KoboToolbox, SurveyCTO, CommCare, xlsx form builder, survey authoring"
+    />
     <meta name="theme-color" content="#4338ca" />
+    <link rel="canonical" href="https://xlsform-studio.pages.dev/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="xlsform-studio" />
+    <meta property="og:url" content="https://xlsform-studio.pages.dev/" />
+    <meta
+      property="og:title"
+      content="xlsform-studio — Offline-First XLSForm IDE &amp; Validator"
+    />
+    <meta
+      property="og:description"
+      content="IDE intelligence for complex XLSForms: ${variable} autocomplete, <15ms XLS-001…011 validation, side-by-side Choices drawer, and lossless .xlsx round-trip."
+    />
+    <meta property="og:image" content="https://xlsform-studio.pages.dev/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="xlsform-studio IDE preview showing XLSForm formula autocomplete, real-time validation, and side-by-side Choices drawer"
+    />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="xlsform-studio — Offline-First XLSForm IDE &amp; Validator"
+    />
+    <meta
+      name="twitter:description"
+      content="Author complex XLSForms for ODK, KoboToolbox, SurveyCTO &amp; CommCare with ${variable} autocomplete, <15ms validation, Choices drawer, and lossless .xlsx round-trip."
+    />
+    <meta name="twitter:image" content="https://xlsform-studio.pages.dev/og-image.png" />
+
     <link rel="icon" href="/favicon.ico" sizes="32x32" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <title>xlsform-studio</title>
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "xlsform-studio",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Windows 10, Windows 11, Web Browser",
+        "url": "https://xlsform-studio.pages.dev/",
+        "downloadUrl": "https://github.com/fahmiau/xlsform-studio/releases/latest",
+        "softwareVersion": "1.0.0",
+        "license": "https://opensource.org/licenses/MIT",
+        "isAccessibleForFree": true,
+        "offers": {
+          "@type": "Offer",
+          "price": "0",
+          "priceCurrency": "USD"
+        },
+        "description": "Offline-first desktop and browser IDE for authoring XLSForm (.xlsx) surveys for ODK, KoboToolbox, SurveyCTO, and CommCare with formula autocomplete, real-time XLS-001 to XLS-011 validation, Choices drawer, and lossless .xlsx round-trip.",
+        "featureList": [
+          "Context-aware ${variable}, choice value, and ODK function autocomplete",
+          "Real-time XLS-001 to XLS-011 XLSForm validation in under 15ms",
+          "Side-by-side Choices drawer with auto-slugify and cascading filters",
+          "Token-aware rename refactoring across expressions in one undo step",
+          "Multilingual All, Single, and Side-by-side translation split views",
+          "Lossless .xlsx round-trip preserving custom columns, unmanaged sheets, and styling"
+        ]
+      }
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <noscript>
+        <main
+          style="
+            max-width: 760px;
+            margin: 48px auto;
+            padding: 0 20px;
+            font-family: system-ui, sans-serif;
+            line-height: 1.6;
+          "
+        >
+          <h1>xlsform-studio — Offline-First XLSForm IDE &amp; Validator</h1>
+          <p>
+            Author complex XLSForm (.xlsx) surveys for ODK, KoboToolbox, SurveyCTO, and CommCare
+            without Excel's blind spots: context-aware <code>${variable}</code> autocomplete,
+            &lt;15ms XLS-001…011 validation, side-by-side Choices drawer, safe rename refactoring,
+            multilingual views, and lossless .xlsx round-trip.
+          </p>
+          <p>
+            <a href="/app">Launch Web Editor (requires JavaScript)</a> ·
+            <a href="https://github.com/fahmiau/xlsform-studio/releases/latest"
+              >Download Windows Desktop App (.exe)</a
+            >
+            ·
+            <a href="https://github.com/fahmiau/xlsform-studio">GitHub Repository</a>
+          </p>
+        </main>
+      </noscript>
+    </div>
     <div id="portal"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

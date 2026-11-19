@@ -5,6 +5,10 @@ A fast, offline-first desktop and web IDE for [XLSForm](https://xlsform.org/)
 author forms in Excel for **ODK Collect / Central**, **KoboToolbox**,
 **SurveyCTO**, or **CommCare**.
 
+**Try in browser:** **[xlsform-studio.pages.dev](https://xlsform-studio.pages.dev/)**
+([Launch Web Editor](https://xlsform-studio.pages.dev/app)) · **Windows Desktop:**
+**[Latest Release (.exe)](https://github.com/fahmiau/xlsform-studio/releases/latest)**
+
 ---
 
 ## Who is this for?
@@ -45,10 +49,12 @@ tired of Excel's blind spots:
 
 ## Use on the Web (Browser)
 
-1. Open the hosted web app (or build/preview it locally with `pnpm build` /
-   `pnpm preview`).
-   - `/` shows the landing page with an interactive IDE showcase; click **Launch
-     Web Editor** (or visit `/app` / `/?app=1`) to jump straight into the editor.
+1. Open **[xlsform-studio.pages.dev](https://xlsform-studio.pages.dev/)** and
+   click **Launch Web Editor** (or go directly to
+   **[xlsform-studio.pages.dev/app](https://xlsform-studio.pages.dev/app)**, or
+   preview locally with `pnpm build` / `pnpm preview`).
+   - `/` shows the landing page with an interactive IDE showcase; `/app` and
+     `/?app=1` open the editor immediately.
 2. Open any `.xlsx` form or start from a blank workbook. All parsing, linting,
    refactoring, and `.xlsx` export runs **100% client-side in browser memory** —
    your survey files are never uploaded to a server.

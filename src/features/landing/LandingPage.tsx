@@ -114,6 +114,25 @@ const PLANS = [
   },
 ] as const;
 
+const FAQ = [
+  [
+    'How is this different from Excel or Google Sheets?',
+    'xlsform-studio is purpose-built for XLSForm (.xlsx) authoring: it validates XLS-001…011 rules in under 15ms, autocompletes ${variables}, choice names, and ODK XPath functions, and performs token-aware renames across every formula in one Ctrl+Z step.',
+  ],
+  [
+    'Which survey platforms are supported?',
+    'Forms authored here target ODK Collect / ODK Central, KoboToolbox, SurveyCTO, and CommCare. Your .xlsx workbook saves losslessly—preserving custom columns, unmanaged sheets, header text, and cell formatting.',
+  ],
+  [
+    'Are my survey files uploaded to a server?',
+    'No. In the browser editor at xlsform-studio.pages.dev/app, parsing, validation, refactoring, and .xlsx export run 100% locally in browser memory. The Windows desktop app works completely offline with zero telemetry.',
+  ],
+  [
+    'Should I use the Web App or Windows Desktop App?',
+    'Use the Web App on Windows, macOS, or Linux whenever you want instant zero-install XLSForm editing or validation. Use the Windows Desktop App for native file associations, disk crash recovery, Excel lock detection, and the optional BYOK or local Ollama AI assistant.',
+  ],
+] as const;
+
 function staggerStyle(step: number): CSSProperties {
   return { '--stagger': step } as CSSProperties;
 }
@@ -474,6 +493,26 @@ export function LandingPage({ onLaunchApp }: { onLaunchApp: () => void }) {
                       {securityNote}
                     </span>
                   </div>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          {/* Frequently Asked Questions */}
+          <section aria-label="Frequently Asked Questions">
+            <div className="max-w-2xl">
+              <h2 className="text-2xl leading-[1.2] font-bold tracking-[-0.015em] text-balance sm:text-[1.75rem]">
+                Frequently asked questions
+              </h2>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+              {FAQ.map(([question, answer]) => (
+                <article key={question} className="landing-surface bg-card rounded-xl p-6">
+                  <h3 className="text-[15px] leading-[1.35] font-semibold">{question}</h3>
+                  <p className="text-muted-foreground mt-2 text-sm leading-[1.6] text-pretty">
+                    {answer}
+                  </p>
                 </article>
               ))}
             </div>

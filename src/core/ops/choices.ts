@@ -679,11 +679,21 @@ export function resolveFilterParentList(
       const right = sig[i + 2];
       if (!left || !op || !right) continue;
       if (op.kind !== 'op' || (op.text !== '=' && op.text !== '!=')) continue;
-      if (left.kind === 'ident' && left.text === trimmedCol && right.kind === 'varRef' && right.name) {
+      if (
+        left.kind === 'ident' &&
+        left.text === trimmedCol &&
+        right.kind === 'varRef' &&
+        right.name
+      ) {
         const list = selectListByVar.get(right.name);
         if (list) return list;
       }
-      if (right.kind === 'ident' && right.text === trimmedCol && left.kind === 'varRef' && left.name) {
+      if (
+        right.kind === 'ident' &&
+        right.text === trimmedCol &&
+        left.kind === 'varRef' &&
+        left.name
+      ) {
         const list = selectListByVar.get(left.name);
         if (list) return list;
       }

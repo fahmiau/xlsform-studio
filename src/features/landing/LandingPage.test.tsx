@@ -39,6 +39,12 @@ describe('LandingPage', () => {
     expect(screen.getByTestId('download-desktop')).toHaveAttribute('href', RELEASE_URL);
     expect(screen.getByTestId('hero-download-desktop')).toHaveAttribute('href', RELEASE_URL);
     expect(screen.getByTestId('showcase-lint-pill')).toHaveTextContent(/XLS-004/);
+    expect(
+      screen.getByRole('heading', { level: 2, name: /Frequently asked questions/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { level: 3, name: /Which survey platforms are supported\?/i }),
+    ).toBeInTheDocument();
   });
 
   it('steps through relevant column variable and choice-list autocomplete in IdeShowcase', async () => {
@@ -162,6 +168,7 @@ describe('App routing', () => {
 
     expect(screen.getByTestId('landing-page')).toBeInTheDocument();
     expect(screen.queryByTestId('app-shell')).not.toBeInTheDocument();
+    expect(document.title).toContain('XLSForm IDE');
 
     await user.click(screen.getByTestId('landing-theme-toggle'));
     await user.click(screen.getByTestId('landing-theme-toggle'));

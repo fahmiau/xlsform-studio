@@ -95,7 +95,9 @@ export default function App() {
   const showEditor = tauri || isEditorRoute(route);
 
   useEffect(() => {
-    if (!showEditor) document.title = 'xlsform-studio';
+    if (!showEditor) {
+      document.title = 'xlsform-studio — Offline-First XLSForm IDE & Validator';
+    }
   }, [showEditor]);
 
   const launchApp = () => {

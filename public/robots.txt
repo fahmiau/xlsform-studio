@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://xlsform-studio.pages.dev/sitemap.xml
