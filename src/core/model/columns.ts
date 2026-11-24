@@ -130,6 +130,7 @@ const BASE_ALIASES: Record<string, ColumnBase> = {
   trigger: 'trigger',
   note: 'note',
   parameter: 'parameter',
+  parameters: 'parameter',
   style: 'style',
   version: 'version',
 };
@@ -157,7 +158,7 @@ const CANONICAL_HEADERS: Record<ColumnBase, string> = {
   audio: 'media::audio',
   video: 'media::video',
   note: 'note',
-  parameter: 'parameter',
+  parameter: 'parameters',
   style: 'style',
   form_title: 'form_title',
   form_id: 'form_id',
@@ -278,21 +279,7 @@ export function localizedHeader(base: ColumnBase, language: LanguageTag): string
   return `${CANONICAL_HEADERS[base]}::${label}`;
 }
 
-export const DEFAULT_SURVEY_COLUMNS: readonly ColumnKey[] = [
-  'type',
-  'name',
-  'label',
-  'hint',
-  'required',
-  'relevant',
-  'constraint',
-  'constraint_message',
-  'calculation',
-  'appearance',
-  'default',
-  'choice_filter',
-  'repeat_count',
-];
+export const DEFAULT_SURVEY_COLUMNS: readonly ColumnKey[] = ['type', 'name', 'label'];
 
 export const DEFAULT_CHOICES_COLUMNS: readonly ColumnKey[] = ['list_name', 'name', 'label'];
 
@@ -310,11 +297,21 @@ export const DEFAULT_SETTINGS_COLUMNS: readonly ColumnKey[] = [
  * any header the user types is accepted.
  */
 export const KNOWN_XLSFORM_COLUMNS: readonly ColumnKey[] = [
+  'hint',
+  'required',
+  'relevant',
+  'constraint',
+  'constraint_message',
+  'calculation',
+  'appearance',
+  'default',
+  'choice_filter',
+  'repeat_count',
+  'parameters',
   'required_message',
   'read_only',
   'trigger',
   'note',
-  'parameter',
   'style',
   'media::image',
   'media::audio',
@@ -324,15 +321,6 @@ export const KNOWN_XLSFORM_COLUMNS: readonly ColumnKey[] = [
   'bind::odk:length',
   'bind::odk:required',
   'bind::odk:relevant',
-  'choice_filter',
-  'repeat_count',
-  'appearance',
-  'default',
-  'constraint',
-  'constraint_message',
-  'calculation',
-  'relevant',
-  'hint',
   'label::English (en)',
   'label::French (fr)',
   'allow_choice_duplicates',

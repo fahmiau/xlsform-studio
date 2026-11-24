@@ -93,7 +93,9 @@ describe('addLanguage (Task 5.5)', () => {
   });
 
   it('converts unsuffixed columns instead of adding parallels', () => {
-    const result = addLanguage(workbook(), {
+    const data = workbook();
+    data.survey.columns.push('hint', 'constraint_message');
+    const result = addLanguage(data, {
       name: 'Indonesian',
       code: 'id',
       convertDefault: true,

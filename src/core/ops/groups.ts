@@ -5,7 +5,7 @@
 import { produce } from 'immer';
 
 import { buildGroupTree, type GroupNode } from '../indexes/groupTree';
-import { columnKey } from '../indexes/columns';
+import { columnKey, findColumnKey } from '../indexes/columns';
 import { newRowId } from '../model/factory';
 import { parseType } from '../model/parseType';
 import type { Row, RowId, SheetData, WorkbookData } from '../model/types';
@@ -124,6 +124,9 @@ export function wrapSelection(
   const rowId = newRowId();
 
   const next = produce(data, (draft) => {
+    if (kind === 'repeat' && !findColumnKey(draft.survey, 'repeat_count')) {
+      draft.survey.columns.push('repeat_count');
+    }
     const rows = draft.survey.rows;
     const begin: Row = {
       id: rowId,

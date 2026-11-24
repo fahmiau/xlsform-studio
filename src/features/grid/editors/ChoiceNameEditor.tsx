@@ -1,5 +1,5 @@
 /** Manual choice-name editor (Task 3.4); committing marks the row locked. */
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import type { ProvideEditorComponent } from '@glideapps/glide-data-grid';
 
 import { makeChoiceNameCell, type ChoiceNameCell } from '../cells/ChoiceNameCell';
@@ -20,17 +20,22 @@ export function ChoiceNameEditor({
 }: EditorProps) {
   const isDirectType = initialValue !== undefined;
   const [draft, setDraft] = useDirectTypeInitialState(initialValue, value.data.value);
+  const [focusTick, setFocusTick] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const userEdited = useRef(false);
 
   const makeCell = (text: string) =>
     makeChoiceNameCell({ ...value.data, value: text, locked: text.trim() !== '' });
 
-  useFocusInputOnMount(inputRef, isDirectType);
+  useFocusInputOnMount(inputRef, isDirectType, focusTick);
 
   useConsumeDirectType((pending) => {
     const initialText = pending?.text ?? initialValue;
     if (initialText !== undefined && !userEdited.current) {
+      if (pending && pending.text !== draft) {
+        setDraft(pending.text);
+        setFocusTick((tick) => tick + 1);
+      }
       onChange(makeCell(initialText));
     }
     if (!pending?.trailingAction) return;

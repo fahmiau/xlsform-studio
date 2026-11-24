@@ -127,4 +127,20 @@ describe('uiStore', () => {
     expect(selectIsDirty(useWorkbookStore.getState())).toBe(false);
     expect(useWorkbookStore.temporal.getState().pastStates).toHaveLength(0);
   });
+
+  it('stores customizable frozen column count per sheet outside the document', () => {
+    const dataBefore = useWorkbookStore.getState().data;
+    useUiStore.getState().setFrozenColumns('survey', 0);
+    useUiStore.getState().setFrozenColumns('choices', 2);
+
+    expect(useUiStore.getState().frozenColumns).toMatchObject({
+      survey: 0,
+      choices: 2,
+    });
+    useUiStore.getState().setFrozenColumns('survey', -5);
+    expect(useUiStore.getState().frozenColumns.survey).toBe(0);
+    expect(useWorkbookStore.getState().data).toBe(dataBefore);
+    expect(selectIsDirty(useWorkbookStore.getState())).toBe(false);
+    expect(useWorkbookStore.temporal.getState().pastStates).toHaveLength(0);
+  });
 });

@@ -7,6 +7,7 @@ import { deleteRows, duplicateRows, insertRows } from './rows';
 
 function workbookWithRows() {
   const data = createEmptyWorkbook();
+  data.survey.columns.push('hint');
   data.survey.rows.push(
     createRow({ type: 'text', name: 'q1', label: 'One' }),
     createRow({ type: 'integer', name: 'q2', label: 'Two' }),

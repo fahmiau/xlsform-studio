@@ -169,7 +169,8 @@ const CASES: Case[] = [
     role: 'content',
   },
   { header: 'note', base: 'note', canonical: 'note', role: 'content' },
-  { header: 'parameter', base: 'parameter', canonical: 'parameter', role: 'logic' },
+  { header: 'parameter', base: 'parameter', canonical: 'parameters', role: 'logic' },
+  { header: 'parameters', base: 'parameter', canonical: 'parameters', role: 'logic' },
   { header: 'style', base: 'style', canonical: 'style', role: 'presentation' },
   {
     header: 'form_title',
@@ -330,8 +331,8 @@ describe('parseLanguageTag', () => {
 });
 
 describe('column presets and helpers', () => {
-  it('uses the PRD default presets', () => {
-    expect(DEFAULT_SURVEY_COLUMNS).toContain('repeat_count');
+  it('uses the minimal 3-column default survey preset', () => {
+    expect(DEFAULT_SURVEY_COLUMNS).toEqual(['type', 'name', 'label']);
     expect(DEFAULT_CHOICES_COLUMNS).toEqual(['list_name', 'name', 'label']);
     expect(DEFAULT_SETTINGS_COLUMNS).toContain('instance_name');
     for (const column of DEFAULT_SURVEY_COLUMNS) {

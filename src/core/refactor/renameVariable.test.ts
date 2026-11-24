@@ -13,6 +13,15 @@ import {
 function workbook(): WorkbookData {
   const data = createEmptyWorkbook();
   data.survey.columns.push(
+    'hint',
+    'required',
+    'relevant',
+    'constraint',
+    'constraint_message',
+    'calculation',
+    'default',
+    'choice_filter',
+    'repeat_count',
     'required_message',
     'trigger',
     'label::English (en)',

@@ -14,6 +14,7 @@ function row(id: string, cells: Record<string, string> = {}): Row {
 
 function workbook(): WorkbookData {
   const data = createEmptyWorkbook();
+  data.survey.columns.push('relevant', 'calculation');
   data.survey.rows = [
     row('s1', { type: 'text', name: 'q1' }),
     row('s2', { type: 'text', name: 'q2', relevant: '${q3}' }),
@@ -118,6 +119,7 @@ describe('lint runner (Task 4.7)', () => {
 
   it('returns no diagnostics for a clean workbook', () => {
     const data = createEmptyWorkbook();
+    data.survey.columns.push('calculation');
     data.survey.rows = [
       row('s1', { type: 'text', name: 'q1', label: 'Question 1' }),
       row('s2', { type: 'select_one yes_no', name: 'q2', label: 'Question 2' }),

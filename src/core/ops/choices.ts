@@ -5,9 +5,9 @@
 import { produce } from 'immer';
 
 import { buildGroupTree } from '../indexes/groupTree';
-import { columnKey } from '../indexes/columns';
+import { columnKey, findColumnKey } from '../indexes/columns';
 import { primaryLabelColumn } from '../languages/discover';
-import { resolveColumn } from '../model/columns';
+import { resolveColumn, type ColumnBase } from '../model/columns';
 import { newRowId } from '../model/factory';
 import { formatType, parseType } from '../model/parseType';
 import type { ColumnKey, Row, RowId, WorkbookData } from '../model/types';
@@ -34,6 +34,13 @@ const SELECT_LIST_BASES: ReadonlySet<string> = new Set([
 ]);
 
 export const DEFAULT_LIST_NAME_PATTERN = '{name}';
+
+/** Survey column auto-added when a question type requires it. */
+const TYPE_AUTO_COLUMNS: Readonly<Record<string, { base: ColumnBase; header: ColumnKey }>> = {
+  calculate: { base: 'calculation', header: 'calculation' },
+  begin_repeat: { base: 'repeat_count', header: 'repeat_count' },
+  range: { base: 'parameter', header: 'parameters' },
+};
 
 function listNameKey(data: WorkbookData): ColumnKey {
   return columnKey(data.choices, 'list_name');
@@ -150,6 +157,11 @@ export function applyTypeChange(
       ? [{ rowId: surveyRowId, column: nameKey, value: nextName }]
       : []),
   ]);
+
+  const autoColumn = TYPE_AUTO_COLUMNS[parsed.base];
+  if (autoColumn && !findColumnKey(next.survey, autoColumn.base)) {
+    next = addColumn(next, 'survey', autoColumn.header);
+  }
 
   // Pair consistency: begin_group ↔ begin_repeat updates the existing end row.
   const before = buildGroupTree(data.survey);
@@ -525,11 +537,11 @@ export function addFilterColumn(
   let scaffolded = false;
   const next = produce(data, (draft) => {
     if (!exists) draft.choices.columns.push(trimmed);
+    const filterKey = columnKey(draft.survey, 'choice_filter');
+    if (!draft.survey.columns.includes(filterKey)) draft.survey.columns.push(filterKey);
     if (!options.surveyRowId || !options.parentName) return;
     const row = draft.survey.rows.find((candidate) => candidate.id === options.surveyRowId);
     if (!row) return;
-    const filterKey = columnKey(draft.survey, 'choice_filter');
-    if (!draft.survey.columns.includes(filterKey)) draft.survey.columns.push(filterKey);
     const expression = `${trimmed} = \${${options.parentName}}`;
     const existing = (row.cells[filterKey] ?? '').trim();
     if (!existing) {

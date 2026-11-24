@@ -14,7 +14,7 @@ describe('factory', () => {
     expect(workbook.survey.rows).toEqual([]);
     expect(workbook.choices.rows).toEqual([]);
     expect(workbook.settings.rows).toHaveLength(1);
-    expect(workbook.survey.columns).toContain('type');
+    expect(workbook.survey.columns).toEqual(['type', 'name', 'label']);
     expect(workbook.choices.columns).toEqual(['list_name', 'name', 'label']);
     expect(workbook.settings.columns).toEqual([...DEFAULT_SETTINGS_COLUMNS]);
   });

@@ -6,6 +6,7 @@ import { applyCellEdits, applyListMode } from './cellEditPipeline';
 
 function workbook(): WorkbookData {
   const data = createEmptyWorkbook();
+  data.survey.columns.push('relevant', 'constraint');
   data.survey.rows.push(
     createRow({
       type: 'select_one marital_status',

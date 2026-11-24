@@ -162,6 +162,25 @@ describe('buildDisplayColumns with a session order (Category C4)', () => {
     const hint = display.columns.find((column) => 'id' in column && column.id === 'hint');
     expect(hint && 'title' in hint ? hint.title : undefined).toBe('Hint text');
   });
+
+  it('supports customizable frozenDataCount including unfreezing all data columns', () => {
+    const unfrozen = buildDisplayColumns(sheet(columns), SURVEY_GRID_CONFIG, {
+      frozenDataCount: 0,
+    });
+    expect(unfrozen.keys).toEqual(columns);
+    expect(unfrozen.frozenCount).toBe(1);
+
+    const twoFrozen = buildDisplayColumns(sheet(columns), SURVEY_GRID_CONFIG, {
+      frozenDataCount: 2,
+    });
+    expect(twoFrozen.keys).toEqual(columns);
+    expect(twoFrozen.frozenCount).toBe(3);
+
+    const clamped = buildDisplayColumns(sheet(columns), SURVEY_GRID_CONFIG, {
+      frozenDataCount: 99,
+    });
+    expect(clamped.frozenCount).toBe(1 + columns.length);
+  });
 });
 
 describe('moveDisplayColumn (Category C4)', () => {

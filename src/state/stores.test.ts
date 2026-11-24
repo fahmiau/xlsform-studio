@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { setCells } from '@/core/ops/cells';
+import { addColumn } from '@/core/ops/columns';
 import { insertRows, type RowInsert } from '@/core/ops/rows';
 import { createEmptyWorkbook, createRow } from '@/core/model/factory';
 import { LINT_DEBOUNCE_MS, useDerivedStore } from './derivedStore';
@@ -38,7 +39,8 @@ describe('workbookStore history', () => {
     ];
 
     useWorkbookStore.getState().apply('Insert group block', (data) => {
-      const inserted = insertRows(data, 'survey', 0, rows);
+      const withHint = addColumn(data, 'survey', 'hint');
+      const inserted = insertRows(withHint, 'survey', 0, rows);
       const first = inserted.survey.rows[0];
       const second = inserted.survey.rows[1];
       if (!first || !second) return inserted;

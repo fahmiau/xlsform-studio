@@ -12,6 +12,7 @@ import { FormulaBar } from './FormulaBar';
 
 function loadForm(relevant = '') {
   const data = createEmptyWorkbook();
+  data.survey.columns.push('relevant');
   data.survey.rows = [
     { id: 's1', cells: { type: 'text', name: 'q1', label: 'Q1', relevant } },
     { id: 's2', cells: { type: 'integer', name: 'q2', label: 'Q2' } },

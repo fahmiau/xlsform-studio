@@ -211,3 +211,55 @@ test('settings columns reorder with only the gutter frozen', async ({ page }) =>
   await page.mouse.click(left(60), rowY);
   await expect(column).toHaveText('[Column: version]');
 });
+
+test('dragging the freeze handle unfreezes and refreezes columns like Google Sheets', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1920, height: 900 });
+  await mockTauri(page);
+  await openFixture(page);
+
+  const grid = page.getByTestId('sheet-grid-survey');
+  const canvas = grid.locator('canvas').first();
+  await canvas.waitFor();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('survey grid canvas has no layout box');
+
+  const handle = grid.getByTestId('freeze-column-handle');
+  await expect(handle).toBeVisible();
+  await expect(handle).toHaveAttribute('data-frozen-count', '3');
+
+  // Drag the freeze handle all the way left to the gutter edge to unfreeze all data columns.
+  const handleBox = await handle.boundingBox();
+  if (!handleBox) throw new Error('freeze handle has no layout box');
+  await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + GUTTER_WIDTH, handleBox.y + handleBox.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await expect(handle).toHaveAttribute('data-frozen-count', '0');
+
+  // Drag the unfrozen handle right to after `name` (2 columns frozen).
+  const unfrozenBox = await handle.boundingBox();
+  if (!unfrozenBox) throw new Error('unfrozen handle has no layout box');
+  const afterNameX = box.x + columnLeft('label');
+  await page.mouse.move(
+    unfrozenBox.x + unfrozenBox.width / 2,
+    unfrozenBox.y + unfrozenBox.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(afterNameX, unfrozenBox.y + unfrozenBox.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await expect(handle).toHaveAttribute('data-frozen-count', '2');
+
+  // Also drag the vertical body freeze divider left to 1 frozen column.
+  const divider = grid.getByTestId('freeze-column-divider');
+  await expect(divider).toBeVisible();
+  const dividerBox = await divider.boundingBox();
+  if (!dividerBox) throw new Error('freeze divider has no layout box');
+  const afterTypeX = box.x + columnLeft('name');
+  await page.mouse.move(dividerBox.x + dividerBox.width / 2, dividerBox.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(afterTypeX, dividerBox.y + 20, { steps: 10 });
+  await page.mouse.up();
+  await expect(handle).toHaveAttribute('data-frozen-count', '1');
+});

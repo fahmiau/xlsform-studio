@@ -124,4 +124,48 @@ describe('directTypeBuffer', () => {
     expect(onFinishedEditing).toHaveBeenCalledTimes(1);
     expect(onFinishedEditing).toHaveBeenCalledWith(expect.objectContaining({ data: 'ab' }), [0, 0]);
   });
+
+  it('reconciles keys buffered between initial render and commit in TextCellEditor', () => {
+    const controller = createDirectTypeController();
+    controller.start([2, 1], 'a');
+    controller.pushKey(keyEvent('g'));
+    controller.pushKey(keyEvent('e'));
+
+    let pushed = false;
+    function LateKeyPusher() {
+      if (!pushed) {
+        pushed = true;
+        for (const ch of '_direct') {
+          controller.pushKey(keyEvent(ch));
+        }
+      }
+      return null;
+    }
+
+    const onChange = vi.fn();
+    render(
+      <StrictMode>
+        <DirectTypeProvider controller={controller}>
+          <TextCellEditor
+            value={makeTextCell('a')}
+            initialValue="a"
+            onChange={onChange}
+            onFinishedEditing={vi.fn()}
+            isHighlighted={false}
+            target={{ x: 0, y: 0, width: 100, height: 34 }}
+            forceEditMode
+            theme={getDefaultTheme()}
+          />
+          <LateKeyPusher />
+        </DirectTypeProvider>
+      </StrictMode>,
+    );
+
+    const editor = screen.getByTestId('text-cell-editor') as HTMLTextAreaElement;
+    expect(editor.value).toBe('age_direct');
+    expect(editor.selectionStart).toBe('age_direct'.length);
+    expect(editor.selectionEnd).toBe('age_direct'.length);
+    expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ data: 'age_direct' }));
+    expect(controller.isActive()).toBe(false);
+  });
 });
