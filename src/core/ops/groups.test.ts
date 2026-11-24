@@ -94,6 +94,7 @@ describe('wrapSelection (Task 3.8)', () => {
     expect(suggestGroupName(data, 'group')).toBe('group_1_2');
     const wrapped = wrapSelection(data, 1, 1, 'repeat', { name: 'members' });
     expect(names(wrapped.data)).toEqual(['group_1', 'members', 'a', '']);
+    expect(wrapped.data.survey.columns).toContain('repeat_count');
   });
 
   it('rejects an unbalanced selection with an explanation', () => {

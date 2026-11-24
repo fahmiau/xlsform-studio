@@ -67,6 +67,9 @@ import { GRID_HEADER_HEIGHT, GRID_ROW_HEIGHT } from './geometry';
 import { buildGroupRails } from './groupRails';
 import { HeaderMenu, type HeaderMenuState } from './HeaderMenu';
 import { AddColumnDialog } from './AddColumnDialog';
+import { AddRowBar } from './AddRowBar';
+import { FreezeColumnHandle } from './FreezeColumnHandle';
+import { columnWidthsFromDisplay, computeAddRowBarTop } from './freezeHandle';
 import { computeRevealScrollTarget } from './revealScroll';
 import {
   buildProjection,
@@ -162,6 +165,7 @@ export function SheetGrid({
   const cellPreview = useUiStore((state) => state.cellPreview);
   const widths = useUiStore((state) => state.columnWidths[sheetName]);
   const storedOrder = useUiStore((state) => state.columnOrder[sheetName]);
+  const customFrozenColumns = useUiStore((state) => state.frozenColumns[sheetName]);
   const hidden = useUiStore((state) => state.hiddenColumns[sheetName]);
   const collapsedGroupIds = useUiStore((state) => state.collapsedGroupIds);
   const flashRowId = useUiStore((state) => state.flashRowId);
@@ -177,6 +181,12 @@ export function SheetGrid({
   const hostRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<DataEditorRef>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+  const [scrollRegion, setScrollRegion] = useState({
+    y: 0,
+    ty: 0,
+    clientWidth: 0,
+    clientHeight: 0,
+  });
   const uiGridSelection = useUiStore((state) => state.gridSelections[sheetName]);
   const [drawerGridSelection, setDrawerGridSelection] = useState<GridSelection | undefined>(
     undefined,
@@ -212,6 +222,7 @@ export function SheetGrid({
         : visibleColumns(sheetName, viewSheet.columns, languages, languageView),
     [columnKeys, languages, languageView, sheetName, viewSheet.columns],
   );
+  const allowCustomFreeze = !compact && languageView.mode !== 'split';
   const display = useMemo(
     () =>
       buildDisplayColumns(viewSheet, config, {
@@ -220,9 +231,27 @@ export function SheetGrid({
         // The drawer's explicit columnKeys are ordered by the caller.
         order: columnKeys ? undefined : storedOrder,
         ...(view ? { keys: view.columns, frozen: view.frozen } : {}),
+        ...(allowCustomFreeze && customFrozenColumns !== undefined
+          ? { frozenDataCount: customFrozenColumns }
+          : {}),
         ...(compact ? { gutterWidth: 48 } : {}),
       }),
-    [columnKeys, compact, config, hidden, storedOrder, view, viewSheet, widths],
+    [
+      allowCustomFreeze,
+      columnKeys,
+      compact,
+      config,
+      customFrozenColumns,
+      hidden,
+      storedOrder,
+      view,
+      viewSheet,
+      widths,
+    ],
+  );
+  const displayColumnWidths = useMemo(
+    () => columnWidthsFromDisplay(display.columns),
+    [display.columns],
   );
   const untranslated = useMemo(() => {
     if (!view || languageView.mode !== 'split') return new Set<string>();
@@ -999,6 +1028,45 @@ export function SheetGrid({
     [display, sheetName],
   );
 
+  const commitFreezeColumns = useCallback(
+    (nextDataCount: number) => {
+      const ui = useUiStore.getState();
+      // Preserve current visual order when customizing freeze on files whose
+      // headers were not originally in frozen-first order.
+      if (!ui.columnOrder[sheetName] && !columnKeys) {
+        const sameOrder =
+          display.keys.length === viewSheet.columns.length &&
+          display.keys.every((key, index) => key === viewSheet.columns[index]);
+        if (!sameOrder) ui.setColumnOrder(sheetName, display.keys);
+      }
+      ui.setFrozenColumns(sheetName, nextDataCount);
+    },
+    [columnKeys, display.keys, sheetName, viewSheet.columns],
+  );
+
+  const handleAddRowClick = useCallback(() => {
+    if (locked) return;
+    const targetCol = Math.min(1, display.keys.length);
+    if (gridRef.current) {
+      void gridRef.current.appendRow(targetCol, true);
+    } else {
+      void onRowAppended();
+    }
+  }, [display.keys.length, locked, onRowAppended]);
+
+  const handleAddRowWheel = useCallback((event: React.WheelEvent<HTMLButtonElement>) => {
+    const scroller = hostRef.current?.querySelector('.dvn-scroller');
+    if (!(scroller instanceof HTMLElement)) return;
+    scroller.scrollTop += event.deltaY;
+    scroller.scrollLeft += event.deltaX;
+  }, []);
+
+  const getHostRect = useCallback(() => hostRef.current?.getBoundingClientRect() ?? null, []);
+  const getScrollLeft = useCallback(() => {
+    const scroller = hostRef.current?.querySelector('.dvn-scroller');
+    return scroller instanceof HTMLElement ? scroller.scrollLeft : 0;
+  }, []);
+
   const handleSelectionChange = useCallback(
     (selection: GridSelection) => {
       directType.clear();
@@ -1121,6 +1189,27 @@ export function SheetGrid({
     [diagnosticIndex.byCell, display.keys, projection, sheet.rows],
   );
 
+  const effectiveViewportWidth =
+    scrollRegion.clientWidth > 0 &&
+    scrollRegion.clientWidth <= size.width &&
+    size.width - scrollRegion.clientWidth <= 24
+      ? scrollRegion.clientWidth
+      : size.width;
+  const effectiveViewportHeight =
+    scrollRegion.clientHeight > 0 &&
+    scrollRegion.clientHeight <= size.height &&
+    size.height - scrollRegion.clientHeight <= 24
+      ? scrollRegion.clientHeight
+      : size.height;
+  const bodyHeight = Math.max(0, effectiveViewportHeight - GRID_HEADER_HEIGHT);
+  const addRowTop = locked
+    ? null
+    : computeAddRowBarTop(rowCount, scrollRegion.y, scrollRegion.ty, GRID_ROW_HEIGHT, bodyHeight);
+  const dataBottomInBody = Math.max(
+    0,
+    (rowCount - scrollRegion.y) * GRID_ROW_HEIGHT + scrollRegion.ty,
+  );
+
   return (
     <div
       className="flex h-full min-h-0 flex-col"
@@ -1161,7 +1250,7 @@ export function SheetGrid({
 
       <div
         ref={hostRef}
-        className="relative min-h-0 flex-1"
+        className="relative isolate min-h-0 flex-1"
         onMouseDown={() => directType.clear()}
         onBlur={(event) => {
           const next = event.relatedTarget;
@@ -1190,7 +1279,7 @@ export function SheetGrid({
             onDelete={() => !locked}
             onPaste={onPaste}
             onFillPattern={onFillPattern}
-            onRowAppended={onRowAppended}
+            onRowAppended={locked ? undefined : onRowAppended}
             onRowMoved={compact ? onMoveRow : undefined}
             onGridSelectionChange={handleSelectionChange}
             gridSelection={gridSelection}
@@ -1282,10 +1371,34 @@ export function SheetGrid({
               const target = event.target;
               return !(target instanceof Element && target.closest('.cm-tooltip') !== null);
             }}
-            onVisibleRegionChanged={(region) => {
+            onVisibleRegionChanged={(region, _tx, ty) => {
               visibleRegionObjRef.current = region;
               hoverKey.current = null;
               setDiagnosticHover((current) => (current ? null : current));
+              const scroller = hostRef.current?.querySelector('.dvn-scroller');
+              const nextClientWidth =
+                scroller instanceof HTMLElement && scroller.clientWidth > 0
+                  ? scroller.clientWidth
+                  : 0;
+              const nextClientHeight =
+                scroller instanceof HTMLElement && scroller.clientHeight > 0
+                  ? scroller.clientHeight
+                  : 0;
+              const nextY = region.y;
+              const nextTy = ty ?? 0;
+              setScrollRegion((prev) =>
+                prev.y === nextY &&
+                prev.ty === nextTy &&
+                prev.clientWidth === nextClientWidth &&
+                prev.clientHeight === nextClientHeight
+                  ? prev
+                  : {
+                      y: nextY,
+                      ty: nextTy,
+                      clientWidth: nextClientWidth,
+                      clientHeight: nextClientHeight,
+                    },
+              );
               if (!restoredScrollRef.current) return;
               scrollMemory.set(compact ? `${sheetName}:drawer` : sheetName, {
                 col: region.x,
@@ -1313,10 +1426,8 @@ export function SheetGrid({
               locked
                 ? undefined
                 : {
-                    tint: true,
-                    // Zero-width space, not '': Glide only always-draws the plus
-                    // glyph when the hint is non-empty (new-row-cell.js).
-                    hint: '\u200B',
+                    tint: false,
+                    hint: '',
                     sticky: false,
                     targetColumn: Math.min(1, display.keys.length),
                   }
@@ -1341,6 +1452,27 @@ export function SheetGrid({
             smoothScrollY={true}
           />
         </DirectTypeProvider>
+        <AddRowBar
+          topInBody={addRowTop}
+          viewportWidth={effectiveViewportWidth}
+          bodyHeight={bodyHeight}
+          label={compact ? 'Add choice' : 'Add row'}
+          onAddRow={handleAddRowClick}
+          onWheel={handleAddRowWheel}
+        />
+        {allowCustomFreeze && effectiveViewportWidth > 0 && display.keys.length > 0 ? (
+          <FreezeColumnHandle
+            columnWidths={displayColumnWidths}
+            frozenCount={display.frozenCount}
+            maxDataColumns={display.keys.length}
+            viewportWidth={effectiveViewportWidth}
+            bodyHeight={bodyHeight}
+            dataBottomInBody={dataBottomInBody}
+            getHostRect={getHostRect}
+            getScrollLeft={getScrollLeft}
+            onCommit={commitFreezeColumns}
+          />
+        ) : null}
         {diagnosticHover ? (
           <div
             className="bg-popover text-popover-foreground border-border pointer-events-none absolute z-50 w-max rounded border px-2.5 py-1.5 text-[11px] leading-snug whitespace-normal break-words shadow-lg"

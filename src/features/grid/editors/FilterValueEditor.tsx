@@ -59,12 +59,14 @@ export function FilterValueEditor({
   const parentListName = value.data.parentListName ?? '';
   const options = useMemo(() => loadParentChoices(parentListName), [parentListName]);
   const [query, setQuery] = useDirectTypeInitialState(initialValue, '');
+  const [focusTick, setFocusTick] = useState(0);
   const [activeIndex, setActiveIndex] = useState(() => {
     if (isDirectType) return 0;
     const idx = options.findIndex((opt) => opt.name === value.data.value);
     return idx >= 0 ? idx : 0;
   });
   const inputRef = useRef<HTMLInputElement>(null);
+  const userEdited = useRef(false);
 
   const filteredChoices = useMemo(
     () => filterByFuzzy(query, options, (opt) => `${opt.name} ${opt.label}`),
@@ -79,9 +81,14 @@ export function FilterValueEditor({
     return items;
   }, [filteredChoices, query, value.data.value]);
 
-  useFocusInputOnMount(inputRef, true);
+  useFocusInputOnMount(inputRef, true, focusTick);
 
   useConsumeDirectType((pending) => {
+    if (pending && !userEdited.current && pending.text !== query) {
+      setQuery(pending.text);
+      setActiveIndex(0);
+      setFocusTick((tick) => tick + 1);
+    }
     if (!pending?.trailingAction) return;
     const movement = actionMovement(pending.trailingAction);
     if (!movement) {
@@ -163,6 +170,7 @@ export function FilterValueEditor({
         ref={inputRef}
         value={query}
         onValueChange={(next) => {
+          userEdited.current = true;
           setQuery(next);
           setActiveIndex(0);
         }}

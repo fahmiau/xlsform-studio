@@ -30,7 +30,7 @@ export function CellFormulaEditor({
   const fontSize = usePrefsStore((state) => state.formulaFontSize);
   const dark = useIsDark(theme);
   const cell = { sheet: 'survey' as const, rowId: value.data.rowId, column: value.data.column };
-  const [startDoc] = useDirectTypeInitialState(initialValue, value.data.value);
+  const [startDoc, setStartDoc] = useDirectTypeInitialState(initialValue, value.data.value);
   const userEdited = useRef(false);
 
   const update = (next: string) => makeXPathCell({ ...value.data, value: next });
@@ -44,6 +44,9 @@ export function CellFormulaEditor({
   useConsumeDirectType((pending) => {
     const initialDoc = pending?.text ?? startDoc;
     if (!userEdited.current) {
+      if (pending && pending.text !== startDoc) {
+        setStartDoc(pending.text);
+      }
       onChange(update(initialDoc));
     }
     if (!pending?.trailingAction) return;

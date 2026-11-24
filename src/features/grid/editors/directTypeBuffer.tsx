@@ -5,7 +5,6 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useLayoutEffect,
   useRef,
   useState,
@@ -162,7 +161,7 @@ export function useConsumeDirectType(
   useLayoutEffect(() => {
     callbackRef.current = onConsume;
   });
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (consumed.current) return;
     consumed.current = true;
     callbackRef.current(directType?.consume() ?? null);

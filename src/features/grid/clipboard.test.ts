@@ -10,6 +10,7 @@ const KEYS = ['type', 'name', 'label', 'relevant'];
 
 function workbook(rows: Array<Record<string, string>>): WorkbookData {
   const data = createEmptyWorkbook();
+  data.survey.columns.push('relevant');
   return insertRows(
     data,
     'survey',

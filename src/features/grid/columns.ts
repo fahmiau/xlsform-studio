@@ -75,6 +75,8 @@ export interface BuildDisplayColumnsOptions {
   keys?: readonly ColumnKey[];
   /** Frozen subset of `keys`, leftmost in this order. */
   frozen?: readonly ColumnKey[];
+  /** Explicit frozen data-column count (0 = unfrozen); overrides `frozen`/`config.frozenBases`. */
+  frozenDataCount?: number;
   /** Gutter width in px; the drawer keeps 48 next to Glide's row markers. */
   gutterWidth?: number;
 }
@@ -117,29 +119,37 @@ export function buildDisplayColumns(
     (key) => !hidden.has(key),
   );
 
-  const frozen: ColumnKey[] = [];
-  if (options.frozen) {
-    for (const key of options.frozen) {
-      if (available.includes(key) && !frozen.includes(key)) frozen.push(key);
-    }
+  let keys: ColumnKey[];
+  let frozenLength: number;
+  if (options.frozenDataCount !== undefined) {
+    keys = available;
+    frozenLength = Math.max(0, Math.min(Math.floor(options.frozenDataCount), keys.length));
   } else {
-    for (const base of config.frozenBases) {
-      const key = available.find(
-        (candidate) => resolveColumn(candidate).base === base && !frozen.includes(candidate),
-      );
-      if (key !== undefined) frozen.push(key);
+    const frozen: ColumnKey[] = [];
+    if (options.frozen) {
+      for (const key of options.frozen) {
+        if (available.includes(key) && !frozen.includes(key)) frozen.push(key);
+      }
+    } else {
+      for (const base of config.frozenBases) {
+        const key = available.find(
+          (candidate) => resolveColumn(candidate).base === base && !frozen.includes(candidate),
+        );
+        if (key !== undefined) frozen.push(key);
+      }
     }
-  }
 
-  // A session order may move columns inside the frozen block (e.g. name before
-  // type) but never past it; keys the order omits keep the config order.
-  if (options.order) {
-    const position = new Map(options.order.map((key, index) => [key, index]));
-    const at = (key: ColumnKey) => position.get(key) ?? Number.MAX_SAFE_INTEGER;
-    frozen.sort((a, b) => at(a) - at(b));
-  }
+    // A session order may move columns inside the frozen block (e.g. name before
+    // type) but never past it; keys the order omits keep the config order.
+    if (options.order) {
+      const position = new Map(options.order.map((key, index) => [key, index]));
+      const at = (key: ColumnKey) => position.get(key) ?? Number.MAX_SAFE_INTEGER;
+      frozen.sort((a, b) => at(a) - at(b));
+    }
 
-  const keys = [...frozen, ...available.filter((key) => !frozen.includes(key))];
+    keys = [...frozen, ...available.filter((key) => !frozen.includes(key))];
+    frozenLength = frozen.length;
+  }
 
   const columns: GridColumn[] = [
     {
@@ -157,7 +167,7 @@ export function buildDisplayColumns(
     }),
   ];
 
-  return { keys, columns, frozenCount: 1 + frozen.length, gutterIndex: 0 };
+  return { keys, columns, frozenCount: 1 + frozenLength, gutterIndex: 0 };
 }
 
 /** Header key for a display column, or `undefined` for the gutter. */

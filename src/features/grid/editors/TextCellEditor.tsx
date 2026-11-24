@@ -2,7 +2,7 @@
  * In-cell text editor (Step 3). Commits on Enter with `[0, 0]` movement so
  * focus stays on the edited cell instead of walking onto the trailing ghost row.
  */
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import {
   GridCellKind,
   type ProvideEditorComponent,
@@ -21,6 +21,7 @@ type EditorProps = Parameters<ProvideEditorComponent<TextCell>>[0];
 export function TextCellEditor({ value, initialValue, onChange, onFinishedEditing }: EditorProps) {
   const isDirectType = initialValue !== undefined;
   const [draft, setDraft] = useDirectTypeInitialState(initialValue, value.data ?? '');
+  const [focusTick, setFocusTick] = useState(0);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const userEdited = useRef(false);
 
@@ -31,13 +32,17 @@ export function TextCellEditor({ value, initialValue, onChange, onFinishedEditin
     displayData: text,
   });
 
-  useFocusInputOnMount(inputRef, isDirectType);
+  useFocusInputOnMount(inputRef, isDirectType, focusTick);
 
   // Seed Glide's overlay tempValue once on direct typing so outside clicks
   // commit the typed character instead of reverting to the previous text.
   useConsumeDirectType((pending) => {
     const initialText = pending?.text ?? initialValue;
     if (initialText !== undefined && !userEdited.current) {
+      if (pending && pending.text !== draft) {
+        setDraft(pending.text);
+        setFocusTick((tick) => tick + 1);
+      }
       onChange(makeCell(initialText));
     }
     if (!pending?.trailingAction) return;

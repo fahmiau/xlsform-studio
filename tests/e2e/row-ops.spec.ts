@@ -669,3 +669,68 @@ test('direct typing on frozen columns opens editor and Enter keeps focus on edit
   await expect(page.getByTestId('formula-bar-column')).toHaveText('[Column: name]');
   await expect(page.getByTestId('formula-bar-input')).toHaveValue('age_direct');
 });
+
+test('new workbook defaults to 3 columns, single full-width Add row works, and types auto-add columns', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1400, height: 800 });
+  await mockTauri(page);
+  await page.goto('/');
+
+  const grid = page.getByTestId('sheet-grid-survey');
+  await expect(grid).toContainText('3 columns');
+
+  // Click near the far right of the single full-width "+ Add row" bar.
+  const addRow = grid.getByTestId('add-row-button');
+  await expect(addRow).toBeVisible();
+  await expect(addRow).toHaveText('Add row');
+  const addBox = await addRow.boundingBox();
+  if (!addBox) throw new Error('add-row button has no layout box');
+  expect(addBox.width).toBeGreaterThan(600);
+  await page.mouse.click(addBox.x + addBox.width - 40, addBox.y + addBox.height / 2);
+
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (1)');
+  const typePopup = page.getByTestId('type-editor');
+  const typeEditor = page.getByTestId('type-editor-input');
+  await expect(typeEditor).toBeVisible();
+
+  // Regression: the question-type overlay (#portal) must paint above AddRowBar
+  // and FreezeColumnHandle where their bounds overlap.
+  const popupBox = await typePopup.boundingBox();
+  const nextAddBox = await addRow.boundingBox();
+  if (!popupBox || !nextAddBox) throw new Error('missing popup or add-row box');
+  const overlapX = popupBox.x + popupBox.width / 2;
+  const overlapY = nextAddBox.y + nextAddBox.height / 2;
+  expect(overlapY).toBeGreaterThan(popupBox.y);
+  expect(overlapY).toBeLessThan(popupBox.y + popupBox.height);
+  const hitInsidePopup = await page.evaluate(
+    ([x, y]) => document.elementFromPoint(x, y)?.closest('[data-testid="type-editor"]') !== null,
+    [overlapX, overlapY] as const,
+  );
+  expect(hitInsidePopup).toBe(true);
+
+  await typeEditor.fill('calculate');
+  await page.keyboard.press('Enter');
+  await expect(typeEditor).toHaveCount(0);
+  await expect(grid).toContainText('4 columns');
+
+  // Undo reverts both the type change and the auto-added `calculation` column in one step.
+  await page.keyboard.press('Control+z');
+  await expect(grid).toContainText('3 columns');
+
+  // Auto-add `parameters` for `range`, then `repeat_count` for `begin_repeat`.
+  await page.keyboard.press('Enter');
+  await expect(typeEditor).toBeVisible();
+  await typeEditor.fill('range');
+  await page.keyboard.press('Enter');
+  await expect(typeEditor).toHaveCount(0);
+  await expect(grid).toContainText('4 columns');
+
+  await addRow.click();
+  await expect(page.getByTestId('sheet-tab-survey')).toHaveText('survey (2)');
+  await expect(typeEditor).toBeVisible();
+  await typeEditor.fill('begin_repeat');
+  await page.keyboard.press('Enter');
+  await expect(typeEditor).toHaveCount(0);
+  await expect(grid).toContainText('5 columns');
+});

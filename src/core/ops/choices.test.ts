@@ -103,6 +103,30 @@ describe('type binding (Task 3.3)', () => {
     expect(typeOf(group, 1)).toBe('begin_group');
     expect(typeOf(group, 2)).toBe('end_group');
   });
+
+  it('auto-adds required survey columns for calculate, begin_repeat, and range', () => {
+    const data = workbook();
+    const rowId = data.survey.rows[1]!.id;
+    expect(data.survey.columns).toEqual(['type', 'name', 'label']);
+
+    const calc = applyTypeChange(data, rowId, 'calculate');
+    expect(calc.survey.columns).toContain('calculation');
+    expect(calc.survey.columns.filter((c) => c === 'calculation')).toHaveLength(1);
+
+    const repeat = applyTypeChange(data, rowId, 'begin_repeat');
+    expect(repeat.survey.columns).toContain('repeat_count');
+
+    const range = applyTypeChange(data, rowId, 'range');
+    expect(range.survey.columns).toContain('parameters');
+
+    // Existing aliases must not produce duplicate columns.
+    const withAlias: WorkbookData = {
+      ...data,
+      survey: { ...data.survey, columns: ['type', 'name', 'label', 'parameter'] },
+    };
+    const rangeAliased = applyTypeChange(withAlias, rowId, 'range');
+    expect(rangeAliased.survey.columns).toEqual(['type', 'name', 'label', 'parameter']);
+  });
 });
 
 describe('choice edits (Task 3.4)', () => {
@@ -316,8 +340,19 @@ describe('shared lists and filters (Task 3.6)', () => {
     expect(result.added).toBe(true);
     expect(result.scaffolded).toBe(true);
     expect(result.data.choices.columns).toContain('province_id');
+    expect(result.data.survey.columns).toContain('choice_filter');
     expect(result.data.survey.rows[0]?.cells.choice_filter).toBe('province_id = ${province}');
     expect(data.choices.columns).not.toContain('province_id');
+  });
+
+  it('auto-adds choice_filter to survey even without scaffolding a parent', () => {
+    const data = workbook();
+    expect(data.survey.columns).not.toContain('choice_filter');
+    const result = addFilterColumn(data, 'region_id');
+    expect(result.added).toBe(true);
+    expect(result.scaffolded).toBe(false);
+    expect(result.data.choices.columns).toContain('region_id');
+    expect(result.data.survey.columns).toContain('choice_filter');
   });
 
   it('only appends to an existing choice_filter after confirmation', () => {

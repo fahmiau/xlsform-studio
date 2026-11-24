@@ -116,9 +116,11 @@ export function TypeEditor({
   );
   const [pendingBase, setPendingBase] = useState(SELECT_BASES.has(parsed.base) ? parsed.base : '');
   const [query, setQuery] = useDirectTypeInitialState(initialValue, '');
+  const [focusTick, setFocusTick] = useState(0);
   const [activeIndex, setActiveIndex] = useState(0);
   const [orOther, setOrOther] = useState(parsed.orOther === true);
   const inputRef = useRef<HTMLInputElement>(null);
+  const userEdited = useRef(false);
 
   const types = useMemo(
     () =>
@@ -139,9 +141,14 @@ export function TypeEditor({
   const canCreate = step === 'list';
   const itemCount = step === 'type' ? types.length : visibleLists.length + (canCreate ? 1 : 0);
 
-  useFocusInputOnMount(inputRef, step === 'type' && isDirectType, step);
+  useFocusInputOnMount(inputRef, step === 'type' && isDirectType, `${step}:${focusTick}`);
 
   useConsumeDirectType((pending) => {
+    if (pending && !userEdited.current && pending.text !== query) {
+      setQuery(pending.text);
+      setActiveIndex(0);
+      setFocusTick((tick) => tick + 1);
+    }
     if (!pending?.trailingAction) return;
     const movement = actionMovement(pending.trailingAction);
     if (!movement) {
@@ -282,6 +289,7 @@ export function TypeEditor({
         ref={inputRef}
         value={query}
         onValueChange={(value) => {
+          userEdited.current = true;
           setQuery(value);
           setActiveIndex(0);
         }}

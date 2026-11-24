@@ -86,6 +86,8 @@ export interface UiState {
   columnWidths: Partial<Record<SheetTab, Record<ColumnKey, number>>>;
   /** Session-only display order per sheet (Category C4); file order is untouched. */
   columnOrder: Partial<Record<SheetTab, ColumnKey[]>>;
+  /** Session-only frozen data-column count per sheet (`undefined` = sheet default). */
+  frozenColumns: Partial<Record<SheetTab, number>>;
   /** View-only hidden columns (Task 2.6). */
   hiddenColumns: Partial<Record<SheetTab, Set<ColumnKey>>>;
   reveal: RevealRequest | null;
@@ -117,6 +119,7 @@ export interface UiState {
   setAddLanguageOpen: (open: boolean) => void;
   setColumnWidth: (sheet: SheetTab, column: ColumnKey, width: number) => void;
   setColumnOrder: (sheet: SheetTab, keys: readonly ColumnKey[]) => void;
+  setFrozenColumns: (sheet: SheetTab, count: number) => void;
   toggleColumnHidden: (sheet: SheetTab, column: ColumnKey) => void;
   showAllColumns: (sheet: SheetTab) => void;
   requestReveal: (
@@ -154,6 +157,7 @@ export const useUiStore = create<UiState>()((set) => ({
   addLanguageOpen: false,
   columnWidths: {},
   columnOrder: {},
+  frozenColumns: {},
   hiddenColumns: {},
   reveal: null,
   cellPreview: null,
@@ -234,6 +238,10 @@ export const useUiStore = create<UiState>()((set) => ({
     })),
   setColumnOrder: (sheet, keys) =>
     set((state) => ({ columnOrder: { ...state.columnOrder, [sheet]: [...keys] } })),
+  setFrozenColumns: (sheet, count) =>
+    set((state) => ({
+      frozenColumns: { ...state.frozenColumns, [sheet]: Math.max(0, Math.floor(count)) },
+    })),
   toggleColumnHidden: (sheet, column) =>
     set((state) => {
       const hidden = new Set(state.hiddenColumns[sheet] ?? []);

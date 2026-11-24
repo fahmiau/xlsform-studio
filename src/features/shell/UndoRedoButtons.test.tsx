@@ -11,6 +11,7 @@ import { redoWithReveal, undoWithReveal } from './UndoRedoButtons';
 
 function seedWorkbook() {
   const data = createEmptyWorkbook();
+  data.survey.columns.push('relevant');
   data.survey.rows = [
     createRow({ type: 'select_one yes_no', name: 'consent', label: 'Consent', relevant: '' }),
     createRow({ type: 'text', name: 'respondent', label: 'Respondent', relevant: '' }),
